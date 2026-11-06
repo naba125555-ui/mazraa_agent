@@ -122,9 +122,16 @@ class AgentApp extends ChangeNotifier {
       case 'case':result=obj(await read('/api/vet/cases/$id'));break;
       case 'prescription':result=obj(await read('/api/vet/prescriptions/$id',query:scoped()));break;
       case 'document':result=obj(await read('/api/agent/commercial/documents/$id/receipt',query:scoped()));break;
-      case 'pickup':result=obj(await read('/api/agent/pickup/requests/$id/custody-details',query:scoped()));break;
+      case 'pickup':
+        final request=(await all('/api/agent/pickup/requests',query:scoped())).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));
+        final movement=obj(await read('/api/agent/pickup/requests/$id/custody-details',query:scoped()));
+        result={...movement,...request,'movement':movement};break;
       case 'campaign':result=obj(await read('/api/agent/field/campaigns/$id/report'));break;
       case 'task':result=(await all('/api/agent/field/tasks')).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
+      case 'visit':
+        final tasks=await all('/api/agent/field/tasks');
+        final visits=[for(final task in tasks)for(final visit in maps(task['visits'])){...visit,'taskId':task['id'],'taskStatus':task['status']}];
+        result=visits.firstWhere((v)=>numId(v['id'])==id,orElse:()=>throw const Failure(404,''));break;
       case 'stock':result=(await all('/api/agent/commerce/inventory',query:scoped(),pageSize:100)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
       case 'proposal':result=(await all('/api/agent/marketplace/proposals')).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
       case 'transfer':result=(await all('/api/agent/commerce/transfers',query:scoped())).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
@@ -133,7 +140,7 @@ class AgentApp extends ChangeNotifier {
         final data=obj(await read('/api/agent/marketplace/auctions',query:scoped()));
         final auction=maps(data['auctions']).firstWhere((a)=>numId(a['id'])==id,orElse:()=>throw const Failure(404,''));
         final review=maps(data['reviews']).firstWhere((r)=>numId(r['relatedId'])==id,orElse:()=>{});
-        result={...auction,'review':review};break;
+        result={...auction,'version':review['version'],'review':review};break;
       default:throw const Failure(404,'');
     }
     _records[key]=result;return result;

@@ -13,10 +13,10 @@ class BrandLogo extends StatelessWidget{
 class BotanicalBackground extends StatelessWidget{
   const BotanicalBackground({super.key,required this.child});final Widget child;
   @override Widget build(BuildContext context)=>Stack(children:[
-    PositionedDirectional(bottom:0,start:-35,child:IgnorePointer(child:Opacity(opacity:.045,child:
-      SvgPicture.asset('assets/decorations/leaf_pattern.svg',width:230,height:310,fit:BoxFit.cover)))),
-    PositionedDirectional(top:120,end:-95,child:IgnorePointer(child:Opacity(opacity:.025,child:
-      Transform.rotate(angle:3.14,child:SvgPicture.asset('assets/decorations/leaf_pattern.svg',width:280,height:340,fit:BoxFit.cover))))),
+    PositionedDirectional(bottom:0,start:-35,child:IgnorePointer(child:Opacity(opacity:.32,child:
+      SvgPicture.asset('assets/decorations/leaf_pattern.svg',width:230,height:310,fit:BoxFit.cover,colorFilter:ColorFilter.mode(Theme.of(context).colorScheme.primary,BlendMode.srcIn))))),
+    PositionedDirectional(top:120,end:-95,child:IgnorePointer(child:Opacity(opacity:.20,child:
+      Transform.rotate(angle:3.14,child:SvgPicture.asset('assets/decorations/leaf_pattern.svg',width:280,height:340,fit:BoxFit.cover,colorFilter:ColorFilter.mode(Theme.of(context).colorScheme.primary,BlendMode.srcIn)))))),
     Positioned.fill(child:child),
   ]);
 }

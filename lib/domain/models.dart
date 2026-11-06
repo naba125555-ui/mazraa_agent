@@ -15,7 +15,7 @@ String str(Object? v) => v==null ? '' : '$v';
 Json payload(Json v) => obj(v['details'] ?? v['consultation'] ?? v);
 String titleOf(Json v) {
   final d=payload(v);
-  for(final k in ['title','name','documentNumber','batchNumber','subject']) {
+  for(final k in ['title','name','productName','documentNumber','batchNumber','subject','sku']) {
     final s=str(v[k]??d[k]); if(s.isNotEmpty) return s;
   }
   return '#${v['id']??v['productVariantId']??'—'}';
