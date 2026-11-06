@@ -52,7 +52,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver{
         NavigationDestination(icon:const Icon(Icons.assignment_outlined),selectedIcon:const Icon(Icons.assignment),label:context.tr('المهام','Tasks')),
         NavigationDestination(icon:const Icon(Icons.storefront_outlined),selectedIcon:const Icon(Icons.storefront),label:context.tr('تجارتي','Business')),
         NavigationDestination(icon:const Icon(Icons.person_outline),selectedIcon:const Icon(Icons.person),label:context.tr('حسابي','Account')),
-      ])));
+      ]))));
   }
 }
 class ScreenPage extends StatelessWidget{

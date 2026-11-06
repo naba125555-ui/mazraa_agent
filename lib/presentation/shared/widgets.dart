@@ -116,6 +116,13 @@ class Facts extends StatelessWidget{
       if(data[key]!=null&&data[key] is! Map&&data[key] is! List)Fact(key,data[key]),
   ]));
 }
+class RecordDetails extends StatelessWidget{
+  const RecordDetails(this.data,{super.key});final Json data;
+  @override Widget build(BuildContext context)=>Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[Facts(data),
+    for(final key in ['lines','items','batches'])if(maps(data[key]).isNotEmpty)...[
+      Heading(word(context,key)),for(final row in maps(data[key]))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(row))],
+  ]);
+}
 class BusyButton extends StatefulWidget{
   const BusyButton({super.key,required this.label,required this.run,this.icon=Icons.check});
   final String label;final Future<void> Function() run;final IconData icon;

@@ -62,6 +62,16 @@ class AgentApp extends ChangeNotifier {
     grantId=id;_records.clear();basket.clear();sale={};revision++;notifyListeners();}
   void changed(){revision++;_records.clear();notifyListeners();}
   Future<dynamic> read(String path,{Json? query})=>repo.read(path,query:query);
+  Future<List<Json>> changes()async{
+    final byId=<int,Json>{};Json cursor={};
+    for(var page=0;page<200;page++){
+      final response=obj(await read('/api/agent/mobile/changes',query:cursor));
+      for(final row in maps(response['changes'])){final id=numId(row['id']);if(row['revoked']==true){byId.remove(id);}else{byId[id]=row;}}
+      if(response['hasMore']!=true||response['next']==null)break;
+      final next=obj(response['next']);if(jsonEncode(next)==jsonEncode(cursor))break;cursor=next;
+    }
+    return byId.values.toList();
+  }
   Future<List<Json>> all(String path,{Json? query,int pageSize=50})async{
     final result=<Json>[];var after=0;
     for(var page=0;page<200;page++){

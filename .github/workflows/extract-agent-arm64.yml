@@ -94,6 +94,8 @@ jobs:
             android/gradlew
             android/gradlew.bat
             android/gradle/wrapper/gradle-wrapper.jar
+            lib/
+            test/
           if-no-files-found: warn
           compression-level: 9
           retention-days: 14

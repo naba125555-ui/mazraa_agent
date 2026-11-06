@@ -27,7 +27,10 @@ class BusinessPage extends StatelessWidget{
     if(screen=='N05')return const AccountStatement();
     if(screen=='N06')return _RemoteList('/api/agent/finance/journals',query:app.scoped());
     if(screen=='I05')return const StockAlerts();
-    if(screen=='I10')return _RemoteList('/api/agent/mobile/changes',query:const {},arrayKey:'changes',filter:(r)=>r['kind']=='StockCount');
+    if(screen=='I10')return Resource(load:app.changes,builder:(data,r)=>PageBody(children:[
+      Notice(context.tr('تُعتمد فروق الجرد بواسطة مراجع مستقل. تتحدث الحالة من سجل العمليات.','Stock differences require an independent reviewer. Status follows the operation record.')),
+      const SizedBox(height:14),for(final row in rows(data).where((r)=>r['kind']=='StockCount'))RecordTile(row),
+    ]));
     if(screen=='G02')return OperationPage(embedded:true,operation:operations['proposal']!);
     if(screen=='I09')return OperationPage(embedded:true,operation:operations['stockCount']!);
     if(screen=='I07')return PageBody(children:[
@@ -69,7 +72,7 @@ class BusinessPage extends StatelessWidget{
       FilledButton.icon(onPressed:()=>openOperation(context,'quote'),icon:const Icon(Icons.add),label:Text(context.tr('عرض سعر جديد','New quotation'))),
       Heading(context.tr('عروضي','My quotations')),
       _EmbeddedRecords(load:()async{
-        final changes=maps(obj(await app.read('/api/agent/mobile/changes'))['changes']).where((v)=>v['kind']=='SaleQuote');
+        final changes=(await app.changes()).where((v)=>v['kind']=='SaleQuote');
         return Future.wait(changes.map((c)=>app.read('/api/agent/commercial/quotes/${c['id']}')));
       }),
     ]);
@@ -185,13 +188,15 @@ class _RemoteList extends StatelessWidget{
   final bool Function(Json)? filter;final void Function(Json)? onTap;
   @override Widget build(BuildContext context)=>Resource(load:()=>context.app.read(path,query:query),builder:(data,refresh){
     final list=(arrayKey==null?rows(data):maps(obj(data)[arrayKey])).where((r)=>filter?.call(r)??true).toList();
-    return PageBody(children:[if(list.isEmpty)const Empty(),for(final row in list)Padding(padding:const EdgeInsets.only(bottom:12),child:onTap==null?Facts(payload(row)):RecordTile(row,onTap:()=>onTap!(row)))]);
+    return PageBody(children:[if(list.isEmpty)const Empty(),for(final row in list)Padding(padding:const EdgeInsets.only(bottom:12),child:onTap==null?RecordDetails(payload(row)):RecordTile(row,onTap:()=>onTap!(row)))]);
   });
 }
 class _EmbeddedRecords extends StatelessWidget{
   const _EmbeddedRecords({super.key,required this.load});final Future<dynamic> Function() load;
-  @override Widget build(BuildContext context)=>Resource(load:load,builder:(data,refresh)=>Column(children:[if(rows(data).isEmpty)const Empty(),
-    for(final row in rows(data))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(payload(row)))]));
+  @override Widget build(BuildContext context)=>Resource(load:load,builder:(data,refresh)=>Column(children:[
+    if(data is Map)RecordDetails(payload(obj(data))),
+    if(rows(data).isEmpty&&data is! Map)const Empty(),
+    for(final row in rows(data))Padding(padding:const EdgeInsets.only(bottom:10),child:RecordDetails(payload(row)))]));
 }
 
 class CodeCard extends StatelessWidget{

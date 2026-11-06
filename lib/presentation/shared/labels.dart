@@ -2,6 +2,17 @@ import 'package:flutter/material.dart';
 import 'scope.dart';
 
 const words=<String,List<String>>{
+  'committed':['تم اعتماد العملية','Operation committed'],'requestId':['مرجع العملية','Operation reference'],
+  'items':['الأصناف','Items'],'lines':['البنود','Lines'],'batches':['الدفعات','Batches'],
+  'photoMediaIds':['صور المعروض','Lot photos'],'type':['النوع','Type'],
+  'licenseNumber':['رقم الترخيص','License number'],'jurisdiction':['بلد الترخيص','Jurisdiction'],
+  'specialty':['التخصص','Specialty'],'licenseExpiresAt':['انتهاء الترخيص','License expiry'],
+  'isApproved':['معتمد','Approved'],'isAvailable':['متاح','Available'],'reviewedAt':['تاريخ المراجعة','Reviewed at'],
+  'opening':['رصيد بداية الوردية','Opening balance'],'expectedClosing':['الرصيد المتوقع','Expected closing balance'],
+  'openedAt':['بداية الوردية','Opened at'],'closedAt':['إقفال الوردية','Closed at'],
+  'discount':['الخصم','Discount'],'tax':['الضريبة','Tax'],'scheduledDate':['موعد المهمة','Task date'],
+  'damage':['تلف','Damage'],'refused':['رفض الاستلام','Refused'],'uncollected':['لم يُستلم','Uncollected'],
+  'return-to-source':['إرجاع للمصدر','Return to source'],'remarks':['ملاحظات','Remarks'],
   'email':['البريد الإلكتروني','Email'],'phone':['رقم الهاتف','Phone'],
   'firstName':['الاسم الأول','First name'],'lastName':['الاسم الأخير','Last name'],
   'currentPassword':['كلمة المرور الحالية','Current password'],'newPassword':['كلمة المرور الجديدة','New password'],
