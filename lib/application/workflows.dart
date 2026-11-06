@@ -78,8 +78,8 @@ const operations=<String,Operation>{
     InputSpec('lines',kind:InputKind.lines,mode:'count'),reason],scope:true,cap:16),
   'sale':Operation('sale','ترحيل البيع','Post sale','/api/agent/commerce/documents',[
     InputSpec('partyId',kind:InputKind.reference,source:'customers'),stockLines,
-    InputSpec('paymentMethod',kind:InputKind.choice,options:['Cash','BankTransfer','Wallet']),
-    InputSpec('paidAmount',kind:InputKind.number),InputSpec('discountPercent',kind:InputKind.number,initial:0),
+    InputSpec('paymentMethod',kind:InputKind.choice,options:['Cash','BankTransfer','Credit']),
+    InputSpec('paidAmount',kind:InputKind.number,required:false),InputSpec('discountPercent',kind:InputKind.number,initial:0),
     InputSpec('bankReference',required:false),InputSpec('quoteId',kind:InputKind.integer,required:false)],scope:true,cap:34,constants:{'purchase':false}),
   'quote':Operation('quote','إرسال عرض السعر','Send quotation','/api/agent/commercial/quotes',[
     InputSpec('partyId',kind:InputKind.reference,source:'customers'),stockLines,

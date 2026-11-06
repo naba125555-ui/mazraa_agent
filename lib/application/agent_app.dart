@@ -17,7 +17,7 @@ class AgentApp extends ChangeNotifier {
   String language='ar',theme='system';bool starting=true,loading=false;
   Object? accessError;
   Json bootstrap={},profile={},summary={},user={};
-  Access access=const Access();int? grantId;int revision=0;
+  Access access=const Access();int? grantId;int revision=0,refreshTick=0;
   final List<Json> basket=[];Json sale={},auctionDraft={},prescriptionDraft={};
   final Map<String,Json> _records={};
   bool get signedIn=>repo.session!=null;
@@ -47,9 +47,14 @@ class AgentApp extends ChangeNotifier {
       final result=await Future.wait([repo.read('/api/agent/mobile/bootstrap'),repo.read('/api/agent/me'),
         repo.read('/api/agent/operations/home'),repo.read('/api/users/me')]);
       if(repo.epoch!=epoch)return;
+      final previousAuthority=jsonEncode({'doctor':bootstrap['doctorApproved'],'dispenser':bootstrap['dispensingApproved'],'delegations':bootstrap['delegations']});
+      final nextBootstrap=obj(result[0]);
+      final nextAuthority=jsonEncode({'doctor':nextBootstrap['doctorApproved'],'dispenser':nextBootstrap['dispensingApproved'],'delegations':nextBootstrap['delegations']});
       bootstrap=obj(result[0]);profile=obj(result[1]);summary=obj(result[2]);user=obj(result[3]);access=Access.from(bootstrap,summary);
       if(!access.grants.any((g)=>g.id==grantId&&g.active))grantId=access.grants.where((g)=>g.active).firstOrNull?.id;
-      _records.clear();revision++;
+      // Background polling must not replace an in-progress form with a spinner.
+      if(previousAuthority!=nextAuthority){_records.clear();revision++;}
+      refreshTick++;
     }catch(e){if(repo.epoch==epoch)accessError=e;rethrow;}
     finally{if(repo.epoch==epoch){loading=false;notifyListeners();}}
   }

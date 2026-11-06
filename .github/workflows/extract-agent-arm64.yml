@@ -31,12 +31,32 @@ jobs:
         run: |
           echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
           echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+      - name: Preserve SDK even when verification needs correction
+        id: sdk
+        uses: actions/cache@v5
+        with:
+          path: /opt/hostedtoolcache/flutter/stable-3.47.8-x64
+          key: mazraa-agent-sdk-linux-3.47.8
+          save-always: true
       - name: Restore cached Flutter SDK
+        if: steps.sdk.outputs.cache-hit != 'true'
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.8'
           channel: stable
           cache: true
+      - name: Select cached SDK and package cache
+        run: |
+          echo 'FLUTTER_ROOT=/opt/hostedtoolcache/flutter/stable-3.47.8-x64/flutter' >> "$GITHUB_ENV"
+          echo '/opt/hostedtoolcache/flutter/stable-3.47.8-x64/flutter/bin' >> "$GITHUB_PATH"
+          echo "PUB_CACHE=$HOME/.pub-cache" >> "$GITHUB_ENV"
+      - name: Preserve resolved packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: mazraa-agent-pub-linux-3.47.8-${{ hashFiles('pubspec.lock', 'pubspec.yaml') }}
+          restore-keys: mazraa-agent-pub-linux-3.47.8-
+          save-always: true
       - name: Restore Gradle dependencies
         uses: gradle/actions/setup-gradle@v4
       - name: Preserve development signing identity
@@ -97,5 +117,6 @@ jobs:
             lib/
             test/
           if-no-files-found: warn
+          overwrite: true
           compression-level: 9
           retention-days: 14

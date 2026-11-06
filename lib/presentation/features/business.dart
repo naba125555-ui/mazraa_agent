@@ -10,6 +10,7 @@ import '../shared/forms.dart';
 import '../shared/labels.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
+import 'clinical.dart';
 
 const listBindings=<String,(String,String)>{
   'I01':('/api/agent/commerce/inventory','I02'),'I06':('/api/agent/commerce/transfers','I08'),
@@ -44,7 +45,7 @@ class BusinessPage extends StatelessWidget{
     if(screen=='T08'||screen=='T14')return OperationPage(embedded:true,operation:operations['return']!,initial:id==null?{}:{'originalDocumentId':id});
     if(screen=='T05')return OperationPage(embedded:true,operation:operations['sale']!,initial:{
       ...app.sale,'lines':app.basket.map((l)=>{for(final k in ['productVariantId','batchId','quantity'])k:l[k]}).toList(),
-      'paidAmount':app.basket.fold(0.0,(s,l)=>s+decimal(l['quantity'])*decimal(l['unitPrice'])),'paymentMethod':'Cash'});
+      'paidAmount':null,'paymentMethod':'Cash'});
     if(screen=='A02'||screen=='A03'||screen=='A04')return AuctionWizard(screen:screen);
     if(screen=='A01')return Resource(identity:app.revision,load:()=>app.read('/api/agent/marketplace/auctions',query:app.scoped()),builder:(data,refresh)=>PageBody(children:[
       FilledButton.icon(onPressed:()=>context.open('A02'),icon:const Icon(Icons.add),label:Text(context.tr('إنشاء مزاد','Create auction'))),const SizedBox(height:16),
@@ -143,6 +144,7 @@ class BusinessPage extends StatelessWidget{
         ]);
       }
       if(screen.startsWith('G'))return PageBody(children:[Facts(d),const SizedBox(height:12),StatusTag(str(row['status'])),
+        const SizedBox(height:12),OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>Scaffold(appBar:AppBar(title:Text(context.tr('مرفقات الاقتراح','Proposal attachments'))),body:CaseAttachments(recordId:id)))),icon:const Icon(Icons.attach_file),label:Text(context.tr('مرفقات الاقتراح','Proposal attachments'))),
         if(screen=='G03')_InlineLink('G04',id!),if(row['status']=='NeedsChanges')... [const SizedBox(height:14),
           BusyButton(label:context.tr('استكمال الاقتراح','Revise proposal'),run:()async{await openOperation(context,'reviseProposal',id:id,seed:row,initial:d);refresh();})],
         if(d['linkedEntityId']!=null)Notice('${context.tr('تم الربط بالسجل','Linked record')} #${d['linkedEntityId']}'),
@@ -226,7 +228,7 @@ class _PointOfSaleState extends State<PointOfSale>{
       basket.add({'productVariantId':variant['id'],'batchId':batch['id'],'quantity':1,'name':titleOf(variant),
         'unitPrice':variant['salePrice']??variant['price'],'batchNumber':batch['batchNumber']});}});
   }
-  @override Widget build(BuildContext context){final app=context.app;return Resource(load:()async=>{
+  @override Widget build(BuildContext context){final app=context.app;return Resource(identity:'pos:${app.grantId}:${app.revision}',load:()async=>{
     'catalog':await app.read('/api/product-variants'),'stock':await app.all('/api/agent/commerce/inventory',query:app.scoped(),pageSize:100)},builder:(data,refresh){
       final catalog=rows(obj(data)['catalog']),stock=maps(obj(data)['stock']);
       final products=catalog.where((v)=>'${titleOf(v)} ${v['sku']}'.toLowerCase().contains(search)&&stock.any((s)=>s['productVariantId']==v['id']&&decimal(s['availableQuantity'])>0)).toList();

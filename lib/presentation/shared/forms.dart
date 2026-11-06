@@ -17,15 +17,29 @@ class OperationPage extends StatefulWidget{
   @override State<OperationPage> createState()=>_OperationPageState();
 }
 class _OperationPageState extends State<OperationPage>{
-  final form=GlobalKey<FormState>();late Json values;bool busy=false,review=false;Object? error;
+  final form=GlobalKey<FormState>();late Json values;bool busy=false,review=false;Object? error;Json? quoted;
   @override void initState(){super.initState();values={for(final f in widget.operation.fields)f.key:f.initial,...widget.initial};}
   Future<void> submit()async{
-    if(!form.currentState!.validate())return;form.currentState!.save();
+    if(!review){if(!form.currentState!.validate())return;form.currentState!.save();}
     if(widget.operation.fields.any((f)=>f.kind==InputKind.boolean&&f.key.startsWith('items')&&values[f.key]!=true)){
       toast(context,context.tr('يجب توثيق التحقق الفعلي أولًا.','Confirm the physical verification first.'));return;
     }
-    if(!review){setState(()=>review=true);return;}
     final app=context.app,op=widget.operation;
+    if(!review){
+      if(op.key=='sale'){
+        setState((){busy=true;error=null;});
+        try{
+          final body=prepareBody(op,values,widget.seed,app.grantId,app.repo.session?.userId);
+          final existing=numId(values['quoteId']);
+          quoted=obj(existing>0?await app.read('/api/agent/commercial/quotes/$existing'):
+            await app.execute('/api/agent/commercial/quotes',body,title:context.tr('مراجعة سعر البيع','Sale price review')));
+          values['quoteId']=quoted!['id'];
+          values['paidAmount']??=values['paymentMethod']=='Credit'?0:payload(quoted!)['total'];
+          if(mounted)setState(()=>review=true);
+        }catch(e){if(mounted)setState(()=>error=e);}
+        finally{if(mounted)setState(()=>busy=false);}
+      }else{setState(()=>review=true);}return;
+    }
     if(op.doctor&&!app.access.doctor||op.cap!=0&&!app.allows(op.cap))return;
     if(op.path.contains('{id}')&&(widget.id??0)<=0)throw const Failure(422,'');
     setState((){busy=true;error=null;});
@@ -51,9 +65,10 @@ class _OperationPageState extends State<OperationPage>{
       if(review)...[
         Notice(context.tr('راجع البيانات قبل التأكيد. لن تُعتمد العملية إلا بعد تأكيد السيرفر.','Review before confirming. The operation is final only after server confirmation.')),
         const SizedBox(height:14),Facts(values),const SizedBox(height:12),
+        if(quoted!=null)...[Heading(context.tr('العرض النهائي والضريبة','Final quote and tax')),RecordDetails(payload(quoted!))],
         for(final field in op.fields.where((f)=>f.kind==InputKind.lines))...[
           Heading(word(context,field.key)),for(final row in maps(values[field.key]))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(row))],
-        TextButton(onPressed:busy?null:()=>setState(()=>review=false),child:Text(context.tr('تعديل البيانات','Edit details'))),
+        TextButton(onPressed:busy?null:()=>setState((){review=false;if(op.key=='sale'){values['quoteId']=null;quoted=null;}}),child:Text(context.tr('تعديل البيانات','Edit details'))),
       ],
       Offstage(offstage:review,child:Column(children:[for(final field in op.fields.where((f)=>!(op.key=='visitState'&&widget.seed['status']=='Scheduled'&&['diagnosis','findings','treatment','recommendations'].contains(f.key))))Padding(padding:const EdgeInsets.only(bottom:15),
         child:InputControl(spec:field,value:values[field.key],parentValues:values,onChanged:(v)=>setState(()=>values[field.key]=v)))])),
@@ -79,7 +94,7 @@ class InputControl extends StatelessWidget{
       case InputKind.boolean:return SwitchListTile.adaptive(contentPadding:const EdgeInsets.symmetric(horizontal:10),
         title:Text(title),value:value==true,onChanged:onChanged);
       case InputKind.choice:return DropdownButtonFormField<String>(initialValue:f.options.contains(value)?str(value):null,
-        isExpanded:true,decoration:InputDecoration(labelText:title),items:[for(final item in f.options)DropdownMenuItem(value:item,child:Text(word(context,item)))],
+        isExpanded:true,decoration:InputDecoration(labelText:title),items:[for(final item in f.options.where((v)=>v!='Credit'||context.app.allows(Cap.credit)))DropdownMenuItem(value:item,child:Text(word(context,item)))],
         onChanged:onChanged,validator:(v)=>f.required&&v==null?context.tr('اختر قيمة','Choose a value'):null);
       case InputKind.date:return FormField<String>(initialValue:value as String?,validator:(v)=>f.required&&(v==null||v.isEmpty)?context.tr('اختر التاريخ والوقت','Choose date and time'):null,
         builder:(state)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[OutlinedButton.icon(onPressed:()async{

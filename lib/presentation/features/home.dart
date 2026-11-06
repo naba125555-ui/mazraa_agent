@@ -8,7 +8,7 @@ import '../shared/widgets.dart';
 class HomePage extends StatelessWidget{
   const HomePage({super.key});
   @override Widget build(BuildContext context){final app=context.app,c=Theme.of(context).colorScheme;
-    return Resource(identity:'home:${app.revision}',load:()async{
+    return Resource(identity:'home:${app.revision}:${app.refreshTick}',load:()async{
       final cases=app.access.doctor?await app.all('/api/vet/cases'):<Json>[];
       final tasks=app.access.doctor?await app.all('/api/agent/field/tasks'):<Json>[];
       final pickups=app.allows(Cap.pickup)?await app.all('/api/agent/pickup/requests',query:app.scoped()):<Json>[];

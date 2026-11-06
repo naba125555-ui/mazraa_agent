@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../application/agent_app.dart';
 import '../../application/workflows.dart';
 import '../../domain/models.dart';
@@ -16,7 +17,7 @@ class ClinicalPage extends StatelessWidget{
   const ClinicalPage(this.screen,{super.key,this.id,this.seed=const {}});
   final String screen;final int? id;final Json seed;
   @override Widget build(BuildContext context){final app=context.app;
-    if(screen=='C01')return Resource(identity:app.revision,load:()=>app.all('/api/vet/cases'),builder:(data,refresh)=>PageBody(children:[
+    if(screen=='C01')return Resource(identity:'${app.revision}:${app.refreshTick}',load:()=>app.all('/api/vet/cases'),builder:(data,refresh)=>PageBody(children:[
       Heading(context.tr('مسندة · نشطة · مغلقة','Assigned · active · closed')),
       if(rows(data).isEmpty)const Empty(),for(final row in rows(data).reversed)RecordTile(row,icon:Icons.chat_bubble_outline,
         subtitle:display(context,row['updatedAt']),onTap:()=>context.open('C02',id:numId(row['id']))),
@@ -136,17 +137,22 @@ class _ConsultationChatState extends State<ConsultationChat> with WidgetsBinding
   ]);
 }
 class CaseAttachments extends StatelessWidget{
-  const CaseAttachments({super.key,required this.caseId});final int caseId;
-  @override Widget build(BuildContext context)=>Resource(load:()=>context.app.read('/api/vet/cases/$caseId/attachments'),builder:(data,refresh)=>PageBody(children:[
+  const CaseAttachments({super.key,this.caseId=0,this.recordId});final int caseId;final int? recordId;
+  String get endpoint=>recordId==null?'/api/vet/cases/$caseId/attachments':'/api/agent/mobile/records/$recordId/files';
+  @override Widget build(BuildContext context)=>Resource(load:()=>context.app.read(endpoint),builder:(data,refresh)=>PageBody(children:[
     Notice(context.tr('صور وملفات PDF، حتى 5 ميجابايت للملف. تُعرض داخل الحساب المصرح له فقط.','Images and PDFs, up to 5 MiB per file. Access is limited to authorized participants.')),
     const SizedBox(height:16),BusyButton(icon:Icons.upload_file,label:context.tr('رفع مرفق','Upload attachment'),run:()async{
       final files=await FilePicker.platform.pickFiles(type:FileType.custom,allowedExtensions:['jpg','jpeg','png','pdf'],withData:true);
       if(files==null||files.files.single.bytes==null||!context.mounted)return;final f=files.files.single;
       if(f.size>5*1024*1024)throw const Failure(422,'Maximum file size: 5 MiB');
-      await context.app.repo.upload('/api/vet/cases/$caseId/attachments',f.name,f.bytes!,{'requestId':uuid()});refresh();
+      await context.app.repo.upload(endpoint,f.name,f.bytes!,{'requestId':uuid()});refresh();
+    }),
+    const SizedBox(height:10),BusyButton(icon:Icons.photo_camera_outlined,label:context.tr('التقاط صورة','Take a photo'),run:()async{
+      final image=await ImagePicker().pickImage(source:ImageSource.camera,maxWidth:1600,imageQuality:82);if(image==null||!context.mounted)return;
+      await context.app.repo.upload(endpoint,image.name,await image.readAsBytes(),{'requestId':uuid()});refresh();
     }),
     Heading(context.tr('المرفقات','Attachments')),for(final f in rows(data))RecordTile(f,icon:Icons.attach_file,onTap:()async{
-      try{final bytes=await context.app.repo.download('/api/vet/cases/$caseId/attachments/${f['id']}');if(!context.mounted)return;
+      try{final bytes=await context.app.repo.download(recordId==null?'/api/vet/cases/$caseId/attachments/${f['id']}':'/api/agent/mobile/files/${f['id']}');if(!context.mounted)return;
         if(str(f['contentType']).startsWith('image/'))showDialog<void>(context:context,builder:(c)=>Dialog(child:InteractiveViewer(child:Image.memory(bytes))));
         else{final directory=await getTemporaryDirectory();final file=File('${directory.path}/agent-${uuid()}.pdf');await file.writeAsBytes(bytes,flush:true);await OpenFilex.open(file.path);}
       }catch(e){if(context.mounted)toast(context,failureText(context,e));}
