@@ -16,6 +16,10 @@ const notesField=InputSpec('notes',kind:InputKind.longText);
 const stockLines=InputSpec('lines',kind:InputKind.lines,mode:'stock');
 const purchaseLines=InputSpec('lines',kind:InputKind.lines,mode:'purchase');
 const operations=<String,Operation>{
+  'profile':Operation('profile','تعديل الحساب','Edit account','/api/users/me',[
+    InputSpec('name'),InputSpec('email'),InputSpec('phone',required:false),InputSpec('firstName',required:false),InputSpec('lastName',required:false)],method:'PUT'),
+  'password':Operation('password','تغيير كلمة المرور','Change password','/api/users/me/password',[
+    InputSpec('currentPassword'),InputSpec('newPassword')],method:'PUT'),
   'accept':Operation('accept','قبول الاستشارة','Accept consultation','/api/vet/cases/{id}/accept',[],version:true,doctor:true),
   'decline':Operation('decline','اعتذار عن الاستشارة','Decline consultation','/api/vet/cases/{id}/decline',[],version:true,doctor:true),
   'note':Operation('note','حفظ الملاحظة','Save clinical note','/api/vet/cases/{id}/notes',[
@@ -125,6 +129,7 @@ const operations=<String,Operation>{
 
 Json prepareBody(Operation op,Json values,Json seed,int? grant,int? actor){
   var body=<String,dynamic>{...op.constants,...values};
+  if(op.key=='profile')body={for(final k in ['gender','dateOfBirth'])k:seed[k],...body};
   if(op.scope)body['delegationId']=grant;
   if(op.version)body['version']=numId(seed['version']);
   if(op.key=='prescribe')body['caseId']=numId(seed['caseId']??seed['id']);

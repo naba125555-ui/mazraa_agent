@@ -5,6 +5,10 @@ import '../../domain/screens.dart';
 import '../navigation.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
+import '../shared/forms.dart';
+
+Future<Json?> _editProfile(BuildContext context)=>openOperation(context,'profile',seed:context.app.user,initial:context.app.user);
+Future<Json?> _changePassword(BuildContext context)=>openOperation(context,'password');
 
 class SignInPage extends StatefulWidget{
   const SignInPage({super.key});
@@ -62,6 +66,7 @@ class GeneralPage extends StatelessWidget{
       case 'H07':return const NotificationsPage();
       case 'H08':return PageBody(children:[Panel(child:Column(children:[const BrandLogo(size:70),const SizedBox(height:12),
         Text(str(app.user['name']),style:Theme.of(context).textTheme.titleLarge),Text(str(app.user['email']))])),
+        const SizedBox(height:12),OutlinedButton.icon(onPressed:()async{await _editProfile(context);await app.refreshAccess();},icon:const Icon(Icons.manage_accounts_outlined),label:Text(context.tr('تعديل الحساب','Edit account'))),
         Heading(context.tr('التفضيلات','Preferences')),Panel(child:Column(children:[
           ListTile(leading:const Icon(Icons.language),title:Text(context.tr('اللغة','Language')),trailing:DropdownButton<String>(value:app.language,items:const [DropdownMenuItem(value:'ar',child:Text('العربية')),DropdownMenuItem(value:'en',child:Text('English'))],onChanged:(v)=>app.preferences(language:v))),
           ListTile(leading:const Icon(Icons.dark_mode_outlined),title:Text(context.tr('المظهر','Appearance')),trailing:DropdownButton<String>(value:app.theme,items:[
@@ -84,6 +89,7 @@ class GeneralPage extends StatelessWidget{
       ]));
       case 'H10':return const SupportPage();
       case 'H11':return Resource(load:()=>app.read('/api/users/me/sessions'),builder:(data,refresh)=>PageBody(children:[
+        BusyButton(label:context.tr('تغيير كلمة المرور','Change password'),run:()async{await _changePassword(context);}),const SizedBox(height:16),
         for(final row in rows(data))RecordTile({'title':row['deviceName']??'#${row['id']}'},subtitle:display(context,row['createdAt']),trailing:IconButton(icon:const Icon(Icons.logout),onPressed:()async{
           if(!await confirm(context,context.tr('إلغاء هذه الجلسة؟','Revoke this session?')))return;
           try{await app.repo.write('DELETE','/api/users/me/sessions/${row['id']}',null);refresh();}catch(e){if(context.mounted)toast(context,failureText(context,e));}}))]));

@@ -124,7 +124,9 @@ class AgentApp extends ChangeNotifier {
       case 'document':result=obj(await read('/api/agent/commercial/documents/$id/receipt',query:scoped()));break;
       case 'pickup':
         final request=(await all('/api/agent/pickup/requests',query:scoped())).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));
-        final movement=obj(await read('/api/agent/pickup/requests/$id/custody-details',query:scoped()));
+        Json movement={};
+        try{movement=obj(await read('/api/agent/pickup/requests/$id/custody-details',query:scoped()));}
+        on Failure catch(e){if(e.status!=404)rethrow;}
         result={...movement,...request,'movement':movement};break;
       case 'campaign':result=obj(await read('/api/agent/field/campaigns/$id/report'));break;
       case 'task':result=(await all('/api/agent/field/tasks')).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;

@@ -2,6 +2,15 @@ import 'package:flutter/material.dart';
 import 'scope.dart';
 
 const words=<String,List<String>>{
+  'email':['البريد الإلكتروني','Email'],'phone':['رقم الهاتف','Phone'],
+  'firstName':['الاسم الأول','First name'],'lastName':['الاسم الأخير','Last name'],
+  'currentPassword':['كلمة المرور الحالية','Current password'],'newPassword':['كلمة المرور الجديدة','New password'],
+  'quoteId':['عرض السعر الموافق عليه','Accepted quotation'],
+  'amendsId':['مرجع الملاحظة المستدركة','Amended note reference'],'healthStatus':['الحالة الصحية','Health status'],
+  'fieldVisitId':['الزيارة','Visit'],'journalEntryId':['رقم القيد','Journal entry'],
+  'entryNumber':['رقم القيد','Entry number'],'entryDate':['تاريخ القيد','Entry date'],
+  'debitAmount':['مدين','Debit'],'creditAmount':['دائن','Credit'],'balance':['الرصيد','Balance'],
+  'accountId':['الحساب','Account'],'sent':['المرسل','Sent'],'received':['المستلم','Received'],
   'Assigned':['مسندة','Assigned'],'Requested':['مطلوبة','Requested'],'Active':['نشطة','Active'],
   'Closed':['مغلقة','Closed'],'Cancelled':['ملغاة','Cancelled'],'Pending':['قيد المراجعة','Pending'],
   'Draft':['مسودة','Draft'],'Approved':['معتمدة','Approved'],'Completed':['مكتملة','Completed'],
@@ -60,6 +69,6 @@ const words=<String,List<String>>{
   'administered':['أُعطي اللقاح','Administered'],'deferred':['مؤجل','Deferred'],'excluded':['مستبعد','Excluded'],
   'waste':['هدر','Waste'],'return':['إرجاع','Return'],'normal':['عادية','Normal'],'urgent':['عاجلة','Urgent'],'high':['عالية','High'],
   'local':['محفوظ محليًا','Saved locally'],'conflict':['تحتاج مراجعة','Needs review'],'revoked':['سُحب الوصول','Access revoked'],
-  'sent':['المرسل','Sent'],'received':['المستلم','Received'],'resolved':['تمت تسويته','Resolved'],
+  'resolved':['تمت تسويته','Resolved'],
 };
 String word(BuildContext context,String key)=>words[key]?[context.app.ar?0:1]??key;

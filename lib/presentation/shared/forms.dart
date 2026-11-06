@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../application/workflows.dart';
 import '../../domain/models.dart';
+import '../navigation.dart';
 import 'labels.dart';
 import 'scope.dart';
 import 'widgets.dart';
+import 'scanner.dart';
 
 Future<Json?> openOperation(BuildContext context,String key,{int? id,Json seed=const {},Json initial=const {}})=>
   Navigator.of(context).push<Json>(MaterialPageRoute(builder:(_)=>OperationPage(operation:operations[key]!,id:id,seed:seed,initial:initial)));
@@ -31,7 +33,10 @@ class _OperationPageState extends State<OperationPage>{
       final body=prepareBody(op,values,widget.seed,app.grantId,app.repo.session?.userId);
       final result=obj(await app.execute(op.path.replaceAll('{id}','${widget.id}'),body,method:op.method,title:app.tr(op.ar,op.en)));
       if(!mounted)return;
+      final open=NavScope.of(context);
+      if(op.key=='sale'){app.basket.clear();app.sale={};}
       toast(context,context.tr('تمت العملية بنجاح','Operation confirmed'));Navigator.pop(context,result);
+      if(op.key=='sale'&&numId(result['documentId'])>0)open('T07',id:numId(result['documentId']));
     }catch(e){if(mounted)setState(()=>error=e);}finally{if(mounted)setState(()=>busy=false);}
   }
   @override Widget build(BuildContext context){final op=widget.operation,app=context.app;
@@ -39,6 +44,10 @@ class _OperationPageState extends State<OperationPage>{
     final content=Form(key:form,child:PageBody(children:[
       if(!allowed)Notice(context.tr('لا تملك صلاحية هذه العملية في نطاق العمل الحالي.','This operation is unavailable in this work context.'),error:true),
       if(op.version)Padding(padding:const EdgeInsets.only(bottom:14),child:StatusTag(str(widget.seed['status']))),
+      if(op.key=='profile')Padding(padding:const EdgeInsets.only(bottom:16),child:BusyButton(icon:Icons.account_circle_outlined,label:context.tr('تحديث الصورة الشخصية','Update profile photo'),run:()async{
+        final image=await ImagePicker().pickImage(source:ImageSource.gallery,maxWidth:1000,imageQuality:85);if(image==null)return;
+        await app.repo.upload('/api/users/me/avatar',image.name,await image.readAsBytes(),{});await app.refreshAccess();
+      })),
       if(review)...[
         Notice(context.tr('راجع البيانات قبل التأكيد. لن تُعتمد العملية إلا بعد تأكيد السيرفر.','Review before confirming. The operation is final only after server confirmation.')),
         const SizedBox(height:14),Facts(values),const SizedBox(height:12),
@@ -89,17 +98,20 @@ class InputControl extends StatelessWidget{
           if(state.hasError)Text(state.errorText!,style:TextStyle(color:Theme.of(context).colorScheme.error))]));
       case InputKind.lines:return LineItems(mode:f.mode!,value:maps(value),onChanged:onChanged,parentValues:parentValues);
       case InputKind.photos:return PhotoCollector(value:value is List?(value as List).map(numId).toList():[],items:maps(parentValues['items']),onChanged:onChanged);
-      default:return TextFormField(initialValue:value==null?'':str(value),decoration:InputDecoration(labelText:title,
-          suffixText:f.required?null:context.tr('اختياري','Optional')),
+      default:return TextFormField(key:ValueKey('${f.key}:${f.key=='code'||f.key=='accessCode'?value:''}'),initialValue:value==null?'':str(value),decoration:InputDecoration(labelText:title,
+          suffixText:f.required?null:context.tr('اختياري','Optional'),suffixIcon:f.key=='code'||f.key=='accessCode'?IconButton(icon:const Icon(Icons.qr_code_scanner),onPressed:()async{final code=await scanCode(context);if(code!=null)onChanged(code);}):null),
+        obscureText:f.key.toLowerCase().contains('password'),autocorrect:!f.key.toLowerCase().contains('password'),enableSuggestions:!f.key.toLowerCase().contains('password'),
         maxLines:f.kind==InputKind.longText?4:1,maxLength:f.kind==InputKind.longText?4000:200,
         textDirection:[InputKind.integer,InputKind.number].contains(f.kind)?TextDirection.ltr:null,
         keyboardType:f.kind==InputKind.integer?TextInputType.number:f.kind==InputKind.number?const TextInputType.numberWithOptions(decimal:true,signed:true):TextInputType.multiline,
         validator:(text){final t=(text??'').trim();if(f.required&&t.isEmpty)return context.tr('هذا الحقل مطلوب','This field is required');
+          if(f.key=='newPassword'&&t.length<8)return context.tr('ثمانية أحرف على الأقل','At least eight characters');
+          if(f.key=='email'&&!t.contains('@'))return context.tr('أدخل بريدًا صالحًا','Enter a valid email');
           if(t.isNotEmpty&&f.kind==InputKind.integer&&int.tryParse(normalizeNumber(t))==null)return context.tr('أدخل رقمًا صحيحًا','Enter a whole number');
           if(t.isNotEmpty&&f.kind==InputKind.number&&double.tryParse(normalizeNumber(t))==null)return context.tr('أدخل رقمًا صالحًا','Enter a valid number');return null;},
         onSaved:(text){final t=(text??'').trim();onChanged(t.isEmpty?null:f.kind==InputKind.integer?int.parse(normalizeNumber(t)):
           f.kind==InputKind.number?double.parse(normalizeNumber(t)):t);},
-        onChanged:(text){if(f.kind==InputKind.text||f.kind==InputKind.longText)onChanged(text);});
+        onChanged:(text){if((f.kind==InputKind.text||f.kind==InputKind.longText)&&f.key!='code'&&f.key!='accessCode')onChanged(text);});
     }
   }
 }
@@ -158,7 +170,7 @@ class _LineItemsState extends State<LineItems>{
     final result=await showModalBottomSheet<Json>(context:context,isScrollControlled:true,useSafeArea:true,builder:(c)=>StatefulBuilder(builder:(c,setModal)=>
       Padding(padding:EdgeInsets.fromLTRB(18,0,18,MediaQuery.viewInsetsOf(c).bottom+24),child:SingleChildScrollView(child:Form(key:key,child:Column(mainAxisSize:MainAxisSize.min,children:[
         Heading(c.tr('تفاصيل البند','Line details')),for(final field in fields)Padding(padding:const EdgeInsets.only(bottom:13),child:InputControl(
-          spec:field,value:values[field.key],parentValues:widget.parentValues,onChanged:(v)=>values[field.key]=v)),
+          spec:field,value:values[field.key],parentValues:widget.parentValues,onChanged:(v)=>setModal(()=>values[field.key]=v))),
         FilledButton(onPressed:()async{
           if(!key.currentState!.validate())return;key.currentState!.save();
           if(widget.mode=='auction'&&((values['animalId']==null)==(values['productVariantId']==null))){toast(c,c.tr('اختر حيوانًا أو منتجًا واحدًا للبند.','Choose exactly one animal or product.'));return;}
