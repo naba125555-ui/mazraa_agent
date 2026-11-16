@@ -213,10 +213,10 @@ class _RecordSelector extends StatelessWidget{
     ]));}
 }
 class _RemoteList extends StatelessWidget{
-  const _RemoteList(this.path,{this.query,this.arrayKey,this.filter,this.onTap});final String path;final Json? query;final String? arrayKey;
-  final bool Function(Json)? filter;final void Function(Json)? onTap;
+  const _RemoteList(this.path,{this.query,this.onTap});final String path;final Json? query;
+  final void Function(Json)? onTap;
   @override Widget build(BuildContext context)=>Resource(load:()=>context.app.read(path,query:query),builder:(data,refresh){
-    final list=(arrayKey==null?rows(data):maps(obj(data)[arrayKey])).where((r)=>filter?.call(r)??true).toList();
+    final list=rows(data);
     return PageBody(children:[if(list.isEmpty)const Empty(),for(final row in list)Padding(padding:const EdgeInsets.only(bottom:12),child:onTap==null?RecordDetails(payload(row)):RecordTile(row,onTap:()=>onTap!(row)))]);
   });
 }

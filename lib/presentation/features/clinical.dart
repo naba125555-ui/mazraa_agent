@@ -150,7 +150,7 @@ class CaseAttachments extends StatelessWidget{
   @override Widget build(BuildContext context)=>Resource(load:()=>context.app.read(endpoint),builder:(data,refresh)=>PageBody(children:[
     Notice(context.tr('صور وملفات PDF، حتى 5 ميجابايت للملف. تُعرض داخل الحساب المصرح له فقط.','Images and PDFs, up to 5 MiB per file. Access is limited to authorized participants.')),
     const SizedBox(height:16),BusyButton(icon:Icons.upload_file,label:context.tr('رفع مرفق','Upload attachment'),run:()async{
-      final files=await FilePicker.platform.pickFiles(type:FileType.custom,allowedExtensions:['jpg','jpeg','png','pdf'],withData:true);
+      final files=await FilePicker.pickFiles(type:FileType.custom,allowedExtensions:['jpg','jpeg','png','pdf'],withData:true);
       if(files==null||files.files.single.bytes==null||!context.mounted)return;final f=files.files.single;
       if(f.size>5*1024*1024)throw const Failure(422,'Maximum file size: 5 MiB');
       await context.app.repo.upload(endpoint,f.name,f.bytes!,{'requestId':uuid()});refresh();
