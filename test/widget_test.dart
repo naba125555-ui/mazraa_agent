@@ -35,8 +35,17 @@ void main(){
       await tester.pumpWidget(host(app,RepaintBoundary(key:key,child:const ScreenPage('H05'))));await tester.pumpAndSettle();
       expect(tester.takeException(),isNull);expect(find.textContaining(language=='ar'?'مرحبًا':'Welcome'),findsOneWidget);
       final boundary=key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-      final image=await boundary.toImage();final bytes=await image.toByteData(format:ui.ImageByteFormat.png);
-      final file=File('build/previews/home-$language-$mode.png');file.parent.createSync(recursive:true);file.writeAsBytesSync(bytes!.buffer.asUint8List());image.dispose();
+      // Rasterization and PNG encoding use engine futures. Run them outside
+      // FakeAsync to avoid hanging the entire widget-test suite.
+      final bytes=await tester.runAsync(() async {
+        final image=await boundary.toImage();
+        try{return await image.toByteData(format:ui.ImageByteFormat.png);}
+        finally{image.dispose();}
+      });
+      expect(bytes,isNotNull);
+      final file=File('build/previews/home-$language-$mode.png');
+      file.parent.createSync(recursive:true);
+      file.writeAsBytesSync(bytes!.buffer.asUint8List());
       await tester.pumpWidget(const SizedBox.shrink());app.dispose();
     });
   }
