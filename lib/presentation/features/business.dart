@@ -318,7 +318,7 @@ class _AuctionWizardState extends State<AuctionWizard>{
     final fields=operations['auction']!.fields.where((f)=>widget.screen=='A02'?f.kind!=InputKind.lines&&f.kind!=InputKind.photos:
       widget.screen=='A03'?f.kind==InputKind.lines:f.kind==InputKind.photos).toList();
     return Form(key:form,child:PageBody(children:[
-      Padding(padding:const EdgeInsets.only(bottom:20),child:LinearProgressIndicator(value:widget.screen=='A02'?.33:widget.screen=='A03'?.66:1)),
+      Padding(padding:const EdgeInsets.only(bottom:20),child:LinearProgressIndicator(value:widget.screen == 'A02' ? 0.33 : widget.screen == 'A03' ? 0.66 : 1.0)),
       for(final f in fields)Padding(padding:const EdgeInsets.only(bottom:14),child:InputControl(spec:f,value:draft[f.key],parentValues:draft,onChanged:(v)=>setState(()=>draft[f.key]=v))),
       if(widget.screen!='A04')FilledButton(onPressed:(){if(!form.currentState!.validate())return;form.currentState!.save();context.open(widget.screen=='A02'?'A03':'A04');},child:Text(context.tr('متابعة','Continue')))
       else BusyButton(label:context.tr('مراجعة وحفظ مسودة المزاد','Review and save auction'),run:()async{
