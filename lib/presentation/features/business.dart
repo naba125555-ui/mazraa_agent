@@ -8,6 +8,7 @@ import '../navigation.dart';
 import '../shared/charts.dart';
 import '../shared/forms.dart';
 import '../shared/labels.dart';
+import '../shared/paged_records.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
 import 'clinical.dart';
@@ -77,24 +78,50 @@ class BusinessPage extends StatelessWidget{
         return Future.wait(changes.map((c)=>app.read('/api/agent/commercial/quotes/${c['id']}')));
       }),
     ]);
-    if(listBindings.containsKey(screen)&&!(screen=='T13'&&id!=null)){
-      final binding=listBindings[screen]!;
-      return Resource(identity:'$screen:${app.revision}',load:()=>binding.$1.startsWith('/api/agent/')?app.all(binding.$1,query:app.scoped(),pageSize:screen=='I01'?100:50):app.read(binding.$1),
-        builder:(data,refresh){var list=rows(data);
-          if(screen=='T06')list=list.where((r)=>str(r['type']).contains('Sales')).toList();
-          if(screen=='T11')list=list.where((r)=>str(r['type']).contains('Purchase')).toList();
-          if(screen=='P01')list=list.where((r)=>numId(r['warehouseId'])==app.grant?.warehouse).toList();
-          return PageBody(children:[
-            if(screen=='I01')_Shortcuts(const ['I05','I06','I07','I09']),
-            if(screen=='T06')_Shortcuts(const ['T02','T08','T09']),
-            if(screen=='T11')_Shortcuts(const ['T12','T13','T14']),
-            if(screen=='G01')FilledButton.icon(onPressed:()=>context.open('G02'),icon:const Icon(Icons.add),label:Text(context.tr('اقتراح جديد','New proposal'))),
-            const SizedBox(height:14),if(list.isEmpty)const Empty(),for(final row in list)RecordTile(row,onTap:(){
-              if(screen=='T10'){showDialog<void>(context:context,builder:(c)=>AlertDialog(title:Text(titleOf(row)),content:Facts(row)));return;}
-              context.open(binding.$2,id:numId(row['id']),seed:row);
-            },subtitle:screen=='I01'?'${context.tr('المتاح','Available')}: ${display(context,row['availableQuantity'])}':null),
-          ]);
-        });
+    if (screen == 'T10') {
+      return Resource(
+        load: () => app.read('/api/Suppliers'),
+        builder: (data, _) => PageBody(children: [
+          if (rows(data).isEmpty) const Empty(),
+          for (final supplier in rows(data))
+            RecordTile(supplier, onTap: () => showDialog<void>(
+              context: context,
+              builder: (_) => AlertDialog(title: Text(titleOf(supplier)), content: Facts(supplier)),
+            )),
+        ]),
+      );
+    }
+    if (listBindings.containsKey(screen) && !(screen == 'T13' && id != null)) {
+      final binding = listBindings[screen]!;
+      return PagedRecords(
+        key: ValueKey('$screen:$id:${app.revision}'),
+        load: (afterId) => app.page(binding.$1, query: app.scoped(), afterId: afterId),
+        pageSize: screen == 'I01' ? 100 : 50,
+        include: (row) => switch (screen) {
+          'T06' => str(row['type']).contains('Sales'),
+          'T11' => str(row['type']).contains('Purchase'),
+          'P01' => numId(row['warehouseId']) == app.grant?.warehouse,
+          'P02' when id != null => numId(row['pointId']) == id,
+          _ => true,
+        },
+        header: [
+          if (screen == 'I01') _Shortcuts(const ['I05','I06','I07','I09']),
+          if (screen == 'T06') _Shortcuts(const ['T02','T08','T09']),
+          if (screen == 'T11') _Shortcuts(const ['T12','T13','T14']),
+          if (screen == 'G01') FilledButton.icon(
+            onPressed: () => context.open('G02'), icon: const Icon(Icons.add),
+            label: Text(context.tr('اقتراح جديد', 'New proposal')),
+          ),
+          const SizedBox(height: 14),
+        ],
+        itemBuilder: (row) => RecordTile(
+          row,
+          subtitle: screen == 'I01'
+              ? '${context.tr('المتاح','Available')}: ${display(context,row['availableQuantity'])}'
+              : null,
+          onTap: () => context.open(binding.$2, id: numId(row['id']), seed: row),
+        ),
+      );
     }
     if(id==null)return _RecordSelector(target:screen);
     final kind=screen.startsWith('I')?'stock':screen.startsWith('P')?'pickup':screen.startsWith('A')?'auction':screen.startsWith('G')?'proposal':

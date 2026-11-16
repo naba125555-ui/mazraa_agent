@@ -10,6 +10,7 @@ import 'package:mazraa_agent/domain/models.dart';
 import 'package:mazraa_agent/domain/screens.dart';
 import 'package:mazraa_agent/presentation/design/brand_theme.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
+import 'package:mazraa_agent/presentation/shared/paged_records.dart';
 import 'package:mazraa_agent/presentation/shared/scope.dart';
 import 'package:mazraa_agent/presentation/shell.dart';
 import 'fake_repository.dart';
@@ -39,6 +40,51 @@ void main(){
       await tester.pumpWidget(const SizedBox.shrink());app.dispose();
     });
   }
+  testWidgets('A denied route does not change tabs or mount a screen', (tester) async {
+    final app = fixture('en', 'light');
+    app.access = const Access();
+    await tester.pumpWidget(host(app, const AppShell()));
+    await tester.pumpAndSettle();
+    final navigation = find.byType(NavigationBar);
+    expect(tester.widget<NavigationBar>(navigation).destinations, hasLength(3));
+    final context = tester.element(find.byType(ScreenPage));
+    context.open('C02', id: 7);
+    context.open('I01');
+    await tester.pumpAndSettle();
+    expect(tester.widget<NavigationBar>(navigation).selectedIndex, 0);
+    expect(find.byWidgetPredicate((widget) => widget is ScreenPage && widget.route != 'H05'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
+  testWidgets('A paged list keeps its first page through a failed continuation', (tester) async {
+    final app = fixture('en', 'light');
+    final requested = <int>[];
+    await tester.pumpWidget(host(app, Scaffold(body: PagedRecords(
+      pageSize: 2,
+      load: (afterId) async {
+        requested.add(afterId);
+        if (afterId == 0) return [{'id': 1}, {'id': 2}];
+        if (requested.length == 2) throw const Failure(503, '');
+        return [{'id': 3}];
+      },
+      itemBuilder: (record) => Text('Record ${record['id']}'),
+    ))));
+    await tester.pumpAndSettle();
+    expect(requested, [0]);
+    expect(find.text('Record 1'), findsOneWidget);
+    await tester.tap(find.text('Load more'));
+    await tester.pumpAndSettle();
+    expect(requested, [0, 2]);
+    expect(find.text('Record 1'), findsOneWidget);
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(requested, [0, 2, 2]);
+    expect(find.text('Record 3'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
   testWidgets('All 92 routes render without uncaught errors',(tester)async{
     tester.view.physicalSize=const Size(430,932);tester.view.devicePixelRatio=1;
     addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);

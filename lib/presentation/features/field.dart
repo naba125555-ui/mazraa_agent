@@ -6,18 +6,35 @@ import '../../domain/models.dart';
 import '../navigation.dart';
 import '../shared/charts.dart';
 import '../shared/forms.dart';
+import '../shared/paged_records.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
 
 class FieldPage extends StatelessWidget{
   const FieldPage(this.screen,{super.key,this.id,this.seed=const {}});final String screen;final int? id;final Json seed;
   @override Widget build(BuildContext context){final app=context.app;
-    if(screen=='F01'||screen=='F09')return Resource(identity:app.revision,load:()=>app.all('/api/agent/field/${screen=='F01'?'tasks':'campaigns'}'),builder:(data,refresh)=>PageBody(children:[
-      if(screen=='F01')Wrap(spacing:8,children:[ActionChip(avatar:const Icon(Icons.calendar_month_outlined),label:Text(context.tr('التقويم','Calendar')),onPressed:()=>context.open('F03')),
-        ActionChip(avatar:const Icon(Icons.vaccines_outlined),label:Text(context.tr('الحملات','Campaigns')),onPressed:()=>context.open('F09'))]),
-      const SizedBox(height:14),if(rows(data).isEmpty)const Empty(),for(final row in rows(data))RecordTile(row,icon:screen=='F01'?Icons.assignment_outlined:Icons.vaccines_outlined,
-        subtitle:display(context,row['scheduledDate']??payload(row)['scheduledAt']),onTap:()=>context.open(screen=='F01'?'F02':'F10',id:numId(row['id']))),
-    ]));
+    if (screen == 'F01' || screen == 'F09') {
+      final tasks = screen == 'F01';
+      return PagedRecords(
+        key: ValueKey(app.revision),
+        load: (afterId) => app.page(
+          '/api/agent/field/${tasks ? 'tasks' : 'campaigns'}', afterId: afterId,
+        ),
+        header: [
+          if (tasks) Wrap(spacing: 8, children: [
+            ActionChip(avatar: const Icon(Icons.calendar_month_outlined), label: Text(context.tr('التقويم', 'Calendar')), onPressed: () => context.open('F03')),
+            ActionChip(avatar: const Icon(Icons.vaccines_outlined), label: Text(context.tr('الحملات', 'Campaigns')), onPressed: () => context.open('F09')),
+          ]),
+          const SizedBox(height: 14),
+        ],
+        itemBuilder: (row) => RecordTile(
+          row,
+          icon: tasks ? Icons.assignment_outlined : Icons.vaccines_outlined,
+          subtitle: display(context, row['scheduledDate'] ?? payload(row)['scheduledAt']),
+          onTap: () => context.open(tasks ? 'F02' : 'F10', id: numId(row['id']), seed: row),
+        ),
+      );
+    }
     if(screen=='F03')return const FieldCalendar();
     if(id==null)return Resource(load:()=>app.all('/api/agent/field/tasks'),builder:(data,refresh)=>PageBody(children:[
       for(final task in rows(data))for(final visit in maps(task['visits']))RecordTile(visit,onTap:()=>context.open(screen,id:numId(visit['id']),seed:visit))]));

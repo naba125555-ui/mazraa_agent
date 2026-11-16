@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../application/agent_app.dart';
 import '../../application/workflows.dart';
 import '../../domain/models.dart';
 import '../navigation.dart';
@@ -8,8 +9,28 @@ import 'scope.dart';
 import 'widgets.dart';
 import 'scanner.dart';
 
-Future<Json?> openOperation(BuildContext context,String key,{int? id,Json seed=const {},Json initial=const {}})=>
-  Navigator.of(context).push<Json>(MaterialPageRoute(builder:(_)=>OperationPage(operation:operations[key]!,id:id,seed:seed,initial:initial)));
+bool _canRun(AgentApp app, Operation operation) =>
+    app.signedIn &&
+    (!operation.doctor || app.access.doctor) &&
+    (!operation.scope || app.grant != null) &&
+    (operation.cap == 0 || app.allows(operation.cap)) &&
+    (!operation.dispenser || app.access.dispenser);
+
+Future<Json?> openOperation(
+  BuildContext context, String key, {int? id, Json seed = const {}, Json initial = const {}}
+) async {
+  final operation = operations[key]!;
+  if (!_canRun(context.app, operation) || operation.path.contains('{id}') && (id ?? 0) <= 0) {
+    toast(context, context.tr(
+      'هذه العملية غير متاحة في نطاق العمل الحالي.',
+      'This operation is unavailable in the current work context.',
+    ));
+    return null;
+  }
+  return Navigator.of(context).push<Json>(MaterialPageRoute(
+    builder: (_) => OperationPage(operation: operation, id: id, seed: seed, initial: initial),
+  ));
+}
 
 class OperationPage extends StatefulWidget{
   const OperationPage({super.key,required this.operation,this.id,this.seed=const {},this.initial=const {},this.embedded=false});
@@ -18,13 +39,15 @@ class OperationPage extends StatefulWidget{
 }
 class _OperationPageState extends State<OperationPage>{
   final form=GlobalKey<FormState>();late Json values;bool busy=false,review=false;Object? error;Json? quoted;
+  int? responseVersion;
   @override void initState(){super.initState();values={for(final f in widget.operation.fields)f.key:f.initial,...widget.initial};}
   Future<void> submit()async{
+    final app = context.app, op = widget.operation;
+    if (busy || !_canRun(app, op)) return;
     if(!review){if(!form.currentState!.validate())return;form.currentState!.save();}
     if(widget.operation.fields.any((f)=>f.kind==InputKind.boolean&&f.key.startsWith('items')&&values[f.key]!=true)){
       toast(context,context.tr('يجب توثيق التحقق الفعلي أولًا.','Confirm the physical verification first.'));return;
     }
-    final app=context.app,op=widget.operation;
     if(!review){
       if(op.key=='sale'){
         setState((){busy=true;error=null;});
@@ -40,13 +63,21 @@ class _OperationPageState extends State<OperationPage>{
         finally{if(mounted)setState(()=>busy=false);}
       }else{setState(()=>review=true);}return;
     }
-    if(op.doctor&&!app.access.doctor||op.cap!=0&&!app.allows(op.cap))return;
-    if(op.path.contains('{id}')&&(widget.id??0)<=0)throw const Failure(422,'');
+    if (op.path.contains('{id}') && (widget.id ?? 0) <= 0) return;
     setState((){busy=true;error=null;});
     try{
       final body=prepareBody(op,values,widget.seed,app.grantId,app.repo.session?.userId);
+      if (responseVersion != null) body['version'] = responseVersion;
       final result=obj(await app.execute(op.path.replaceAll('{id}','${widget.id}'),body,method:op.method,title:app.tr(op.ar,op.en)));
       if(!mounted)return;
+      if (result['accepted'] == false) {
+        setState(() {
+          responseVersion = result['version'] is num ? numId(result['version']) : null;
+          review = false;
+          error = Failure(422, context.tr('رفض السيرفر رمز التحقق. راجع الرمز وأعد المحاولة.', 'The server rejected the verification code. Check the code and try again.'));
+        });
+        return;
+      }
       final open=NavScope.of(context);
       if(op.key=='sale'){app.basket.clear();app.sale={};}
       toast(context,context.tr('تمت العملية بنجاح','Operation confirmed'));Navigator.pop(context,result);
@@ -54,9 +85,14 @@ class _OperationPageState extends State<OperationPage>{
     }catch(e){if(mounted)setState(()=>error=e);}finally{if(mounted)setState(()=>busy=false);}
   }
   @override Widget build(BuildContext context){final op=widget.operation,app=context.app;
-    final allowed=(!op.doctor||app.access.doctor)&&(op.cap==0||app.allows(op.cap));
+    final allowed = _canRun(app, op);
+    if (!allowed) {
+      final denial = PageBody(children: [
+        Notice(context.tr('لا تملك صلاحية هذه العملية في نطاق العمل الحالي.','This operation is unavailable in this work context.'),error: true),
+      ]);
+      return widget.embedded ? denial : Scaffold(appBar: AppBar(title: Text(app.tr(op.ar, op.en))), body: denial);
+    }
     final content=Form(key:form,child:PageBody(children:[
-      if(!allowed)Notice(context.tr('لا تملك صلاحية هذه العملية في نطاق العمل الحالي.','This operation is unavailable in this work context.'),error:true),
       if(op.version)Padding(padding:const EdgeInsets.only(bottom:14),child:StatusTag(str(widget.seed['status']))),
       if(op.key=='profile')Padding(padding:const EdgeInsets.only(bottom:16),child:BusyButton(icon:Icons.account_circle_outlined,label:context.tr('تحديث الصورة الشخصية','Update profile photo'),run:()async{
         final image=await ImagePicker().pickImage(source:ImageSource.gallery,maxWidth:1000,imageQuality:85);if(image==null)return;

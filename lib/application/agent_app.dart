@@ -17,7 +17,7 @@ class AgentApp extends ChangeNotifier {
   String language='ar',theme='system';bool starting=true,loading=false;
   Object? accessError;
   Json bootstrap={},profile={},summary={},user={};
-  Access access=const Access();int? grantId;int revision=0,refreshTick=0;
+  Access access=const Access();int? grantId;int revision=0,refreshTick=0,scopeRevision=0;
   final List<Json> basket=[];Json sale={},auctionDraft={},prescriptionDraft={};
   final Map<String,Json> _records={};
   bool get signedIn=>repo.session!=null;
@@ -26,8 +26,11 @@ class AgentApp extends ChangeNotifier {
   String get currency=>str(bootstrap['currency']??summary['catalogCurrency']);
   Grant? get grant=>access.grants.where((g)=>g.id==grantId&&g.active).firstOrNull;
   bool allows(int mask)=>grant?.allows(mask)??false;
-  bool canOpen(ScreenSpec s)=>(!s.doctor||access.doctor)&&(s.cap==0||allows(s.cap))&&
-      (s.id!='C13'||access.dispenser);
+  bool canOpen(ScreenSpec spec) =>
+      signedIn &&
+      (!spec.doctor || access.doctor) &&
+      (spec.cap == 0 || allows(spec.cap)) &&
+      (spec.id != 'C13' || access.dispenser);
   Future<void> initialize()async{
     try{
       language=await repo.local('language')??'ar';theme=await repo.local('theme')??'system';
@@ -40,20 +43,22 @@ class AgentApp extends ChangeNotifier {
     await repo.login(email,password);_reset();notifyListeners();await refreshAccess();
   }
   void _reset(){bootstrap={};profile={};summary={};user={};access=const Access();grantId=null;
-    _records.clear();basket.clear();sale={};auctionDraft={};prescriptionDraft={};revision++;}
+    _records.clear();basket.clear();sale={};auctionDraft={};prescriptionDraft={};revision++;scopeRevision++;}
   Future<void> refreshAccess()async{
     if(!signedIn)return;final epoch=repo.epoch;loading=true;accessError=null;notifyListeners();
     try{
       final result=await Future.wait([repo.read('/api/agent/mobile/bootstrap'),repo.read('/api/agent/me'),
         repo.read('/api/agent/operations/home'),repo.read('/api/users/me')]);
       if(repo.epoch!=epoch)return;
-      final previousAuthority=jsonEncode({'doctor':bootstrap['doctorApproved'],'dispenser':bootstrap['dispensingApproved'],'delegations':bootstrap['delegations']});
-      final nextBootstrap=obj(result[0]);
-      final nextAuthority=jsonEncode({'doctor':nextBootstrap['doctorApproved'],'dispenser':nextBootstrap['dispensingApproved'],'delegations':nextBootstrap['delegations']});
-      bootstrap=obj(result[0]);profile=obj(result[1]);summary=obj(result[2]);user=obj(result[3]);access=Access.from(bootstrap,summary);
+      final previousAuthority = _authority(bootstrap, profile);
+      final previousGrant = grantId;
+      bootstrap=obj(result[0]);profile=obj(result[1]);summary=obj(result[2]);user=obj(result[3]);
+      access=Access.from({...bootstrap, 'doctorApproved': bootstrap['doctorApproved'] == true && profile['canPractice'] != false}, summary);
       if(!access.grants.any((g)=>g.id==grantId&&g.active))grantId=access.grants.where((g)=>g.active).firstOrNull?.id;
-      // Background polling must not replace an in-progress form with a spinner.
-      if(previousAuthority!=nextAuthority){_records.clear();revision++;}
+      if (previousGrant != grantId || previousAuthority != _authority(bootstrap, profile)) {
+        _workContextChanged();
+        if (!access.doctor) prescriptionDraft = {};
+      }
       refreshTick++;
     }catch(e){if(repo.epoch==epoch)accessError=e;rethrow;}
     finally{if(repo.epoch==epoch){loading=false;notifyListeners();}}
@@ -63,8 +68,25 @@ class AgentApp extends ChangeNotifier {
     if(language!=null){this.language=language;await repo.save('language',language);}
     if(theme!=null){this.theme=theme;await repo.save('theme',theme);}notifyListeners();
   }
-  void selectGrant(int id){if(!access.grants.any((g)=>g.id==id&&g.active))return;
-    grantId=id;_records.clear();basket.clear();sale={};revision++;notifyListeners();}
+  String _authority(Json snapshot, Json profile) => jsonEncode({
+    'doctor': snapshot['doctorApproved'] == true && profile['canPractice'] != false,
+    'dispenser': snapshot['dispensingApproved'],
+    'delegations': maps(snapshot['delegations'])..sort((a, b) => numId(a['id']).compareTo(numId(b['id']))),
+  });
+  void _workContextChanged() {
+    _records.clear();
+    basket.clear();
+    sale = {};
+    auctionDraft = {};
+    revision++;
+    scopeRevision++;
+  }
+  void selectGrant(int id) {
+    if (id == grantId || !access.grants.any((g) => g.id == id && g.active)) return;
+    grantId = id;
+    _workContextChanged();
+    notifyListeners();
+  }
   void changed(){revision++;_records.clear();notifyListeners();}
   Future<dynamic> read(String path,{Json? query})=>repo.read(path,query:query);
   Future<List<Json>> changes()async{
@@ -77,6 +99,9 @@ class AgentApp extends ChangeNotifier {
     }
     return byId.values.toList();
   }
+  Future<List<Json>> page(String path, {int afterId = 0, Json? query}) async =>
+      rows(await read(path, query: {...?query, 'afterId': afterId}));
+
   Future<List<Json>> all(String path,{Json? query,int pageSize=50})async{
     final result=<Json>[];var after=0;
     for(var page=0;page<200;page++){
