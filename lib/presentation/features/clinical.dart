@@ -12,6 +12,7 @@ import '../navigation.dart';
 import '../shared/forms.dart';
 import '../shared/paged_records.dart';
 import '../shared/scope.dart';
+import '../shared/section_banner.dart';
 import '../shared/widgets.dart';
 
 class ClinicalPage extends StatelessWidget{
@@ -22,12 +23,16 @@ class ClinicalPage extends StatelessWidget{
       return PagedRecords(
         key: ValueKey(app.revision),
         load: (afterId) => app.page('/api/vet/cases', afterId: afterId),
-        header: [Heading(context.tr('مسندة · نشطة · مغلقة', 'Assigned · active · closed'))],
-        itemBuilder: (row) => RecordTile(
-          row, icon: Icons.chat_bubble_outline,
-          subtitle: display(context, row['updatedAt']),
-          onTap: () => context.open('C02', id: numId(row['id']), seed: row),
-        ),
+        header: [
+          SectionBanner(art:SectionArt.clinical,icon:Icons.monitor_heart_outlined,
+            title:context.tr('عيادتي البيطرية','Veterinary practice'),
+            subtitle:context.tr('الإحالات والاستشارات','Referrals and consultations')),
+          const SizedBox(height:12),
+          ActionTile(title:context.tr('الوصفات وطلبات الصرف','Prescriptions and dispensing'),
+            icon:Icons.medication_outlined,onTap:()=>context.open('C12')),
+          const SizedBox(height:12),
+        ],
+        itemBuilder: (row)=>_ConsultationTile(caseRow:row),
       );
     }
     if((screen=='C12'||screen=='C13'||screen=='C14')&&id==null)return Resource(load:()=>app.all('/api/vet/prescriptions'),builder:(data,refresh)=>PageBody(children:[
@@ -46,7 +51,10 @@ class ClinicalPage extends StatelessWidget{
     return Resource(identity:'$screen:$id:${app.revision}',load:()=>app.record(rx?'prescription':'case',id!,fresh:true),builder:(data,refresh){
       final row=obj(data),d=payload(row),versioned=rx?row:d;
       if(screen=='C02')return PageBody(children:[
-        Panel(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(context.tr('استشارة بيطرية','Veterinary consultation'),style:Theme.of(context).textTheme.titleLarge),
+        SectionBanner(art:SectionArt.clinical,icon:Icons.pets_outlined,
+          title:str(obj(row['animal'])['name']).isEmpty ? context.tr('استشارة بيطرية','Veterinary consultation') : str(obj(row['animal'])['name'])),
+        const SizedBox(height:12),
+        Panel(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(context.tr('الإحالة','Referral'),style:Theme.of(context).textTheme.titleLarge),
           const SizedBox(height:8),StatusTag(str(versioned['status'])),Fact('id',id),if(d['reason']!=null)Fact('reason',d['reason'])])),
         if(versioned['status']=='Assigned')...[
           const SizedBox(height:16),BusyButton(label:context.tr('قبول الاستشارة','Accept consultation'),run:()async{await openOperation(context,'accept',id:id,seed:versioned);refresh();}),
@@ -62,7 +70,7 @@ class ClinicalPage extends StatelessWidget{
       if(screen=='C06'||screen=='C07')return PageBody(children:[
         Facts(obj(row['animal'])),const SizedBox(height:14),Notice(context.tr('الحيوان مرتبط بإحالة العميل. لتقييم حيوان آخر، يرسل العميل إحالة جديدة.','The animal is linked to this customer referral. Another animal requires a separate customer referral.')),
         Heading(context.tr('الفحوص والزيارات','Examinations and visits')),
-        Resource(load:()=>app.read('/api/vet/cases/$id/record'),builder:(data,refresh)=>Column(children:[
+        Resource(embedded:true,load:()=>app.read('/api/vet/cases/$id/record'),builder:(data,refresh)=>Column(children:[
           for(final visit in maps(obj(data)['visits']))RecordTile(visit,icon:Icons.assignment_outlined,onTap:()=>context.open('F06',id:numId(visit['id']),seed:visit)),
           for(final inspection in maps(obj(data)['inspections']))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(inspection)),
         ])),
@@ -70,7 +78,7 @@ class ClinicalPage extends StatelessWidget{
       if(screen=='C08')return PageBody(children:[
         FilledButton.icon(onPressed:()=>openOperation(context,'note',id:id,seed:versioned),icon:const Icon(Icons.add),label:Text(context.tr('ملاحظة سريرية جديدة','New clinical note'))),
         Heading(context.tr('الملاحظات السابقة','Previous notes')),
-        Resource(load:()=>app.read('/api/vet/cases/$id/record'),builder:(record,r)=>Column(children:[for(final note in maps(obj(record)['notes']))Padding(padding:const EdgeInsets.only(bottom:12),child:Panel(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Resource(embedded:true,load:()=>app.read('/api/vet/cases/$id/record'),builder:(record,r)=>Column(children:[for(final note in maps(obj(record)['notes']))Padding(padding:const EdgeInsets.only(bottom:12),child:Panel(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text(str(payload(note)['body'])),Fact('createdAt',note['createdAt']),Text(payload(note)['sharedWithCustomer']==true?context.tr('مشتركة مع العميل','Shared with customer'):context.tr('خاصة بالطبيب','Doctor private')),
           TextButton(onPressed:()=>openOperation(context,'note',id:id,seed:versioned,initial:{'amendsId':note['id']}),child:Text(context.tr('إضافة ملحق مؤرخ','Add a dated addendum'))),
         ])))])),
@@ -89,6 +97,34 @@ class ClinicalPage extends StatelessWidget{
         if(row['ownerId']==app.repo.session?.userId&&row['status']=='Approved')OutlinedButton(onPressed:()=>openOperation(context,'cancelPrescription',id:id,seed:row),child:Text(context.tr('إلغاء الوصفة','Cancel prescription'))),
       ]);
     });
+  }
+}
+class _ConsultationTile extends StatelessWidget {
+  const _ConsultationTile({required this.caseRow});
+  final Json caseRow;
+
+  @override
+  Widget build(BuildContext context){
+    final id=numId(caseRow['id']);
+    final pending=caseRow['status']=='Assigned';
+    Widget tile([Json? detail]){
+      final animal=obj(detail?['animal']);
+      final title=str(animal['name']);
+      final reason=str(payload(detail??{})['reason']);
+      return RecordTile(
+        {...caseRow,'title':title.isEmpty
+          ?(pending?context.tr('إحالة جديدة','New referral'):'${context.tr('استشارة','Consultation')} #$id')
+          :title},
+        icon:pending?Icons.mark_email_unread_outlined:Icons.pets_outlined,
+        subtitle:[if(reason.isNotEmpty)reason,display(context,caseRow['updatedAt'])].join(' · '),
+        onTap:()=>context.open('C02',id:id,seed:caseRow),
+      );
+    }
+    if(pending||id==0)return tile();
+    return FutureBuilder<Json>(
+      future:context.app.record('case',id),
+      builder:(context,snapshot)=>tile(snapshot.data),
+    );
   }
 }
 class _RouteTile extends StatelessWidget{

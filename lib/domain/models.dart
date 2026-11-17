@@ -14,9 +14,15 @@ double decimal(Object? v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 
 String str(Object? v) => v==null ? '' : '$v';
 Json payload(Json v) => obj(v['details'] ?? v['consultation'] ?? v);
 String titleOf(Json v) {
-  final d=payload(v);
-  for(final k in ['title','name','productName','documentNumber','batchNumber','subject','sku']) {
-    final s=str(v[k]??d[k]); if(s.isNotEmpty) return s;
+  final d=payload(v), product=obj(v['product']), animal=obj(v['animal']);
+  for(final candidate in [
+    v['title'],d['title'],v['name'],d['name'],v['productName'],d['productName'],
+    product['name'],if(v['product'] is String)v['product'],v['animalName'],d['animalName'],animal['name'],v['documentNumber'],
+    d['documentNumber'],v['batchNumber'],d['batchNumber'],v['subject'],d['subject'],
+    v['sku'],d['sku'],
+  ]) {
+    final value=str(candidate).trim();
+    if(value.isNotEmpty)return value;
   }
   return '#${v['id']??v['productVariantId']??'—'}';
 }

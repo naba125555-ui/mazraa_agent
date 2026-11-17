@@ -8,6 +8,7 @@ import '../shared/charts.dart';
 import '../shared/forms.dart';
 import '../shared/paged_records.dart';
 import '../shared/scope.dart';
+import '../shared/section_banner.dart';
 import '../shared/widgets.dart';
 
 class FieldPage extends StatelessWidget{
@@ -21,6 +22,10 @@ class FieldPage extends StatelessWidget{
           '/api/agent/field/${tasks ? 'tasks' : 'campaigns'}', afterId: afterId,
         ),
         header: [
+          SectionBanner(art:SectionArt.field,icon:Icons.assignment_outlined,
+            title:tasks?context.tr('العمل الميداني','Field work'):context.tr('الحملات الميدانية','Field campaigns'),
+            subtitle:tasks?context.tr('المهام والزيارات المسندة','Assigned tasks and visits'):null),
+          const SizedBox(height:10),
           if (tasks) Wrap(spacing: 8, children: [
             ActionChip(avatar: const Icon(Icons.calendar_month_outlined), label: Text(context.tr('التقويم', 'Calendar')), onPressed: () => context.open('F03')),
             ActionChip(avatar: const Icon(Icons.vaccines_outlined), label: Text(context.tr('الحملات', 'Campaigns')), onPressed: () => context.open('F09')),
@@ -43,7 +48,10 @@ class FieldPage extends StatelessWidget{
     final task=screen=='F02';
     return Resource(identity:'$screen:$id:${app.revision}',load:()=>app.record(campaign?'campaign':task?'task':'visit',id!,fresh:true),builder:(data,refresh){
       final root=obj(data),row=campaign?obj(root['campaign']):root,d=payload(row);
-      if(screen=='F02')return PageBody(children:[Facts(row,fields:['id','title','description','status','scheduledDate','priority']),
+      if(screen=='F02')return PageBody(children:[
+        SectionBanner(art:SectionArt.field,title:titleOf(row),subtitle:display(context,row['scheduledDate'])),
+        const SizedBox(height:12),
+        Facts(row,fields:['description','status','priority']),
         const SizedBox(height:16),if(!['Completed','Cancelled','Rejected'].contains(row['status']))BusyButton(label:context.tr('تحديث حالة المهمة','Update task state'),run:()async{await openOperation(context,'taskState',id:id,seed:row);refresh();}),
         const SizedBox(height:10),OutlinedButton.icon(onPressed:()=>context.open('F04',id:id,seed:row),icon:const Icon(Icons.near_me_outlined),label:Text(context.tr('الموقع والملاحة','Directions'))),
         Heading(context.tr('الزيارات','Visits')),for(final visit in maps(row['visits']))RecordTile(visit,onTap:()=>context.open('F06',id:numId(visit['id']),seed:visit)),
@@ -76,7 +84,7 @@ class FieldPage extends StatelessWidget{
         BusyButton(label:context.tr('تسجيل حرارة الدفعة','Record batch temperature'),run:()async{await openOperation(context,'temperature',id:id,seed:row);refresh();}),
         const SizedBox(height:12),BusyButton(label:context.tr('توثيق هدر أو إرجاع','Record waste or return'),run:()async{await openOperation(context,'vaccinate',id:id,seed:row,initial:{'outcome':'waste'});refresh();}),
         Heading(context.tr('مطابقة العهدة','Custody reconciliation')),
-        Resource(load:()=>app.read('/api/agent/field/campaigns/$id/reconciliation'),builder:(result,r)=>Column(children:[Facts(obj(result)),
+        Resource(embedded:true,load:()=>app.read('/api/agent/field/campaigns/$id/reconciliation'),builder:(result,r)=>Column(children:[Facts(obj(result)),
           for(final key in ['allocations','outcomes','temperatures','stops'])...[
             Heading(context.tr(key=='allocations'?'الدفعات المخصصة':key=='outcomes'?'النتائج':key=='temperatures'?'سجل الحرارة':'المحطات',key)),
             for(final item in maps(obj(result)[key]))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(payload(item)))],

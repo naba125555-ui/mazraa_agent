@@ -20,6 +20,7 @@ class AgentApp extends ChangeNotifier {
   Access access=const Access();int? grantId;int revision=0,refreshTick=0,scopeRevision=0;
   final List<Json> basket=[];Json sale={},auctionDraft={},prescriptionDraft={};
   final Map<String,Json> _records={};
+  final Map<int, Future<Json>> _variants = {};
   bool get signedIn=>repo.session!=null;
   bool get ar=>language=='ar';
   String tr(String arabic,String english)=>ar?arabic:english;
@@ -43,7 +44,7 @@ class AgentApp extends ChangeNotifier {
     await repo.login(email,password);_reset();notifyListeners();await refreshAccess();
   }
   void _reset(){bootstrap={};profile={};summary={};user={};access=const Access();grantId=null;
-    _records.clear();basket.clear();sale={};auctionDraft={};prescriptionDraft={};revision++;scopeRevision++;}
+    _records.clear();_variants.clear();basket.clear();sale={};auctionDraft={};prescriptionDraft={};revision++;scopeRevision++;}
   Future<void> refreshAccess()async{
     if(!signedIn)return;final epoch=repo.epoch;loading=true;accessError=null;notifyListeners();
     try{
@@ -75,6 +76,7 @@ class AgentApp extends ChangeNotifier {
   });
   void _workContextChanged() {
     _records.clear();
+    _variants.clear();
     basket.clear();
     sale = {};
     auctionDraft = {};
@@ -87,7 +89,18 @@ class AgentApp extends ChangeNotifier {
     _workContextChanged();
     notifyListeners();
   }
-  void changed(){revision++;_records.clear();notifyListeners();}
+  void changed(){revision++;_records.clear();_variants.clear();notifyListeners();}
+  Future<Json> variant(int id) => _variants.putIfAbsent(id, () async {
+    final variant = obj(await read('/api/product-variants/$id'));
+    final productId = numId(variant['productId']);
+    if(productId==0) return variant;
+    try {
+      final images = rows(await read('/api/Images/by-entity',query:{'type':'Product','entityId':productId}));
+      return {...variant,'images':images};
+    } on Failure {
+      return variant;
+    }
+  });
   Future<dynamic> read(String path,{Json? query})=>repo.read(path,query:query);
   Future<List<Json>> changes()async{
     final byId=<int,Json>{};Json cursor={};
@@ -169,15 +182,15 @@ class AgentApp extends ChangeNotifier {
         on Failure catch(e){if(e.status!=404)rethrow;}
         result={...movement,...request,'movement':movement};break;
       case 'campaign':result=obj(await read('/api/agent/field/campaigns/$id/report'));break;
-      case 'task':result=(await all('/api/agent/field/tasks')).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
+      case 'task':result=(await page('/api/agent/field/tasks',afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
       case 'visit':
         final tasks=await all('/api/agent/field/tasks');
         final visits=[for(final task in tasks)for(final visit in maps(task['visits'])){...visit,'taskId':task['id'],'taskStatus':task['status']}];
         result=visits.firstWhere((v)=>numId(v['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'stock':result=(await all('/api/agent/commerce/inventory',query:scoped(),pageSize:100)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'proposal':result=(await all('/api/agent/marketplace/proposals')).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'transfer':result=(await all('/api/agent/commerce/transfers',query:scoped())).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'procurement':result=(await all('/api/agent/procurement',query:scoped())).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
+      case 'stock':result=(await page('/api/agent/commerce/inventory',query:scoped(),afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
+      case 'proposal':result=(await page('/api/agent/marketplace/proposals',afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
+      case 'transfer':result=(await page('/api/agent/commerce/transfers',query:scoped(),afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
+      case 'procurement':result=(await page('/api/agent/procurement',query:scoped(),afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
       case 'auction':
         final data=obj(await read('/api/agent/marketplace/auctions',query:scoped()));
         final auction=maps(data['auctions']).firstWhere((a)=>numId(a['id'])==id,orElse:()=>throw const Failure(404,''));
