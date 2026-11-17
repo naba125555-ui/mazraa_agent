@@ -10,6 +10,7 @@ import '../../application/workflows.dart';
 import '../../domain/models.dart';
 import '../navigation.dart';
 import '../shared/forms.dart';
+import '../shared/paged_records.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
 
@@ -17,11 +18,18 @@ class ClinicalPage extends StatelessWidget{
   const ClinicalPage(this.screen,{super.key,this.id,this.seed=const {}});
   final String screen;final int? id;final Json seed;
   @override Widget build(BuildContext context){final app=context.app;
-    if(screen=='C01')return Resource(identity:'${app.revision}:${app.refreshTick}',load:()=>app.all('/api/vet/cases'),builder:(data,refresh)=>PageBody(children:[
-      Heading(context.tr('مسندة · نشطة · مغلقة','Assigned · active · closed')),
-      if(rows(data).isEmpty)const Empty(),for(final row in rows(data).reversed)RecordTile(row,icon:Icons.chat_bubble_outline,
-        subtitle:display(context,row['updatedAt']),onTap:()=>context.open('C02',id:numId(row['id']))),
-    ]));
+    if (screen == 'C01') {
+      return PagedRecords(
+        key: ValueKey(app.revision),
+        load: (afterId) => app.page('/api/vet/cases', afterId: afterId),
+        header: [Heading(context.tr('مسندة · نشطة · مغلقة', 'Assigned · active · closed'))],
+        itemBuilder: (row) => RecordTile(
+          row, icon: Icons.chat_bubble_outline,
+          subtitle: display(context, row['updatedAt']),
+          onTap: () => context.open('C02', id: numId(row['id']), seed: row),
+        ),
+      );
+    }
     if((screen=='C12'||screen=='C13'||screen=='C14')&&id==null)return Resource(load:()=>app.all('/api/vet/prescriptions'),builder:(data,refresh)=>PageBody(children:[
       if(rows(data).isEmpty)const Empty(),for(final row in rows(data).reversed)RecordTile(row,icon:Icons.medication_outlined,onTap:()=>context.open(screen,id:numId(row['id'])))]));
     if(id==null)return const Empty();
@@ -142,7 +150,7 @@ class CaseAttachments extends StatelessWidget{
   @override Widget build(BuildContext context)=>Resource(load:()=>context.app.read(endpoint),builder:(data,refresh)=>PageBody(children:[
     Notice(context.tr('صور وملفات PDF، حتى 5 ميجابايت للملف. تُعرض داخل الحساب المصرح له فقط.','Images and PDFs, up to 5 MiB per file. Access is limited to authorized participants.')),
     const SizedBox(height:16),BusyButton(icon:Icons.upload_file,label:context.tr('رفع مرفق','Upload attachment'),run:()async{
-      final files=await FilePicker.platform.pickFiles(type:FileType.custom,allowedExtensions:['jpg','jpeg','png','pdf'],withData:true);
+      final files=await FilePicker.pickFiles(type:FileType.custom,allowedExtensions:['jpg','jpeg','png','pdf'],withData:true);
       if(files==null||files.files.single.bytes==null||!context.mounted)return;final f=files.files.single;
       if(f.size>5*1024*1024)throw const Failure(422,'Maximum file size: 5 MiB');
       await context.app.repo.upload(endpoint,f.name,f.bytes!,{'requestId':uuid()});refresh();

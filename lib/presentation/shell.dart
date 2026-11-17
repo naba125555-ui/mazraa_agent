@@ -25,34 +25,161 @@ class AppShell extends StatefulWidget{
   const AppShell({super.key});
   @override State<AppShell> createState()=>_AppShellState();
 }
-class _AppShellState extends State<AppShell> with WidgetsBindingObserver{
-  int index=0;Timer? timer;bool refreshing=false;
-  final keys=List.generate(5,(_)=>GlobalKey<NavigatorState>());
-  static const roots=['H05','C01','F01','T01','H08'];
-  @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);timer=Timer.periodic(const Duration(seconds:30),(_)=>refresh());}
-  @override void dispose(){timer?.cancel();WidgetsBinding.instance.removeObserver(this);super.dispose();}
-  @override void didChangeAppLifecycleState(AppLifecycleState state){if(state==AppLifecycleState.resumed){refresh();timer?.cancel();timer=Timer.periodic(const Duration(seconds:30),(_)=>refresh());}else{timer?.cancel();}}
-  Future<void> refresh()async{if(!mounted||refreshing)return;refreshing=true;try{await context.app.refreshAccess();}catch(_){}finally{refreshing=false;}}
-  void open(String route,{int? id,Json? seed}){
-    if(!implementedScreens.contains(route))return;
-    final area=screen(route).area;
-    final target=area==Area.clinical?1:area==Area.field?2:area==Area.general?(route=='H05'?0:4):3;
-    if(target!=index)setState(()=>index=target);
-    keys[target].currentState!.push(MaterialPageRoute<void>(settings:RouteSettings(name:route),builder:(_)=>ScreenPage(route,id:id,seed:seed??{})));
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
+  static const roots = ['H05', 'C01', 'F01', 'T01', 'H08'];
+  final keys = List.generate(roots.length, (_) => GlobalKey<NavigatorState>());
+  final visited = <int>{0};
+  int index = 0;
+  int? scopeRevision;
+  Timer? timer;
+  bool refreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    startPolling();
   }
-  @override Widget build(BuildContext context){final app=context.app;
-    if(app.accessError!=null&&app.bootstrap.isEmpty)return Scaffold(body:SafeArea(child:PageBody(children:[Notice(failureText(context,app.accessError!),error:true),
-      const SizedBox(height:16),BusyButton(label:context.tr('إعادة الاتصال','Reconnect'),run:app.refreshAccess),TextButton(onPressed:app.logout,child:Text(context.tr('تسجيل الخروج','Sign out')))])));
-    return NavScope(open:open,child:PopScope(canPop:false,onPopInvokedWithResult:(didPop,result)async{
-      if(didPop)return;if(await keys[index].currentState!.maybePop())return;if(index!=0)setState(()=>index=0);
-    },child:Scaffold(body:IndexedStack(index:index,children:[for(var i=0;i<5;i++)Navigator(key:keys[i],onGenerateRoute:(_)=>MaterialPageRoute<void>(builder:(_)=>ScreenPage(roots[i])))]),
-      bottomNavigationBar:NavigationBar(selectedIndex:index,onDestinationSelected:(i)=>setState(()=>index=i),destinations:[
-        NavigationDestination(icon:const Icon(Icons.home_outlined),selectedIcon:const Icon(Icons.home),label:context.tr('الرئيسية','Home')),
-        NavigationDestination(icon:const Icon(Icons.chat_bubble_outline),selectedIcon:const Icon(Icons.chat_bubble),label:context.tr('الاستشارات','Cases')),
-        NavigationDestination(icon:const Icon(Icons.assignment_outlined),selectedIcon:const Icon(Icons.assignment),label:context.tr('المهام','Tasks')),
-        NavigationDestination(icon:const Icon(Icons.storefront_outlined),selectedIcon:const Icon(Icons.storefront),label:context.tr('تجارتي','Business')),
-        NavigationDestination(icon:const Icon(Icons.person_outline),selectedIcon:const Icon(Icons.person),label:context.tr('حسابي','Account')),
-      ]))));
+
+  void startPolling() {
+    timer?.cancel();
+    timer = Timer.periodic(const Duration(seconds: 30), (_) => refresh());
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      refresh();
+      startPolling();
+    } else {
+      timer?.cancel();
+    }
+  }
+
+  Future<void> refresh() async {
+    if (!mounted || refreshing) return;
+    refreshing = true;
+    try {
+      await context.app.refreshAccess();
+    } catch (_) {
+      // AgentApp exposes the failure to the connection screen.
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  void open(String route, {int? id, Json? seed}) {
+    if (!implementedScreens.contains(route)) return;
+    final app = context.app;
+    final spec = screen(route);
+    if (!app.canOpen(spec)) {
+      toast(context, context.tr(
+        'هذه الخدمة غير متاحة في نطاق العمل الحالي.',
+        'This service is unavailable in the current work context.',
+      ));
+      return;
+    }
+    final target = switch (spec.area) {
+      Area.clinical => app.canOpen(screen('C01')) ? 1 : 3,
+      Area.field => 2,
+      Area.general => route == 'H05' ? 0 : 4,
+      _ => 3,
+    };
+    final scope = app.scopeRevision;
+    void push() {
+      if (!mounted || app.scopeRevision != scope || !app.canOpen(spec)) return;
+      final navigator = keys[target].currentState;
+      if (navigator == null) return;
+      if (route == roots[target]) {
+        navigator.popUntil((entry) => entry.isFirst);
+        return;
+      }
+      navigator.push(MaterialPageRoute<void>(
+        settings: RouteSettings(name: route),
+        builder: (_) => ScreenPage(route, id: id, seed: seed ?? {}),
+      ));
+    }
+
+    final needsMount = !visited.contains(target);
+    if (index != target || needsMount) selectTab(target);
+    if (needsMount) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => push());
+    } else {
+      push();
+    }
+  }
+
+  void selectTab(int tab) => setState(() {
+    index = tab;
+    visited.add(tab);
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.app;
+    if (app.bootstrap.isEmpty) {
+      final failure = app.accessError;
+      if (failure == null) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      return Scaffold(body: SafeArea(child: PageBody(children: [
+        Notice(failureText(context, failure), error: true),
+        const SizedBox(height: 16),
+        BusyButton(label: context.tr('إعادة الاتصال', 'Reconnect'), run: app.refreshAccess),
+        TextButton(onPressed: app.logout, child: Text(context.tr('تسجيل الخروج', 'Sign out'))),
+      ])));
+    }
+
+    if (scopeRevision != app.scopeRevision) {
+      scopeRevision = app.scopeRevision;
+      for (final tab in [1, 2, 3]) {
+        keys[tab] = GlobalKey<NavigatorState>();
+        if (tab != index) visited.remove(tab);
+      }
+    }
+    final available = [for (var i = 0; i < roots.length; i++)
+      if (app.canOpen(screen(roots[i]))) i];
+    if (!available.contains(index)) index = 0;
+    final destinations = [
+      NavigationDestination(icon: const Icon(Icons.home_outlined), selectedIcon: const Icon(Icons.home), label: context.tr('الرئيسية', 'Home')),
+      NavigationDestination(icon: const Icon(Icons.chat_bubble_outline), selectedIcon: const Icon(Icons.chat_bubble), label: context.tr('الاستشارات', 'Cases')),
+      NavigationDestination(icon: const Icon(Icons.assignment_outlined), selectedIcon: const Icon(Icons.assignment), label: context.tr('المهام', 'Tasks')),
+      NavigationDestination(icon: const Icon(Icons.storefront_outlined), selectedIcon: const Icon(Icons.storefront), label: context.tr('تجارتي', 'Business')),
+      NavigationDestination(icon: const Icon(Icons.person_outline), selectedIcon: const Icon(Icons.person), label: context.tr('حسابي', 'Account')),
+    ];
+
+    return NavScope(open: open, child: PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (await keys[index].currentState?.maybePop() == true) return;
+        if (mounted && index != 0) setState(() => index = 0);
+      },
+      child: Scaffold(
+        body: IndexedStack(index: index, children: [
+          for (var i = 0; i < roots.length; i++)
+            if (available.contains(i) && visited.contains(i))
+              Navigator(
+                key: keys[i],
+                onGenerateRoute: (_) => MaterialPageRoute<void>(builder: (_) => ScreenPage(roots[i])),
+              )
+            else
+              const SizedBox.shrink(),
+        ]),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: available.indexOf(index),
+          onDestinationSelected: (destination) => selectTab(available[destination]),
+          destinations: [for (final tab in available) destinations[tab]],
+        ),
+      ),
+    ));
   }
 }
 class ScreenPage extends StatelessWidget{

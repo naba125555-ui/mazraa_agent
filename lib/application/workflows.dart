@@ -7,9 +7,9 @@ class InputSpec {
   final String? source,mode;final Object? initial;
 }
 class Operation {
-  const Operation(this.key,this.ar,this.en,this.path,this.fields,{this.cap=0,this.version=false,this.scope=false,this.constants=const {},this.method='POST',this.doctor=false});
+  const Operation(this.key,this.ar,this.en,this.path,this.fields,{this.cap=0,this.version=false,this.scope=false,this.constants=const {},this.method='POST',this.doctor=false,this.dispenser=false});
   final String key,ar,en,path,method;final List<InputSpec> fields;final int cap;
-  final bool version,scope,doctor;final Json constants;
+  final bool version,scope,doctor,dispenser;final Json constants;
 }
 const reason=InputSpec('reason',kind:InputKind.longText);
 const notesField=InputSpec('notes',kind:InputKind.longText);
@@ -38,9 +38,9 @@ const operations=<String,Operation>{
     InputSpec('warnings',kind:InputKind.longText),InputSpec('lines',kind:InputKind.lines,mode:'prescription')],doctor:true),
   'cancelPrescription':Operation('cancelPrescription','إلغاء الوصفة','Cancel prescription','/api/vet/prescriptions/{id}/cancel',[],version:true,doctor:true),
   'dispense':Operation('dispense','تأكيد الصرف','Confirm dispensation','/api/vet/prescriptions/{id}/dispense',[
-    InputSpec('customerId',kind:InputKind.integer),stockLines,InputSpec('accessCode',required:false)],scope:true,version:true,cap:290),
+    InputSpec('customerId',kind:InputKind.integer),stockLines,InputSpec('accessCode',required:false)],scope:true,version:true,cap:290,dispenser:true),
   'releasePrescription':Operation('releasePrescription','اعتماد دفعات الوصفة','Release prescribed batches','/api/vet/prescription-orders/{id}/release',[
-    InputSpec('batches',kind:InputKind.lines,mode:'stock')],scope:true,version:true,cap:256),
+    InputSpec('batches',kind:InputKind.lines,mode:'stock')],scope:true,version:true,cap:256,dispenser:true),
   'prepare':Operation('prepare','تجهيز الطلب','Prepare order','/api/agent/fulfillment/orders/{id}/prepare',[],scope:true),
   'taskState':Operation('taskState','تحديث المهمة','Update task','/api/agent/field/tasks/{id}/state',[
     InputSpec('status',kind:InputKind.choice,options:['Accepted','Rejected','InProgress','Completed'])],doctor:true),
