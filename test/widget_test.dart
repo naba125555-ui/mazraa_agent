@@ -12,6 +12,7 @@ import 'package:mazraa_agent/presentation/design/brand_theme.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
 import 'package:mazraa_agent/presentation/shared/scope.dart';
+import 'package:mazraa_agent/presentation/shared/section_banner.dart';
 import 'package:mazraa_agent/presentation/shell.dart';
 import 'fake_repository.dart';
 
@@ -49,6 +50,23 @@ void main(){
       await tester.pumpWidget(const SizedBox.shrink());app.dispose();
     });
   }
+  testWidgets('Branded module banners and the sale cart fit a narrow phone',(tester)async{
+    tester.view.physicalSize=const Size(360,800);
+    tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final app=fixture('ar','dark');
+    for(final route in ['H02','H05','C01','F01','T01','T02','I01','A01','N01','P01']){
+      await tester.pumpWidget(host(app,ScreenPage(route,key:ValueKey(route))));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(),isNull,reason:route);
+      expect(find.byType(SectionBanner),findsOneWidget,reason:route);
+      if(route=='T02')expect(find.text('عرض السلة'),findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+    app.dispose();
+  });
+
   testWidgets('A denied route does not change tabs or mount a screen', (tester) async {
     final app = fixture('en', 'light');
     app.access = const Access();

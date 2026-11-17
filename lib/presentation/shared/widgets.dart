@@ -4,6 +4,7 @@ import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 import '../../domain/models.dart';
 import 'labels.dart';
 import 'scope.dart';
+import 'product_thumbnail.dart';
 
 class BrandLogo extends StatelessWidget{
   const BrandLogo({super.key,this.size=48});final double size;
@@ -61,8 +62,8 @@ class Empty extends StatelessWidget{
     Text(text??context.tr('لا توجد سجلات حاليًا','No records yet'),textAlign:TextAlign.center),if(action!=null)...[const SizedBox(height:16),action!]]));
 }
 class Resource extends StatefulWidget{
-  const Resource({super.key,required this.load,required this.builder,this.identity});
-  final Future<dynamic> Function() load;final Widget Function(dynamic,VoidCallback) builder;final Object? identity;
+  const Resource({super.key,required this.load,required this.builder,this.identity,this.embedded=false});
+  final Future<dynamic> Function() load;final Widget Function(dynamic,VoidCallback) builder;final Object? identity;final bool embedded;
   @override State<Resource> createState()=>_ResourceState();
 }
 class _ResourceState extends State<Resource>{
@@ -72,8 +73,12 @@ class _ResourceState extends State<Resource>{
   void refresh(){setState(()=>future=widget.load());}
   @override Widget build(BuildContext context)=>FutureBuilder<dynamic>(future:future,builder:(c,s){
     if(s.connectionState!=ConnectionState.done)return const Center(child:CircularProgressIndicator());
-    if(s.hasError)return PageBody(children:[Empty(text:failureText(context,s.error!),icon:Icons.cloud_off_outlined,
-      action:OutlinedButton.icon(onPressed:refresh,icon:const Icon(Icons.refresh),label:Text(context.tr('إعادة المحاولة','Retry'))))]);
+    if(s.hasError){
+      final error=Empty(text:failureText(context,s.error!),icon:Icons.cloud_off_outlined,
+        action:OutlinedButton.icon(onPressed:refresh,icon:const Icon(Icons.refresh),label:Text(context.tr('إعادة المحاولة','Retry'))));
+      return widget.embedded?error:PageBody(children:[error]);
+    }
+    if(widget.embedded)return widget.builder(s.data,refresh);
     return RefreshIndicator(onRefresh:()async{refresh();try{await future;}catch(_){}},child:widget.builder(s.data,refresh));
   });
 }
@@ -86,14 +91,14 @@ class StatusTag extends StatelessWidget{
       child:Text(word(context,value),style:TextStyle(color:color,fontSize:11,fontWeight:FontWeight.w700)));}
 }
 class RecordTile extends StatelessWidget{
-  const RecordTile(this.data,{super.key,this.onTap,this.icon=Icons.description_outlined,this.subtitle,this.trailing});
-  final Json data;final VoidCallback? onTap;final IconData icon;final String? subtitle;final Widget? trailing;
+  const RecordTile(this.data,{super.key,this.onTap,this.icon=Icons.description_outlined,this.subtitle,this.trailing,this.imageUrl});
+  final Json data;final VoidCallback? onTap;final IconData icon;final String? subtitle,imageUrl;final Widget? trailing;
   @override Widget build(BuildContext context){final status=str(data['status']??payload(data)['status']);return Padding(padding:const EdgeInsets.only(bottom:10),child:Panel(onTap:onTap,child:Row(children:[
-    Container(width:44,height:44,decoration:BoxDecoration(color:Theme.of(context).colorScheme.primaryContainer,borderRadius:BorderRadius.circular(13)),
-      child:Icon(icon,color:Theme.of(context).colorScheme.primary)),const SizedBox(width:12),
+    ProductThumbnail(url:imageUrl,size:imageUrl==null?44:54,icon:icon),const SizedBox(width:12),
     Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(titleOf(data),style:Theme.of(context).textTheme.titleMedium),
-      if(subtitle!=null)Text(subtitle!,maxLines:2,overflow:TextOverflow.ellipsis),if(status.isNotEmpty)...[const SizedBox(height:4),StatusTag(status)]])),
-    trailing??Icon(Directionality.of(context)==TextDirection.rtl?Icons.chevron_left:Icons.chevron_right,size:21),
+      if(subtitle?.isNotEmpty==true)Text(subtitle!,maxLines:2,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),if(status.isNotEmpty)...[const SizedBox(height:4),StatusTag(status)]])),
+    if(trailing!=null)trailing!
+    else if(onTap!=null)Icon(Directionality.of(context)==TextDirection.rtl?Icons.chevron_left:Icons.chevron_right,size:21),
   ])));}
 }
 String display(BuildContext context,Object? v){
@@ -111,10 +116,18 @@ class Fact extends StatelessWidget{
 }
 class Facts extends StatelessWidget{
   const Facts(this.data,{super.key,this.fields});final Json data;final List<String>? fields;
-  @override Widget build(BuildContext context)=>Panel(child:Column(children:[
-    for(final key in fields??data.keys.where(words.containsKey).toList())
-      if(data[key]!=null&&data[key] is! Map&&data[key] is! List)Fact(key,data[key]),
-  ]));
+  @override Widget build(BuildContext context) {
+    final visible=(fields??data.keys.where(words.containsKey))
+        .where((key)=>data[key]!=null&&data[key] is! Map&&data[key] is! List)
+        .toList();
+    if(visible.isEmpty)return const SizedBox.shrink();
+    return Panel(child:Column(children:[
+      for(var i=0;i<visible.length;i++) ...[
+        if(i>0)const Divider(height:13),
+        Fact(visible[i],data[visible[i]]),
+      ],
+    ]));
+  }
 }
 class RecordDetails extends StatelessWidget{
   const RecordDetails(this.data,{super.key});final Json data;

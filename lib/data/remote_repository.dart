@@ -3,10 +3,11 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../domain/api_origin.dart';
 import '../domain/models.dart';
 import '../domain/ports.dart';
 
-const baseUrl=String.fromEnvironment('API_BASE_URL',defaultValue:'https://mzraa.runasp.net');
+const baseUrl=apiBaseUrl;
 class RemoteRepository implements AgentRepository {
   RemoteRepository({Dio? client,Dio? refreshClient,FlutterSecureStorage? secure})
       : client=client??Dio(BaseOptions(baseUrl:baseUrl,connectTimeout:const Duration(seconds:15),

@@ -5,6 +5,7 @@ import '../../domain/screens.dart';
 import '../navigation.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
+import '../shared/section_banner.dart';
 import '../shared/forms.dart';
 
 Future<Json?> _editProfile(BuildContext context)=>openOperation(context,'profile',seed:context.app.user,initial:context.app.user);
@@ -20,9 +21,13 @@ class _SignInPageState extends State<SignInPage>{
   @override void dispose(){email.dispose();password.dispose();super.dispose();}
   @override Widget build(BuildContext context)=>Scaffold(body:BotanicalBackground(child:SafeArea(child:Center(child:ConstrainedBox(
     constraints:const BoxConstraints(maxWidth:460),child:Form(key:form,child:PageBody(children:[
-      const SizedBox(height:48),const Center(child:BrandLogo(size:88)),const SizedBox(height:24),
-      Text(context.tr('مرحبًا بك في مزرعتي','Welcome to Mazraa'),textAlign:TextAlign.center,style:Theme.of(context).textTheme.headlineSmall),
-      Text(context.tr('الطبيب والوكيل · رعاية أقرب، وعمل أيسر','Doctor and agent · Better care, simpler work'),textAlign:TextAlign.center),const SizedBox(height:28),
+      const SizedBox(height:16),
+      const Align(alignment:AlignmentDirectional.centerStart,child:BrandLogo(size:52)),
+      const SizedBox(height:14),
+      SectionBanner(art:SectionArt.workspace,
+        title:context.tr('مزرعتي للطبيب والوكيل','Mazraa for doctors and agents')),
+      Heading(context.tr('تسجيل الدخول','Sign in')),
+
       TextFormField(controller:email,keyboardType:TextInputType.emailAddress,textDirection:TextDirection.ltr,
         autofillHints:const [AutofillHints.username],decoration:InputDecoration(labelText:context.tr('البريد الإلكتروني','Email'),prefixIcon:const Icon(Icons.alternate_email)),
         validator:(v)=>(v??'').contains('@')?null:context.tr('أدخل بريدًا صالحًا','Enter a valid email')),const SizedBox(height:16),

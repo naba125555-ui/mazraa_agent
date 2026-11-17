@@ -10,6 +10,8 @@ import '../shared/forms.dart';
 import '../shared/labels.dart';
 import '../shared/paged_records.dart';
 import '../shared/scope.dart';
+import '../shared/section_banner.dart';
+import '../shared/product_thumbnail.dart';
 import '../shared/widgets.dart';
 import 'clinical.dart';
 
@@ -49,6 +51,8 @@ class BusinessPage extends StatelessWidget{
       'paidAmount':null,'paymentMethod':'Cash'});
     if(screen=='A02'||screen=='A03'||screen=='A04')return AuctionWizard(screen:screen);
     if(screen=='A01')return Resource(identity:app.revision,load:()=>app.read('/api/agent/marketplace/auctions',query:app.scoped()),builder:(data,refresh)=>PageBody(children:[
+      SectionBanner(art:SectionArt.workspace,icon:Icons.gavel_outlined,title:context.tr('مزادات الفرع','Branch auctions')),
+      const SizedBox(height:12),
       FilledButton.icon(onPressed:()=>context.open('A02'),icon:const Icon(Icons.add),label:Text(context.tr('إنشاء مزاد','Create auction'))),const SizedBox(height:16),
       if(maps(obj(data)['auctions']).isEmpty)const Empty(),for(final a in maps(obj(data)['auctions']))RecordTile(a,icon:Icons.gavel_outlined,onTap:()=>context.open('A05',id:numId(a['id']))),
     ]));
@@ -59,7 +63,12 @@ class BusinessPage extends StatelessWidget{
         if(shift==null)return PageBody(children:[Empty(text:context.tr('لا توجد وردية مفتوحة','No active shift'))]);
         return OperationPage(embedded:true,operation:operations['closeShift']!,id:numId(shift['id']),seed:shift);
       }
-      return PageBody(children:[Facts(box,fields:['name','currencyCode','currentBalance','openingBalance']),
+      return PageBody(children:[
+        SectionBanner(art:SectionArt.commerce,icon:Icons.account_balance_wallet_outlined,
+          title:str(box['name']).isEmpty?context.tr('صندوق الفرع','Branch cashbox'):str(box['name']),
+          subtitle:'${context.tr('الرصيد الحالي','Current balance')}  ${display(context,box['currentBalance'])} ${str(box['currencyCode'])}'),
+        const SizedBox(height:12),
+        Facts(box,fields:['openingBalance','currencyCode']),
         if(screen=='N01'||screen=='N03')...[
           Heading(context.tr('الوردية النقدية','Cash shift')),
           if(active==null)BusyButton(label:context.tr('فتح وردية','Open shift'),run:()async{await openOperation(context,'openShift');refresh();})
@@ -105,6 +114,10 @@ class BusinessPage extends StatelessWidget{
           _ => true,
         },
         header: [
+          if (['I01','T06','T11','P01','P02','G01'].contains(screen)) ...[
+            SectionBanner(art:SectionArt.commerce, title:context.app.tr(screenById(screen).ar,screenById(screen).en)),
+            const SizedBox(height:10),
+          ],
           if (screen == 'I01') _Shortcuts(const ['I05','I06','I07','I09']),
           if (screen == 'T06') _Shortcuts(const ['T02','T08','T09']),
           if (screen == 'T11') _Shortcuts(const ['T12','T13','T14']),
@@ -114,25 +127,49 @@ class BusinessPage extends StatelessWidget{
           ),
           const SizedBox(height: 14),
         ],
-        itemBuilder: (row) => RecordTile(
-          row,
-          subtitle: screen == 'I01'
-              ? '${context.tr('المتاح','Available')}: ${display(context,row['availableQuantity'])}'
-              : null,
-          onTap: () => context.open(binding.$2, id: numId(row['id']), seed: row),
-        ),
+        itemBuilder: (row) {
+          final open=()=>context.open(binding.$2,id:numId(row['id']),seed:row);
+          if(screen=='I01')return _StockTile(row:row,onTap:open);
+          final subtitle = switch (screen) {
+            'T06' || 'T11' => '${display(context,row['totalAmount'])} ${str(row['currency'])}',
+            'P01' => str(row['address']),
+            'P02' => display(context,row['deadline']),
+            'G01' => str(payload(row)['description']),
+            _ => '',
+          };
+          final icon=switch(screen){
+            'T06'||'T11'=>Icons.receipt_long_outlined,
+            'P01'||'P02'=>Icons.local_shipping_outlined,
+            'G01'=>Icons.lightbulb_outline,
+            _=>Icons.swap_horiz,
+          };
+          return RecordTile(row,icon:icon,subtitle:subtitle,onTap:open);
+        },
       );
     }
     if(id==null)return _RecordSelector(target:screen);
     final kind=screen.startsWith('I')?'stock':screen.startsWith('P')?'pickup':screen.startsWith('A')?'auction':screen.startsWith('G')?'proposal':
       screen=='T13'?'procurement':screen=='I08'?'transfer':'document';
     final actualKind=screen=='I08'?'transfer':screen=='T04'?'variant':kind;
-    return Resource(identity:'$screen:$id:${app.revision}',load:()=>actualKind=='variant'?app.read('/api/product-variants/$id'):app.record(actualKind,id!,fresh:true),builder:(data,refresh){
+    return Resource(identity:'$screen:$id:${app.revision}',load:()async{
+      if(actualKind=='variant')return app.variant(id!);
+      final data=await app.record(actualKind,id!,fresh:true);
+      if(actualKind!='stock')return data;
+      try {
+        final variant=await app.variant(numId(data['productVariantId']));
+        return {...data,'variant':variant};
+      }catch(_){return data;}
+    },builder:(data,refresh){
       final row=obj(data),d=payload(row);
       if(screen=='I08'||screen=='T13')return OperationPage(embedded:true,operation:operations[screen=='I08'?'receiveTransfer':'receivePurchase']!,id:id,seed:row);
       if(screen=='N07')return OperationPage(embedded:true,operation:operations['settle']!,id:id,seed:row);
       if(screen=='I04')return _RemoteList('/api/Inventory/$id/transactions');
-      if(screen=='I02'||screen=='I03'||screen=='T04')return PageBody(children:[Facts(row),
+      if(screen=='I02'||screen=='I03'||screen=='T04')return PageBody(children:[
+        if(screen=='T04')
+          RecordTile(row,icon:Icons.inventory_2_outlined,imageUrl:productImage(row),subtitle:str(row['sku']))
+        else
+          _StockTile(row:row),
+        Facts(row,fields:['quantityOnHand','availableQuantity','reservedQuantity','averageCost']),
         Heading(context.tr('الدفعات والصلاحية','Batches and expiry')),
         for(final batch in maps(row['batches']))Padding(padding:const EdgeInsets.only(bottom:12),child:Facts(batch)),
         if(screen=='I02')...[_InlineLink('I03',id!),_InlineLink('I04',id!)],
@@ -181,6 +218,33 @@ class BusinessPage extends StatelessWidget{
   }
 }
 ScreenSpec screenById(String id)=>screen(id);
+class _StockTile extends StatelessWidget {
+  const _StockTile({required this.row,this.onTap});
+
+  final Json row;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context){
+    final app=context.app;
+    final variantId=numId(row['productVariantId']);
+    final saved=obj(row['variant']);
+    Widget card(Json variant){
+      final batches=maps(row['batches']).length;
+      return RecordTile(
+        {...row,...variant,'id':row['id']},
+        imageUrl:productImage(variant),icon:Icons.inventory_2_outlined,
+        subtitle:'${context.tr('المتاح','Available')}  ${display(context,row['availableQuantity'])}   ·   ${context.tr('الدفعات','Batches')}  ${display(context,batches)}',
+        onTap:onTap,
+      );
+    }
+    if(saved.isNotEmpty||variantId==0)return card(saved);
+    return FutureBuilder<Json>(
+      future:app.variant(variantId),builder:(context,snapshot)=>card(snapshot.data??{}),
+    );
+  }
+}
+
 class _InlineLink extends StatelessWidget{
   const _InlineLink(this.route,this.id);final String route;final int id;
   @override Widget build(BuildContext context){final spec=screenById(route);return RecordTile({'title':context.app.tr(spec.ar,spec.en)},onTap:()=>context.open(route,id:id));}
@@ -193,12 +257,20 @@ class _Shortcuts extends StatelessWidget{
 class BusinessHub extends StatelessWidget{
   const BusinessHub({super.key});
   @override Widget build(BuildContext context)=>PageBody(children:[
-    Heading(context.tr('إدارة العمل','Business workspace'),icon:Icons.storefront_outlined),
+    SectionBanner(art:SectionArt.commerce,icon:Icons.storefront_outlined,
+      title:context.tr('إدارة الفرع','Manage your branch'),
+      subtitle:context.tr('نقطة البيع والمخزون والصندوق','Point of sale, inventory and cashbox')),
+    Heading(context.tr('عمليات الفرع','Branch operations')),
+    LayoutBuilder(builder:(context,grid)=>Wrap(spacing:8,runSpacing:8,children:[
     for(final entry in [('T02',Icons.point_of_sale_outlined),('I01',Icons.inventory_2_outlined),('T06',Icons.receipt_long_outlined),('T09',Icons.request_quote_outlined),
       ('T11',Icons.shopping_bag_outlined),('T12',Icons.add_shopping_cart),('T10',Icons.local_shipping_outlined),('N01',Icons.account_balance_wallet_outlined),
       ('N05',Icons.account_balance_outlined),('N06',Icons.menu_book_outlined),('N08',Icons.bar_chart),('P01',Icons.storefront_outlined),
       ('P02',Icons.move_to_inbox_outlined),('A01',Icons.gavel_outlined),('G01',Icons.lightbulb_outline)])
-      if(context.app.canOpen(screenById(entry.$1)))RecordTile({'title':context.app.tr(screenById(entry.$1).ar,screenById(entry.$1).en)},icon:entry.$2,onTap:()=>context.open(entry.$1)),
+      if(context.app.canOpen(screenById(entry.$1)))
+        SizedBox(width:grid.maxWidth<340?grid.maxWidth:(grid.maxWidth-8)/2,
+          child:ActionTile(title:context.app.tr(screenById(entry.$1).ar,screenById(entry.$1).en),
+            icon:entry.$2,onTap:()=>context.open(entry.$1))),
+    ])),
     if(context.app.access.grants.isEmpty)Notice(context.tr('لا يوجد تفويض تجاري نشط. تواصل مع الإدارة لتحديد نطاقك.','No active business delegation. Contact your administrator to assign a work context.')),
   ]);
 }
@@ -207,10 +279,13 @@ class _RecordSelector extends StatelessWidget{
   @override Widget build(BuildContext context){final app=context.app;
     final binding=target.startsWith('I')?('/api/agent/commerce/inventory',true):target.startsWith('P')?('/api/agent/pickup/requests',true):
       target.startsWith('G')?('/api/agent/marketplace/proposals',false):('/api/agent/commerce/documents',true);
-    return Resource(load:()=>app.all(binding.$1,query:binding.$2?app.scoped():null,pageSize:target.startsWith('I')?100:50),builder:(data,refresh)=>PageBody(children:[
-      Notice(context.tr('اختر السجل للمتابعة','Choose a record to continue')),const SizedBox(height:14),if(rows(data).isEmpty)const Empty(),
-      for(final row in rows(data))RecordTile(row,onTap:()=>context.open(target,id:numId(row['id']),seed:row)),
-    ]));}
+    return PagedRecords(
+      load:(cursor)=>app.page(binding.$1,query:binding.$2?app.scoped():null,afterId:cursor),
+      pageSize:target.startsWith('I')?100:50,
+      header:[Heading(context.tr('اختر سجلًا للمتابعة','Choose a record to continue'))],
+      itemBuilder:(row)=>RecordTile(row,onTap:()=>context.open(target,id:numId(row['id']),seed:row)),
+    );
+  }
 }
 class _RemoteList extends StatelessWidget{
   const _RemoteList(this.path,{this.query,this.onTap});final String path;final Json? query;
@@ -222,7 +297,7 @@ class _RemoteList extends StatelessWidget{
 }
 class _EmbeddedRecords extends StatelessWidget{
   const _EmbeddedRecords({super.key,required this.load});final Future<dynamic> Function() load;
-  @override Widget build(BuildContext context)=>Resource(load:load,builder:(data,refresh)=>Column(children:[
+  @override Widget build(BuildContext context)=>Resource(embedded:true,load:load,builder:(data,refresh)=>Column(children:[
     if(data is Map)RecordDetails(payload(obj(data))),
     if(rows(data).isEmpty&&data is! Map)const Empty(),
     for(final row in rows(data))Padding(padding:const EdgeInsets.only(bottom:10),child:RecordDetails(payload(row)))]));
@@ -241,41 +316,164 @@ class PointOfSale extends StatefulWidget{
   const PointOfSale({super.key});
   @override State<PointOfSale> createState()=>_PointOfSaleState();
 }
-class _PointOfSaleState extends State<PointOfSale>{
+class _PointOfSaleState extends State<PointOfSale> {
+  final searchController=TextEditingController();
   String search='';
+
+  @override
+  void dispose(){
+    searchController.dispose();
+    super.dispose();
+  }
+
+  void changeQuantity(Json line,double desired){
+    final basket=context.app.basket;
+    final inOtherBatches=basket.where((other)=>other!=line&&other['productVariantId']==line['productVariantId'])
+        .fold(0.0,(total,other)=>total+decimal(other['quantity']));
+    if(desired>decimal(line['maxQuantity'])||desired+inOtherBatches>decimal(line['availableStock'])){
+      toast(context,context.tr('الكمية المطلوبة تتجاوز الرصيد المتاح.','The requested quantity exceeds available stock.'));
+      return;
+    }
+    setState((){
+      if(desired<=0){basket.remove(line);}
+      else{line['quantity']=desired;if(!basket.contains(line))basket.add(line);}
+    });
+  }
+
   Future<void> add(Json variant,Json stock)async{
-    final batches=maps(stock['batches']).where((b){final expiry=DateTime.tryParse(str(b['expiryDate']));
-      return decimal(b['quantity'])>0&&(expiry==null||expiry.isAfter(DateTime.now().toUtc()));}).toList();
-    final batch=await showModalBottomSheet<Json>(context:context,builder:(c)=>PageBody(children:[
-      Heading(c.tr('اختر الدفعة','Choose a batch')),if(batches.isEmpty)const Empty(),for(final b in batches)RecordTile(b,subtitle:'${display(c,b['quantity'])} · ${display(c,b['expiryDate'])}',onTap:()=>Navigator.pop(c,b)),
+    final batches=maps(stock['batches']).where((batch){
+      final expiry=DateTime.tryParse(str(batch['expiryDate']));
+      return decimal(batch['quantity'])>0&&(expiry==null||expiry.isAfter(DateTime.now().toUtc()));
+    }).toList();
+    final batch=await showModalBottomSheet<Json>(context:context,useSafeArea:true,builder:(sheet)=>PageBody(children:[
+      Heading(sheet.tr('اختر الدفعة','Choose a batch')),
+      if(batches.isEmpty)Empty(text:sheet.tr('لا توجد دفعة صالحة للبيع','No eligible batch is available')),
+      for(final item in batches)
+        RecordTile(item,icon:Icons.inventory_2_outlined,
+          subtitle:'${display(sheet,item['quantity'])} · ${display(sheet,item['expiryDate'])}',
+          onTap:()=>Navigator.pop(sheet,item)),
     ]));
     if(batch==null||!mounted)return;
-    final basket=context.app.basket,index=basket.indexWhere((l)=>l['productVariantId']==variant['id']&&l['batchId']==batch['id']);
-    setState((){if(index>=0){basket[index]['quantity']=decimal(basket[index]['quantity'])+1;}else{
-      basket.add({'productVariantId':variant['id'],'batchId':batch['id'],'quantity':1,'name':titleOf(variant),
-        'unitPrice':variant['salePrice']??variant['price'],'batchNumber':batch['batchNumber']});}});
+    final variantId=numId(stock['productVariantId']);
+    final basket=context.app.basket;
+    final existing=basket.where((line)=>line['productVariantId']==variantId&&line['batchId']==batch['id']).firstOrNull;
+    final line=existing??{
+      'productVariantId':variantId,'batchId':batch['id'],'quantity':0,
+      'name':titleOf(variant),'unitPrice':variant['salePrice']??variant['price'],'batchNumber':batch['batchNumber'],
+      'maxQuantity':batch['quantity'],'availableStock':stock['availableQuantity'],
+    };
+    changeQuantity(line,decimal(line['quantity'])+1);
   }
-  @override Widget build(BuildContext context){final app=context.app;return Resource(identity:'pos:${app.grantId}:${app.revision}',load:()async=>{
-    'catalog':await app.read('/api/product-variants'),'stock':await app.all('/api/agent/commerce/inventory',query:app.scoped(),pageSize:100)},builder:(data,refresh){
-      final catalog=rows(obj(data)['catalog']),stock=maps(obj(data)['stock']);
-      final products=catalog.where((v)=>'${titleOf(v)} ${v['sku']}'.toLowerCase().contains(search)&&stock.any((s)=>s['productVariantId']==v['id']&&decimal(s['availableQuantity'])>0)).toList();
-      return PageBody(children:[TextField(decoration:InputDecoration(prefixIcon:const Icon(Icons.search),hintText:context.tr('اسم المنتج أو SKU','Product name or SKU'),
-        suffixIcon:IconButton(icon:const Icon(Icons.qr_code_scanner),onPressed:()=>context.open('T03'))),onChanged:(v)=>setState(()=>search=v.toLowerCase())),
-        Heading(context.tr('أصناف متاحة في مخزنك','Available in your warehouse')),
-        if(products.isEmpty)const Empty(),for(final product in products.take(60))RecordTile(product,icon:Icons.add_shopping_cart,
-          subtitle:'${display(context,product['salePrice']??product['price'])} ${app.currency}',onTap:()=>add(product,stock.firstWhere((s)=>s['productVariantId']==product['id']))),
-        Heading(context.tr('سلة البيع','Sale cart'),action:TextButton(onPressed:()=>setState(()=>app.basket.clear()),child:Text(context.tr('إفراغ','Clear')))),
-        if(app.basket.isEmpty)const Empty(icon:Icons.shopping_cart_outlined),
-        for(var i=0;i<app.basket.length;i++)Padding(padding:const EdgeInsets.only(bottom:10),child:Panel(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Text(str(app.basket[i]['name']),style:Theme.of(context).textTheme.titleMedium),Fact('batchNumber',app.basket[i]['batchNumber']),
-          Row(children:[IconButton(onPressed:()=>setState((){final qty=decimal(app.basket[i]['quantity']);if(qty<=1){app.basket.removeAt(i);}else{app.basket[i]['quantity']=qty-1;}}),icon:const Icon(Icons.remove_circle_outline)),
-            Text(display(context,app.basket[i]['quantity'])),IconButton(onPressed:()=>setState(()=>app.basket[i]['quantity']=decimal(app.basket[i]['quantity'])+1),icon:const Icon(Icons.add_circle_outline)),
-            const Spacer(),Text('${display(context,decimal(app.basket[i]['quantity'])*decimal(app.basket[i]['unitPrice']))} ${app.currency}')]),
-        ]))),
-        if(app.basket.isNotEmpty)... [Notice(context.tr('تعرض السلة أسعار الكتالوج. تحدد الفاتورة المعتمدة الضرائب والخصومات النهائية.','The cart shows catalog prices. The posted invoice confirms final taxes and discounts.')),
-          const SizedBox(height:16),FilledButton.icon(onPressed:()=>context.open('T05'),icon:const Icon(Icons.receipt_long_outlined),label:Text(context.tr('متابعة إلى الدفع','Continue to payment')))],
-      ]);
-    });}
+
+  Future<void> openCart()async{
+    final app=context.app;
+    final continueToPayment=await showModalBottomSheet<bool>(
+      context:context,useSafeArea:true,isScrollControlled:true,
+      builder:(sheet)=>StatefulBuilder(builder:(context,refresh)=>FractionallySizedBox(
+        heightFactor:.78,
+        child:Column(children:[
+          Expanded(child:PageBody(children:[
+            Heading(context.tr('سلة البيع','Sale cart')),
+            if(app.basket.isEmpty)const Empty(icon:Icons.shopping_cart_outlined),
+            for(final line in app.basket)
+              Padding(padding:const EdgeInsets.only(bottom:8),child:Panel(child:Column(
+                crossAxisAlignment:CrossAxisAlignment.start,
+                children:[
+                  Text(str(line['name']),style:Theme.of(context).textTheme.titleMedium),
+                  Fact('batchNumber',line['batchNumber']),
+                  Row(children:[
+                    IconButton(tooltip:context.tr('إنقاص الكمية','Decrease quantity'),
+                      onPressed:()=>refresh(()=>changeQuantity(line,decimal(line['quantity'])-1)),
+                      icon:const Icon(Icons.remove_circle_outline)),
+                    Text(display(context,line['quantity'])),
+                    IconButton(tooltip:context.tr('زيادة الكمية','Increase quantity'),
+                      onPressed:()=>refresh(()=>changeQuantity(line,decimal(line['quantity'])+1)),
+                      icon:const Icon(Icons.add_circle_outline)),
+                    const Spacer(),
+                    Text('${display(context,decimal(line['quantity'])*decimal(line['unitPrice']))} ${app.currency}'),
+                  ]),
+                ],
+              ))),
+          ])),
+          Padding(padding:const EdgeInsets.fromLTRB(18,8,18,18),child:SizedBox(
+            width:double.infinity,
+            child:FilledButton.icon(
+              onPressed:app.basket.isEmpty?null:()=>Navigator.pop(sheet,true),
+              icon:const Icon(Icons.receipt_long_outlined),
+              label:Text(context.tr('مراجعة المبلغ والدفع','Review amount and payment')),
+            ),
+          )),
+        ]),
+      )),
+    );
+    if(continueToPayment==true&&mounted)context.open('T05');
+  }
+
+  @override
+  Widget build(BuildContext context){
+    final app=context.app,theme=Theme.of(context);
+    final count=app.basket.fold(0.0,(total,line)=>total+decimal(line['quantity']));
+    final subtotal=app.basket.fold(0.0,(total,line)=>total+decimal(line['quantity'])*decimal(line['unitPrice']));
+    return Column(children:[
+      Expanded(child:PagedRecords(
+        key:ValueKey('pos:${app.grantId}:${app.revision}'),
+        pageSize:100,
+        load:(cursor)=>app.page('/api/agent/commerce/inventory',query:app.scoped(),afterId:cursor),
+        include:(row)=>decimal(row['availableQuantity'])>0,
+        header:[
+          SectionBanner(art:SectionArt.commerce,icon:Icons.point_of_sale_outlined,
+            title:context.tr('البيع من مخزنك','Sell from your inventory')),
+          const SizedBox(height:12),
+          TextField(controller:searchController,textInputAction:TextInputAction.search,
+            decoration:InputDecoration(prefixIcon:const Icon(Icons.search),
+              hintText:context.tr('اسم الصنف أو رمزه','Product name or SKU'),
+              suffixIcon:IconButton(tooltip:context.tr('مسح رمز','Scan code'),
+                icon:const Icon(Icons.qr_code_scanner),onPressed:()=>context.open('T03'))),
+            onChanged:(value){
+              if(value.isEmpty)setState(()=>search='');
+            },
+            onSubmitted:(value)=>setState(()=>search=value.trim().toLowerCase()),
+          ),
+          const SizedBox(height:12),
+        ],
+        itemBuilder:(stock){
+          final id=numId(stock['productVariantId']);
+          return FutureBuilder<Json>(
+            future:app.variant(id),
+            builder:(context,snapshot){
+              final product=snapshot.data;
+              if(product==null){
+                if(snapshot.hasError && search.isEmpty){
+                  return RecordTile({'title':'${context.tr('صنف المخزون','Stock item')} #$id'},
+                    icon:Icons.inventory_2_outlined,subtitle:context.tr('تعذر تحميل تفاصيل الصنف','Product details unavailable'));
+                }
+                return snapshot.connectionState==ConnectionState.done?const SizedBox.shrink():
+                  const Padding(padding:EdgeInsets.all(14),child:LinearProgressIndicator());
+              }
+              if(product['isAvailable']==false||
+                 !'${titleOf(product)} ${str(product['sku'])}'.toLowerCase().contains(search)){
+                return const SizedBox.shrink();
+              }
+              return RecordTile(product,imageUrl:productImage(product),icon:Icons.add_shopping_cart,
+                subtitle:'${display(context,product['salePrice']??product['price'])} ${app.currency}  ·  ${context.tr('متاح','Available')} ${display(context,stock['availableQuantity'])}',
+                onTap:()=>add(product,stock));
+            },
+          );
+        },
+      )),
+      Material(color:theme.colorScheme.surface,child:SafeArea(
+        top:false,
+        child:Padding(padding:const EdgeInsets.symmetric(horizontal:18,vertical:10),child:Row(children:[
+          Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
+            Text('${display(context,count)} ${context.tr('وحدة في السلة','units in cart')}',style:theme.textTheme.bodySmall),
+            Text('${display(context,subtotal)} ${app.currency}',style:theme.textTheme.titleMedium),
+          ])),
+          FilledButton.icon(onPressed:count>0?openCart:null,icon:const Icon(Icons.shopping_basket_outlined),
+            label:Text(context.tr('عرض السلة','View cart'))),
+        ])),
+      )),
+    ]);
+  }
 }
 class BusinessInsights extends StatefulWidget{
   const BusinessInsights({super.key});
