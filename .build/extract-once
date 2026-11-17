@@ -1,1 +1,4 @@
-Verify completed implementation with the corrected initial lockfile handling and persistent SDK cache.
+Build request for the refreshed permission-aware Mazraa Agent home screen.
+Source update: f07b082c59b910adad4ab7042d4b32e8aceb7d42
+Requested: 2026-11-18
+Artifacts: ARM64 release APK and widget-test previews.
