@@ -1,0 +1,394 @@
+# التدفقات التكميلية، صلاحيات الإدارة، سيناريوهات الفشل واختبارات القبول
+
+**ملحق إلزامي لخطة إعادة بناء تطبيق الطبيب والوكيل.** الشاشات القياسية الـ92 موثقة في [01](01-general-clinical-field.md)، [02](02-inventory-trade-finance.md)، [03](03-pickup-auctions-proposals.md). هذه الوثيقة تحصي الإجراءات التي لا تُختزل في شاشات تشغيل الوكيل العادي، وما يلزم لإطلاق متكامل. تظل كل عمليات الإدارة **مخفية وممنوعة** ما لم يمنح السيرفر حقًا إداريًا حقيقيًا.
+
+## أ. شاشات الأدوار المتقدمة والتوسع المشروط (X01–X18)
+
+**تصنيف:** X ليس فهرسًا موجودًا في كود Flutter الحالي؛ هو اقتراح **شرطي** لإظهار قدرات خلفية ثبت وجودها، ولا يفرض وضع وظائف الإدارة العامة في تطبيق الطبيب. عند عدم تمكين الدور الإداري ضمن سياسة المنتج، تنفذ هذه الشاشات في لوحة الإدارة الحالية مع روابط حالة للوكيل، وليس في الهاتف. كل X يحتاج صلاحية/ترخيص/نطاق مستقلًا، وتحكم في الوصول في الخادم؛ إخفاء زر الواجهة وحده ليس حماية.
+
+### X01 — مركز مراجعات المستودع للمخوّل
+
+- **API القراءة:** GET /api/agent/operations/review-queue?warehouseId=&kind=&afterId=؛ GET /api/agent/supply/review-queue.
+- **API التغيير:** —؛ الانتقال إلى X02–X11 لتأكيد القرار.
+- **Request/DTO:** warehouseId من نطاق الإدارة؛ kind ضمن StockCount,CashShift,AuctionReview,Proposal,PurchaseRequest,TransferRequest,TransferException,PickupException,ReturnRequest,CustomerRefund؛ afterId.
+- **Response المطلوب:** items: id,kind,status,version,ownerId,warehouseId,relatedId,details؛ قائمة التغذية حسب عقدها.
+- **بوابة التفويض والتتابع:** permission agent.operations.review أو agent.proposals.review وفق kind + warehouse scope؛ لا يكفي AgentCapability، ولا تعرض لمستخدم بلا حق المراجعة.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X02 — قرار مراجعة الجرد
+
+- **API القراءة:** GET /api/agent/operations/review-queue?warehouseId=&kind=StockCount&afterId=.
+- **API التغيير:** POST /api/agent/commerce/stock-counts/{id}/review.
+- **Request/DTO:** ReviewInput: requestId,version,approve,notes.
+- **Response المطلوب:** قرار/نسخة جديدة أو تعارض 409؛ details.lines expected,counted مع تاريخ/rowVersion.
+- **بوابة التفويض والتتابع:** مراجع آخر غير المنشئ؛ رفض عند تغيّر المخزون بعد تاريخ الحصر؛ العودة I09/I10.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X03 — قرار فرق الوردية
+
+- **API القراءة:** GET /api/agent/operations/review-queue?warehouseId=&kind=CashShift&afterId=؛ GET /api/agent/operations/cashbox?delegationId=.
+- **API التغيير:** POST /api/agent/commerce/shifts/{id}/review.
+- **Request/DTO:** ReviewInput: requestId,version,approve,notes.
+- **Response المطلوب:** record id,status,version,details.expectedClosing,countedClosing؛ ledger المستقل.
+- **بوابة التفويض والتتابع:** مراجع مستقل؛ اعتماد الفرق لا ينشئ حركة نقدية تلقائيًا؛ سجل متابعة قيود ومطابقة ضمن N04/N06.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X04 — مراجعة طلب شراء
+
+- **API القراءة:** GET /api/agent/operations/review-queue?warehouseId=&kind=PurchaseRequest&afterId=؛ GET /api/agent/procurement?delegationId=&afterId=.
+- **API التغيير:** POST /api/agent/procurement/{id}/review.
+- **Request/DTO:** ReviewInput: requestId,version,approve,notes.
+- **Response المطلوب:** status,version,details.supplierId,lines,documentIds إن وصلت في سجل الطلب.
+- **بوابة التفويض والتتابع:** مراجعة مستقلة وصلاحية مستودع؛ القبول لا يعني استلام أو دفع؛ T12 → X04 → T13.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X05 — مراجعة طلب تغذية وصرف المصدر
+
+- **API القراءة:** GET /api/agent/supply/review-queue؛ GET /api/agent/supply/requests?delegationId=&afterId=.
+- **API التغيير:** POST /api/agent/supply/requests/{id}/review؛ POST /api/agent/supply/requests/{id}/dispatch.
+- **Request/DTO:** ReviewInput: requestId,version,approve,notes؛ SupplyDispatchInput: requestId,version,batches[{productVariantId,batchId,quantity}],notes.
+- **Response المطلوب:** طلب مُراجع مرتبط بتحويل/رقم TransferId وحالة النسخة الجديدة.
+- **بوابة التفويض والتتابع:** المراجعة غير إرسال الدفعات؛ مصدر المخزن مخول بالصرف؛ I07 → X05 → I08.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X06 — إدارة استثناءات اختلاف النقل
+
+- **API القراءة:** GET /api/agent/operations/review-queue?warehouseId=&kind=TransferException&afterId=؛ GET /api/agent/commerce/transfers?delegationId=&afterId=.
+- **API التغيير:** POST /api/agent/supply/transfers/{id}/exceptions؛ POST /api/agent/supply/exceptions/{id}/review.
+- **Request/DTO:** TransferExceptionInput: requestId,delegationId,version,batchId,quantity,reason,notes؛ TransferResolutionInput: requestId,version,approve,returnReceived,notes.
+- **Response المطلوب:** details.batchId,quantity,reason,reviewNotes,status,version.
+- **بوابة التفويض والتتابع:** لا تعدّل الرصيد أو الكمية المُرسلة يدويًا؛ أثبت التلف/الفقد/المرتجع المادي؛ طرف مراجعة آخر.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X07 — قرار مرتجع بيع أو شراء
+
+- **API القراءة:** GET /api/agent/returns?delegationId=&afterId=؛ GET /api/agent/operations/review-queue?warehouseId=&kind=ReturnRequest&afterId=.
+- **API التغيير:** POST /api/agent/returns/{id}/review.
+- **Request/DTO:** AgentReturnReviewInput: requestId,version,approve,itemsReceived,refundAmount,notes.
+- **Response المطلوب:** returnDocumentId,reviewNotes,originalDocumentId,lines,status,version.
+- **بوابة التفويض والتتابع:** مراجعة غير مُنشئ المرتجع؛ المبلغ المعتمد قد يُنشئ التزام رد مال لا تحويل مزوّد خارجي؛ T08/T14 → X09 عند اللزوم.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X08 — اعتماد استثناء نقطة الاستلام
+
+- **API القراءة:** GET /api/agent/pickup/requests?delegationId=&afterId=؛ GET /api/agent/pickup/requests/{id}/custody-details؛ GET /api/agent/operations/review-queue?warehouseId=&kind=PickupException&afterId=.
+- **API التغيير:** POST /api/agent/pickup/exceptions/{id}/review.
+- **Request/DTO:** PickupExceptionReview: requestId,version,returnReceivedAtSource,resumeCustody,notes.
+- **Response المطلوب:** id,status,version,details والمستند الناتج عند إعادة المصدر.
+- **بوابة التفويض والتتابع:** لا تؤكد الإرجاع إلى المصدر دون إثبات مادي؛ فصل إلغاء الطلب عن استثناء الحيازة؛ P07.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X09 — مطالبات رد المال وتنفيذها
+
+- **API القراءة:** GET /api/agent/finance/refunds?delegationId=&afterId=.
+- **API التغيير:** POST /api/agent/finance/refunds؛ POST /api/agent/finance/refunds/{id}/pay؛ POST /api/agent/finance/refunds/{id}/cancel.
+- **Request/DTO:** CustomerRefundInput: requestId,returnDocumentId,amount,method؛ CustomerRefundPayInput: requestId,delegationId,version,approve,code?,notes؛ تحقق من body خاص cancel بالمصدر.
+- **Response المطلوب:** CustomerRefundData: returnDocumentId,amount,method,currency,expiresAt,attempts,paidBy,notes؛ status/version.
+- **بوابة التفويض والتتابع:** طلب رد مال يخص العميل؛ دفع النقد بمسؤول صندوق ثانٍ ورمز العميل؛ رد المحفظة خادمي؛ البنك/البطاقة خارج مسار رد مباشر لا تدّع نجاحها.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X10 — قرار مراجعة مزاد
+
+- **API القراءة:** GET /api/agent/operations/review-queue?warehouseId=&kind=AuctionReview&afterId=؛ GET /api/agent/marketplace/auctions?delegationId=&afterId=.
+- **API التغيير:** POST /api/agent/marketplace/auctions/{id}/review.
+- **Request/DTO:** ProposalReviewInput: requestId,version,status,notes,linkedEntityId?؛ الحالات Approved/Rejected/NeedsChanges حسب Controller.
+- **Response المطلوب:** review record ونسخة/hash اعتماد لعناصر وشروط وصور المزاد.
+- **بوابة التفويض والتتابع:** لا يصادق المبدع على مزاده؛ تغيّر أي شرط/صورة يبطل موافقة سابقة؛ بعد الاعتماد يظل النشر بخطوة A06.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X11 — قرار مراجعة مقترح
+
+- **API القراءة:** GET /api/agent/operations/review-queue?warehouseId=&kind=Proposal&afterId=؛ GET /api/agent/marketplace/proposals?afterId=.
+- **API التغيير:** POST /api/agent/marketplace/proposals/{id}/review.
+- **Request/DTO:** ProposalReviewInput: requestId,version,status,notes,linkedEntityId?.
+- **Response المطلوب:** status,version,details.reviewedBy,reviewedAt,linkedEntityId.
+- **بوابة التفويض والتتابع:** permission agent.proposals.review + warehouse scope؛ لا نشر منتج ولا ترحيل شراء عند الموافقة؛ G03/G04.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X12 — إلغاء عزل دفعة بمراجع مخول
+
+- **API القراءة:** GET /api/agent/operations/batch-holds?delegationId=&afterId=.
+- **API التغيير:** POST /api/agent/operations/batch-holds/{id}/release.
+- **Request/DTO:** BatchReleaseInput: requestId,version,reason.
+- **Response المطلوب:** hold id,status,version وعودة قابلية المخزون للقراءة بعد فك العزل.
+- **بوابة التفويض والتتابع:** مراجع غير منشئ الحظر مع agent.operations.review؛ لا تسمح بالإفراج من I03 دون تفويض مستقل.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X13 — اعتماد تراخيص الأطباء — الإدارة
+
+- **API القراءة:** GET /api/agent/administration/veterinarians?userId=&search=&afterId=.
+- **API التغيير:** PUT /api/agent/administration/veterinarians/{userId}.
+- **Request/DTO:** ProfileInput: requestId,licenseNumber,jurisdiction ISO-2,specialty,expiresAt,approved.
+- **Response المطلوب:** user.id,name,license؛ حالة الموافقة والموعد/التخصص.
+- **بوابة التفويض والتتابع:** vet.profiles.manage؛ لا مراجعة ملف الطبيب لنفسه؛ مكانها إداري محمي لا تظهر في H08 العادية.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X14 — إسناد وإلغاء تفويضات الفرع — الإدارة
+
+- **API القراءة:** GET /api/agent/administration/delegations?warehouseId=&search=&afterId=.
+- **API التغيير:** POST /api/agent/administration/delegations؛ DELETE /api/agent/administration/delegations/{id}.
+- **Request/DTO:** DelegationInput: requestId,userId,warehouseId,cashBoxId?,capabilities,endsAt?؛ الإلغاء يحتاج id فقط.
+- **Response المطلوب:** warehouses,cashBoxes,accounts,grants,nextAfterId؛ نتيجة إنشاء التفويض.
+- **بوابة التفويض والتتابع:** agent.delegations.manage + warehouse scope؛ المدير لا يفوض نفسه؛ السحب الفوري يزيل أزرار الوحدة والكاش.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X15 — رخصة الصرف المستقلة — الإدارة
+
+- **API القراءة:** راجع GET /api/agent/mobile/bootstrap لصاحب الحساب وبيانات الترخيص الإدارية ذات الإذن.
+- **API التغيير:** PUT /api/vet/administration/dispensers/{userId}.
+- **Request/DTO:** DispensingLicenseInput: requestId,number,jurisdiction ISO-2,expiresAt,approved,notes.
+- **Response المطلوب:** record id,status,version؛ dispensingApproved وdispensingJurisdiction في bootstrap.
+- **بوابة التفويض والتتابع:** vet.profiles.manage؛ صاحب الحساب لا يعتمد نفسه؛ رخصة طبيب ≠ رخصة صرف؛ C13/C14.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X16 — حوكمة الحملات والتسوية
+
+- **API القراءة:** GET /api/agent/field/campaigns/{id}/report؛ GET /api/agent/field/campaigns/{id}/reconciliation.
+- **API التغيير:** PUT /api/agent/field/campaigns/{id}/team؛ PUT /api/agent/field/campaigns/{id}/authority؛ POST /api/agent/field/campaigns/{id}/outcomes/{outcomeId}/review؛ POST /api/agent/field/campaigns/{id}/reconciliation.
+- **Request/DTO:** CampaignTeamInput,CampaignAuthorityInput,ReviewInput بالتعريف في 07؛ المراجعة تتطلب version.
+- **Response المطلوب:** team,authority,allocations,outcomes,temperatures,reconciliation,version حسب موردها.
+- **بوابة التفويض والتتابع:** أهلية الإدارة/المراجع مستقلة عن كون الشخص طبيبًا عضوًا؛ فصل التسجيل الطبي عن اعتماد هدر المخزون.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X17 — إعداد نقطة استلام وإعادة التفويض — الإدارة
+
+- **API القراءة:** GET /api/agent/pickup/points?afterId=؛ GET /api/agent/pickup/requests?delegationId=&afterId=.
+- **API التغيير:** POST /api/agent/pickup/points؛ POST /api/agent/pickup/points/{id}/reassign؛ POST /api/agent/pickup/points/{id}/deactivate.
+- **Request/DTO:** PickupPointInput: requestId,delegationId,name,address,latitude,longitude,openingHours,capacity؛ PickupReassignInput: requestId,version,delegationId,reason؛ تحقق من تعطيل المسار.
+- **Response المطلوب:** pointId,status,version,assigned delegation؛ الطلبات المفتوحة المتأثرة.
+- **بوابة التفويض والتتابع:** agent.operations.review + warehouse scope؛ إعادة الإسناد تبطل رموز تسليم قديمة؛ منع تعطيل نقطة ما زالت حيازتها معلقة.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+### X18 — فحص تشغيل الخادم (اختياري لمسؤول تقني)
+
+- **API القراءة:** GET /api/agent/administration/diagnostics.
+- **API التغيير:** —.
+- **Request/DTO:** Bearer وجميع أذونات endpoint الفعلية.
+- **Response المطلوب:** الحالة التشغيلية حسب Controller؛ لا يُفترض أي حقل غير مثبت.
+- **بوابة التفويض والتتابع:** شاشة دعم داخلية لأصحاب الصلاحية الفنية فقط؛ لا تُضمّن بيانات خطأ أو تكوين/أسرار في التطبيق العام.
+- **حالات الواجهة:** فتح محمي → تحميل وفحص التخصيص → عرض قيد التنفيذ/المراجعة → نموذج تأكيد مع version → انتظار receipt → إعادة قراءة status. حالات 401/403/404/409/422، وتعثر تأكيد الطلب، وانتهاء التفويض بين الفتح والتأكيد إلزامية.
+
+## ب. عمليات لا تنفذها هوية الوكيل (حدود تطبيقات النظام)
+
+### E01 — إحالة العميل والموافقة على مشاركة AI
+
+- **صاحب التنفيذ:** عميل.
+- **Endpoints:** POST /api/vet/cases; POST /api/vet/cases/{id}/revoke-ai-consent.
+- **Payload الأساسي:** CaseInput: requestId,animalId,reason,aiConversationId?,sharedThroughMessageId?,shareAiConsent.
+- **العلاقة مع تطبيق الوكيل:** Requested، ثم Assign من جهة الإدارة إلى طبيب؛ الطبيب يقرأ فقط بعد الإسناد ويقبل في C02.
+
+### E02 — تعيين الطبيب والإدارة السريرية
+
+- **صاحب التنفيذ:** موزع أو إدارة مخولة.
+- **Endpoints:** GET /api/vet/cases/queue; POST /api/vet/cases/{id}/assign.
+- **Payload الأساسي:** AssignCaseInput: requestId,version,doctorId.
+- **العلاقة مع تطبيق الوكيل:** العيادة لا تُظهر زر Assign لطبيب غير مخول، وإعادة التكليف تلغي الوصول السابق.
+
+### E03 — مشتريات وصفة باسم العميل
+
+- **صاحب التنفيذ:** عميل.
+- **Endpoints:** POST /api/vet/prescriptions/{id}/checkout/preview; POST /api/vet/prescriptions/{id}/checkout.
+- **Payload الأساسي:** CreateOrderDto متضمن prescriptionId وcheckoutRequestId عند الإنشاء.
+- **العلاقة مع تطبيق الوكيل:** الوكيل يقرأ C14 ويصدر الدفعات ويجهز الطلب؛ لا ينشئ طلب شراء بموافقته عن العميل.
+
+### E04 — قبول عرض السعر أو الدفع من محفظة العميل
+
+- **صاحب التنفيذ:** عميل مالك الحساب.
+- **Endpoints:** POST /api/agent/commercial/quotes/{id}/accept; POST /api/agent/commercial/quotes/{id}/pay-wallet.
+- **Payload الأساسي:** QuoteAcceptanceInput: requestId,version؛ قيود محفظة العميل في السيرفر.
+- **العلاقة مع تطبيق الوكيل:** الوكلاء يصدرون quote في T09 لكن لا يصادرون رصيد العميل ولا يرفعون سعره محليًا.
+
+### E05 — عرض سعر نقطة استلام واختيار مسار الاستلام
+
+- **صاحب التنفيذ:** عميل.
+- **Endpoints:** POST /api/agent/pickup/points/{id}/quote; POST /api/agent/pickup/points/{id}/incoming-quotes.
+- **Payload الأساسي:** PickupQuoteInput: requestId,addressId,termsAccepted؛ IncomingPickupInput: requestId,addressId,sourceWarehouseId,termsAccepted,items[].
+- **العلاقة مع تطبيق الوكيل:** ثم Checkout العميل المعتاد ثم تحضير المصدر؛ الوكيل يستلم فقط.
+
+### E06 — تأكيد تسليم السائق إلى نقطة الوكيل
+
+- **صاحب التنفيذ:** سائق مخول بشحنة مطابقة.
+- **Endpoints:** POST /api/agent/pickup/requests/{id}/driver-handoff.
+- **Payload الأساسي:** PickupDriverInput: requestId,version,shipmentId,code,itemsVerified.
+- **العلاقة مع تطبيق الوكيل:** المسؤول يصدر driver-code في P04؛ السائق وحده يؤكد تحت جلسة السائق؛ عند accepted:false تتغير النسخة.
+
+### E07 — إصدار رمز استلام العميل/الوكيل البديل
+
+- **صاحب التنفيذ:** عميل المستحق أو من ينوب عنه وفق عقد الـ proxy.
+- **Endpoints:** POST /api/agent/pickup/requests/{id}/code; POST /api/agent/pickup/requests/{id}/proxy; POST /api/agent/pickup/requests/{id}/proxy/revoke.
+- **Payload الأساسي:** حقول الرموز والتفويض في AgentPickupController/AgentPickupMovementController؛ لا تفترض إمكانية إنشاء رمز للعميل تحت حساب الوكيل.
+- **العلاقة مع تطبيق الوكيل:** الوكيل يقرأ رمزًا يقدمه العميل ويسجّل إكمالًا واحدًا فقط في P06؛ لا يحفظ الكود.
+
+### E08 — عطاء المزاد وفوز العميل والدفع والتسليم
+
+- **صاحب التنفيذ:** عميل المزايدة ونظام المزادات وخدمة الطلبات.
+- **Endpoints:** GET /api/AuctionBids/auction-item/{id} وغيرها من عقود Auctions/AuctionWinners/Orders حسب موقعها؛ GET /api/agent/marketplace/auctions/{id}/fulfillment للوكيل.
+- **Payload الأساسي:** العطاء والـ checkout يمران بموافقات العميل وفحص ضمانه، لا ينشئهما الوكيل.
+- **العلاقة مع تطبيق الوكيل:** الوكيل يراقب الفائز في A08 ويحضّر ويقدم handover بعد الدفع/الموافقة.
+
+### E09 — ترخيص الطبيب والصرف وتحديد نطاقه
+
+- **صاحب التنفيذ:** مراجع إدارة منفصل.
+- **Endpoints:** PUT /api/agent/administration/veterinarians/{userId}; PUT /api/vet/administration/dispensers/{userId}; POST /api/agent/administration/delegations.
+- **Payload الأساسي:** ProfileInput,DispensingLicenseInput,DelegationInput.
+- **العلاقة مع تطبيق الوكيل:** بدون هذه التهيئة ينفتح H04 بحالة غير مؤهل بدل أزرار طبية أو تجارية فاعلة.
+
+## ج. مخطط التنقل الكامل ونقاط عودة المستخدم
+
+| مسار المستخدم | خطوات الشاشة والتقاطعات | شرط الانتقال وما يحدث عند الفشل |
+|---|---|---|
+| الدخول | H01 → H02 → H04 → H06 → H05؛ H03/H11/H08 | لا تفويض: لا فتح وحدة محمية؛ تسجيل خروج واضح |
+| إحالة الطبيب | H05/C01 → C02 → C03/C04/C05/C06/C07/C08 → C09/F02/F05/F06/F08/F13 → C15/C16 | الإحالة من E01/E02؛ إعادة الإسناد أو زوال الموافقة يمنع القراءة فورًا |
+| وصفة مباشرة | C02 → C10 → C11 → C12 → C13 → T07/N02 | رخصة الطبيب + صلاحية صرف + اعتماد نسخ وفحص دفعات ووردية |
+| وصفة ضمن طلب عميل | C12 → E03 → C14 → I03 → عملية release → prepare → P03 أو شاشة شحن السائق | لا تجهيز قبل الدفع والموافقة الدوائية |
+| زيارة وحملة | F01 → F02 → F04 → F05 → F06 → F07/F08 → F13؛ F09 → F10 → F11/F12 → X16 | الإجراءات المسجلة منفصلة عن قرارات المراجع |
+| مخزون وتغذية | I01 → I02 → I03/I04/I05 → I06/I07 → X05 → I08/X06؛ I09 → I10/X02 | التحويل الجزئي والهدر والاعتماد يحتفظان بنسخ ومصدر مخزن |
+| بيع ومحاسبة | T01 → T02 → T03/T04 → T05 → T06/T07 → N01–N04/N05–N07؛ T08/X07/X09 | يجب فتح وردية صحيحة وبسعر/عملة صادرين من السيرفر |
+| شراء ومورد | T10 → T12 → X04 → T13 → T11/T07 → T14/X07 | طلب الشراء لا يساوي الفاتورة المدفوعة أو المستلمة |
+| استلام محلي أو عبر سائق | E05 → P01/P02 → P03 → P04 → E06 (الوارد) → P05 → E07 → P06؛ P07/X08 عند مشكلة | مهمتان مستقلتان: تأكيد السائق ثم تأكيد العميل |
+| مزاد ومقترحات | A01 → A02 → A03 → A04 → A05 → A06/X10 → A07 → A08/A09؛ G01 → G02 → G03/X11 → G04 | المراجعة مستقلة، والنشر بعد موافقة صالحة، والمقترح لا ينتج فاتورة تلقائية |
+| تغييرات متزامنة/دعم | أي شاشة → H07/H09/H10 أو H04/H06 | انتهاء صلاحية/تراجع تفويض يمحو الكاش؛ العملية المشكوك في نجاحها تبقى قيد التحقق |
+
+## د. حواجز سير العمل والأخطاء
+
+| الحالة | معنى الاستجابة | السلوك الملزم |
+|---|---|---|
+| 401 | جلسة منتهية أو refresh رفض | refresh single-flight؛ توقف الطلب المعتمد على الحساب بعد انتهاء الجلسة؛ امسح بياناته إذا فشل التجديد؛ H02 |
+| 403 | مراجعة تفويض/طبيب/صندوق/مستودع فشلت | لا تكرار كحل؛ إعادة bootstrap/me وتنظيف cache وفتح H04؛ لا تستخدم مستخدمًا آخر |
+| 404 | كيان مفقود أو محجوب عن المستخدم | اعتبر الشاشة غير صالحة بدل إظهار بيانات cached؛ عودة للقائمة دون تسريب |
+| 409 | إصدار قديم، مخزون متنازع عليه، requestId مع حمولة مختلفة | إن كان أمرًا جديدًا اقرأ النسخة وأعد موافقة المستخدم؛ إن كان تأكيدًا غامضًا فحص receipt ثم إعادة نفس UUID والحمولة |
+| 422 | حقول غير صالحة أو قيد أعمال مرفوض | اربط الخطأ بالحقل/الدفعة/الكمية؛ لا تتجاوز تحقق السيرفر |
+| 503 | وحدة AgentOperations مغلقة | حالة خدمة غير متاحة؛ تعطيل الأفعال واعتماد قراءة ما تسمح به الخدمات العامة فقط |
+| 200+accepted:false | محاولة QR/رمز سائق فاشلة مع عداد محاولات محفوظ | أظهر خطأ رمز، حدّث النسخة/attempts؛ لا تُسجّل تسليمًا، وبعد 5 محاولات اطلب رمزًا جديدًا |
+| Timeout/connection loss after POST | قد يكون الترحيل نُفذ دون وصول الرد | احفظ UUID وطول العملية والحمولة الآمنة كما هي؛ GET receipt؛ لا تفتح Submit جديدًا ولا تعيد سند دفع ثاني |
+| offline before POST | لا دليل على الترحيل | المسودات السريرية فقط محليًا؛ مالية/مخزون/مزاد/سداد/تسليم = غير متاح مؤقتًا |
+| permission revoked mid-flow | العامل لم يعد صاحب النطاق | ألغِ requests الجارية، لا تعرض بيانات محفوظة في الصور/التنبيهات، أبطل تأكيد الواجهة |
+| delegation switched mid-request | البيانات الراجعة تخص النطاق السابق | ارفض تطبيق النتيجة إذا تغير context epoch؛ امسح السلة والخيارات، ابحث من جديد |
+| time-based expiry | انتهى رمز أو موعد أو رخصة أو تفويض أو وصفة | اعتمد serverTime وإعادة التحقق عند تنفيذ POST؛ لا تصحح تاريخ انتهاء الصلاحية من الهاتف |
+| payment provider incomplete | السيرفر أنشأ مطالبة رد مال ولا يملك تأكيد مزوّد خارجي | أظهر refundDue/بانتظار التنفيذ؛ لا تعرض «تم رد المبلغ» |
+| partial fulfillment | الشراء/التحويل/الجرعة جزء من المطلوب | أظهر المرسل والمستلم والمتبقي والمتعلق؛ لا تسوي الفرق آليًا |
+| stale auction approval | تبدلت شروط/أسعار/صور/أصل بعد المراجعة | إبطال زر نشر حتى إعادة الإرسال والمراجعة |
+
+## هـ. اختبارات قبول إلزامية بالمعرّفات (يجب الاحتفاظ بأدلتها)
+
+### هوية وتفويض
+
+| ID | اختبار النهاية إلى النهاية | الشاشات/المشاركون | معيار النجاح |
+|---|---|---|---|
+| ID-01 | دخول صحيح وتخزين آمن للتوكنات ثم رجوع من الخلفية | H01,H02,H04,H05,H11 | لا كلمة مرور ولا refreshToken في logs؛ ملخص مطابق للشخص |
+| ID-02 | انتهاء access token أثناء 3 GET متوازية | H05,H07,I01 | طلب refresh واحد وعدم تكرار GET بلا حدود |
+| ID-03 | انتهاء refresh أو إلغاء جلسة من جهاز آخر | H02,H11 | العودة للدخول ومسح بيانات النطاق المخزنة |
+| ID-04 | حساب طبيب بلا ترخيص أو ترخيص منتهي | H04,C01–C16,F01 | منع طب/وصفة مع إظهار سبب الأهلية |
+| ID-05 | موظف تجاري بلا صلاحيات طبية | H05,T01,C01 | أزرار البيع حسب grant؛ لا بيانات سريرية |
+| ID-06 | تغيير مخزن أثناء سلة بها منتجات | H06,T02,T04 | تفريغ سلة/نسخة/قراءات سابقة وعدم خلط المخزنين |
+| ID-07 | سحب التفويض بعد فتح نموذج قبول | H04,H06,T05,X14 | 403 عند التأكيد يزيل الاختيار ويوقف العمل بلا ترحيل |
+| ID-08 | مراجعة نفس منشئ السجل بامتياز إدارة | X02,X03,X07,X10,X11 | الخادم يمنع المراجعة الذاتية حيث يتطلب الفصل |
+| ID-09 | لغة عربية/إنجليزية وRTL/LTR وثيم وشاشة 320dp وخط 200% | جميع الشاشات | لا قص حقول أو انقلاب ترتيب قيم العملة/QR |
+
+### عيادة ودواء
+
+| ID | اختبار النهاية إلى النهاية | الشاشات/المشاركون | معيار النجاح |
+|---|---|---|---|
+| CL-01 | عميل يحيل حيوانًا يملكه وموافقة AI محددة لآخر رسالة | E01,C01,C02,C03 | لا يظهر ما بعد cutoff |
+| CL-02 | إحالة قبل قبول الطبيب ثم بعده | C02,C03,C04 | قبل القبول أقل بيانات مسموحة فقط؛ بعد القبول فتح التراسل |
+| CL-03 | سحب موافقة AI/تغيير طبيب أثناء قراءة محفوظة | C02,C03,C05 | إزالة محتوى AI/المرفقات ومنع أي قراءة لاحقة |
+| CL-04 | محادثة سريرية ومرفقات JPEG/PNG/PDF وملف غير مسموح >5MiB | C04,C05 | حد رفع صحيح وخدمة تنزيل خاصة no-store |
+| CL-05 | ملاحظة سريرية ثم addendum بعد إغلاق الحالة | C08,C16,H09 | الملحق منفصل تاريخيًا؛ لا استبدال نص التوقيع |
+| CL-06 | ملاحظة offline وتزامن 25 سجلًا منها مقبول ومرفوض | C08,H09 | نتيجة فردية وحفظ المرفوضين وحذف الناجحين فقط |
+| CL-07 | إنشاء موعد وزيارة ثم إعادة جدولة قبل/بعد بدء الزيارة | C09,F02,F03,F05 | قبول الحدود الصحيحة وعدم تعديل زيارة جارية خلاف العقد |
+| CL-08 | وصفة لدواء requiresInPerson قبل زيارة مكتملة | C10,C11,C12 | رفض الوصفة وفهم سبب الفحص السريري |
+| CL-09 | وصفة صالحة ثم صرف جزئي بدفعة صحيحة ثم محاولة صرف زائد | C12,C13,I03,T07 | كمية متبقية صحيحة، لا صرف زائد، فاتورة لكل أثر معتمد |
+| CL-10 | فقد ترخيص الصرف/اختلاف jurisdiction/وردية مغلقة | C13,C14,N03 | منع الصرف ولا خصم مخزون |
+| CL-11 | العميل يدفع طلب وصفة ثم وكيل يطلق الدفعات ويجهزه | E03,C14 | release/prepare بعد قبول الدفع، لا خصم مرتين |
+| CL-12 | محاولة إغلاق حالة مع زيارة معلقة | C16,F06 | 409 أو تحقق خادمي واحتفاظ بالحالة النشطة |
+
+### ميدان وحملات
+
+| ID | اختبار النهاية إلى النهاية | الشاشات/المشاركون | معيار النجاح |
+|---|---|---|---|
+| FD-01 | مهمة Assigned → Accepted → InProgress → Completed | F01,F02,F05,F13 | expectedStatus مطابق وعدم تخطي زيارة معلقة |
+| FD-02 | مهمة Rejected/Cancelled والعودة لاحقًا | F02,F03 | لا يظهر بدء/زيارة بعد الرفض |
+| FD-03 | زيارة بلا GPS أو إذن موقع مرفوض | F04,F05 | رسالة واضحة وإتاحة البديل الذي يسمح به السيرفر، بلا إحداثيات وهمية |
+| FD-04 | فحص الحيوان بصلاحيات legacy ممنوعة | F07,F08 | لا تجاوز إلى AnimalInspections؛ استخدم المسار الطبي المعتمد |
+| FD-05 | حملة حيوان واحد وقطيع وتأجيل/استبعاد | F09,F10,F11 | الفصل في الأنواع والجرعات والتجميع وخادم يتابع كل سجل |
+| FD-06 | درجة حرارة تتجاوز الحد المصرح ثم محاولة صرف الدفعة | F12,I03,C13 | حجز batch وعدم بيع/صرف حتى إفراج مخول |
+| FD-07 | مراجعة هدر أو إرجاع وتسوية مستقلة | F11,F12,X16 | سجل كمية معتمد دون خصم مضاعف أو خرق فصل المراجع |
+
+### المخزون والتجارة والمالية
+
+| ID | اختبار النهاية إلى النهاية | الشاشات/المشاركون | معيار النجاح |
+|---|---|---|---|
+| BM-01 | 100+ سجل مخزون مع paging وتغيير النطاق | I01,I02 | afterId تقدّم صحيح وعدم عرض سجل سابق |
+| BM-02 | بيع منتج بمخزون محجوز أو batch منتهية | T02,T04,T05 | رفض ترحيل ولا سند مكرر |
+| BM-03 | مسح باركود غير معروف ومتغير له أكثر من دفعة | T03,T04 | خطأ معلوم واختيار دفعة قبل البيع |
+| BM-04 | عرض سعر خصم أعلى من السياسة | T05,T09 | الخادم يرفض، لا قبول wallet باسم العميل |
+| BM-05 | بيع Cash/BankTransfer/Credit بعامل مختص | T05,N01,N03 | الحد والرصيد والمرجع والعملة ضمن policy؛ نجاح الترحيل مرة واحدة |
+| BM-06 | إغلاق الشبكة بعد ترحيل فاتورة وقبل وصول الرد | T05,T07,H09 | GET receipt ثم نفس requestId عند الحاجة، سند واحد |
+| BM-07 | طلب شراء ومراجعة ثم استلام دفعتين جزئيًا | T12,X04,T13 | remaining صحيح، المبلغ/الفاتورة مراجعان، لا استلام بدون مراجعة |
+| BM-08 | طلب تغذية ومراجعة وصرف ثم استلام نصف كمية | I07,X05,I08 | المصدر والوجهة والكمية في transit صحيحة |
+| BM-09 | تسجيل تلف/فقد في تحويل ومراجعته | I08,X06 | الاستثناء لا يمحو أثر المصدر أو يولّد رصيد وهميًا |
+| BM-10 | جرد نُفذ بعد حركة مخزون أحدث من snapshot | I09,I10,X02 | رفض stale count ولا تسوية تلقائية |
+| BM-11 | صندوق وردية مفتوحة ثم تحصيل وإقفال بفرق | N01,N02,N03,N04,X03 | تسجيل الفرق منفصل عن ledger، مراجع مستقل |
+| BM-12 | فواتير أرصدة عملاء وموردين بعملتين | N05,N06,N07 | كشوف مفصولة بالعملة، لا جمع قيم بإجمالي متعدد العملات |
+| BM-13 | مرتجع جزئي لبيع سبق ترحيله ثم رد مال نقدي برمز | T08,T07,X07,X09 | رد مال فقط عند إتمام الإجراء، لا دفع مكرر ولا كود دائم |
+| BM-14 | مرتجع شراء وقيمة مخزون خاضعة للفحص | T14,X07 | اعتماد واستلام فعلي بالحقول الصحيحة |
+
+### الاستلام والمزادات والمقترحات
+
+| ID | اختبار النهاية إلى النهاية | الشاشات/المشاركون | معيار النجاح |
+|---|---|---|---|
+| PK-01 | طلب استلام محلي جاهز يتلقى حيازة ورفًا | E05,P02,P03,P04,P05 | لا قبول طلب غير جاهز أو شحنة سائق مفتوحة |
+| PK-02 | طلب وارد من مستودع آخر برمز تسليم السائق | E05,P03,P04,E06 | هويتان مختلفتان، ختم وصول السائق هو مرحلة مستقلة |
+| PK-03 | رمز عميل خاطئ 5 مرات ثم إصدار جديد | E07,P06 | 200 accepted:false لا يسلم البضاعة، تحديث محاولات ونسخة |
+| PK-04 | رمز صحيح عند الطلب المدفوع ثم COD صفر | P06,N02 | لا تحصيل ثانٍ على مدفوع مقدمًا |
+| PK-05 | COD يساوي قيمة التحصيل الدقيقة ويصل لوردية مفتوحة | P06,N03 | المبلغ يترحل مرة واحدة والإيصال موثق |
+| PK-06 | تعطيل/إعادة تفويض نقطة باستلامات معلقة | P01,P02,X17 | رفض التعطيل، وإعادة الإسناد تبطل الرموز |
+| PK-07 | عدم استلام/تلف/عودة المصدر ثم refundDue | P07,X08,X09 | اثبات رجوع مادي وطلب رد المال غير مُساوٍ لرد مدفوع |
+| AU-01 | مسودة مزاد بمنتج موجود أو حيوان يملكه المنشئ | A02,A03,A04,A05 | ownership/quantity والفحص والصور والضرائب وفق السيرفر |
+| AU-02 | مراجع يوافق على hash ثم المبدع يغير الصور | A05,A06,X10 | الحاجة لمراجعة جديدة لا نشر بموافقة قديمة |
+| AU-03 | مزايد فائز دفع وأنشئ له طلب محفوظ بحجز المخزون | A07,A08,E08 | حجز واحد وقيد فائز حقيقي دون بيع آخر لنفس lot |
+| AU-04 | تسليم مزاد بQR صحيح بعد تجهيز الطلب | A08 | تسليم مرة واحدة وتحويل ملكية الحيوان عند الإجراء النهائي |
+| AU-05 | إلغاء مزاد مع عطاءات/ضمانات مدفوعة | A06 | منع إلغاء غير مسموح؛ توضيح تسوية الضمان دون استرداد محلي غير مثبت |
+| PR-01 | اقتراح منتج + صور خاصة ثم NeedsChanges ثم revise | G02,G03,G04 | سجل مراجعة/نسخ ومرفقات يحترم ownership |
+| PR-02 | مراجع مستقل يوافق ويربط منتجًا أو طلب شراء موجودًا | X11,G04 | لا خلق منتج أو فاتورة تلقائيًا |
+
+## و. معايير الأداء وسلامة الخصوصية وقابلية الاستخدام
+
+1. **الجلب المقسّم:** استخدم `afterId` الحقيقي والانتقال إلى الصفحة التالية بمرور المستخدم قرب نهاية القائمة (prefetch محدود)، وليس جلب كل البيانات عند فتح الوحدة. لا تُرسل عشرات الطلبات لإعادة بناء بطاقة واحدة. المخزون 100 صف وحدّ `changes` 100، باقي حدود الملفات تتبع Controller.
+2. **العدّادات:** القيم المؤكدة فقط من `operations/home`. أي إحصاء مجمع مشتق من صفحات جزئية موسوم صراحةً «البيانات المحملة»؛ لا تعرض مجموعات كأنها على مستوى الفرع كاملًا.
+3. **الأمان:** لا AI خاص أو رسالة بيطرية في الإشعار، ولا محتوى مالي حساس في analytics، ولا تخزين QR/OTP في سجل دائم أو صورة شاشة مشاركة. الملفات السريرية/الوكيل الخاصة تؤخذ بمصادقة/no-store، وتُحذف من cache عند زوال التفويض.
+4. **المزامنة:** المشترك مع الأعمال غير السريرية لا يحتفظ بمسودات POST مالية offline؛ offline notes فقط عبر مسار sync. الطلب الغامض ينتظر تحقق receipt ضمن جلسة نفس actor.
+5. **المطابقة البصرية:** لكل من 92 شاشة نسخة light/dark وRTL/LTR وحالات: Loading, Empty, Error, Forbidden, Offline, Confirming, Committed; اختبر 320/360/430dp وخطًا مكبرًا وقراءة TalkBack وkeyboard focus. ألوان الهوية قابلة للضبط لكن البنية الوظيفية تعتمد على سير العمل.
+6. **الوصول:** قبل كل mutation أعد قراءة صلاحيات/ترخيص/نطاق إذا تغيّرت أو انتهى زمن صلاحيتها؛ لا تستنتج أن Admin permission تُمنح تلقائيًا للوكيل. فشل التحقق الخادمي يقود إلى رسالة ملموسة لا crash.
+7. **الأرقام والتواريخ:** عارض تنسيق مالي منفصل للعملة؛ decimal دقيق؛ UTC مع serverTime؛ تواريخ انتهاء/مهلة/اعتماد تحترم وقت السيرفر؛ لا يقبل سالبًا أو كمية أعلى من المتاح.
+8. **الملاحة:** كل قائمة تفتح تفاصيل مع identity وdelegation context، وكل «تأكيد» يؤدي إلى شاشة نتيجة/إيصال مؤكد، وزر رجوع لا يعيد عملية POST.
+
+## ز. الفجوات والأسئلة الفنية التي تحتاج إثباتًا قبل وسم 100%
+
+| الرمز | الفجوة | سببها | بوابة إغلاقها |
+|---|---|---|---|
+| GAP-01 | أشكال response في خدمات legacy وDTOs المضمنة | العقود 05–08 تعرض تصاريح C# لا عينة JSON كاملة في كل حالة | أضف Staging contract snapshots لنجاح وفشل كل endpoint وتحقق من enum serialization/204/binary |
+| GAP-02 | نطاق /api/Inventory/{id}/transactions | قد يحتاج إذنًا قديمًا غير Inventory delegation | اختبار مستخدم Inventory=1 فقط؛ عند عدم الإذن اقترح API سجل scoped خلفي في تغيير منفصل |
+| GAP-03 | طريقة العثور على مورد/عميل/منتج/مخزن ضمن صلاحية الوكيل | بعض طرق legacy عامة وليست scope-filtered أو تؤدي إلى عرض بيانات لا تخص الفرع | اختبر قواعد القراءة والحجب لكل picker، ولا تعتمد على تحميل كل العملاء عبر /api/Users/customers دون مسوغ |
+| GAP-04 | تفاصيل مراجعات الحملات/الفاتورة/بعض تقارير المحاسبة | قد تُعاد كـ AgentRecord details أو خدمة Document/finance متداخلة | ثبّت أمثلة ردود وحقول الفاتورة (ضريبة، مدفوع، باقٍ، عملة) من Controller ثم عقود tests |
+| GAP-05 | إحصاءات وتقارير شاملة لخطة N08 | لا يوجد في وحدة Agent endpoint تحليلي مجمع موثق لكل فترة/عملة | تعرض نتيجة صفحات محملة موسومة أو تنشئ Back-end enhancement منفصل من دون تغيير الآن |
+| GAP-06 | قائمة نسخ الاقتراح وكل ملفات السجلات | records/private files متاحة لكن GET revisions مخصص لم يُثبت | استخدم التفاصيل المصرح بها أو ضع enhancement إذا اشترط عرض تاريخ نسخ كامل |
+| GAP-07 | التنبيهات عندما يكون التطبيق مغلقًا | in-app inbox/SignalR لا يساوي Push قابلًا لإيقاظ جهاز مغلق | يتطلب مزود Push أو بريد/رسائل مع إعداد حقيقي واختبار جهاز |
+| GAP-08 | سياسات النظام الفعلية: الدفع والضريبة والعملات والمخازن | وجود الكود لا يعني حسابات مفعلة أو تراخيص معتمدة | تجهيز staging بترخيص حقيقي اختباري مفوض، وصندوق عملة مناسب، وسائق، وطرق الدفع sandbox |
+| GAP-09 | أهلية الجهاز وإشعارات الموقع وملفات PDF | تختلف من منصة إلى أخرى وقد تتطلب إعدادات Android/حزم | اختبار جهاز فعلي وإذن GPS والكاميرا والمرفقات وملفات خاصة على نسخة release |
+| GAP-10 | استجابات 200 المقبولة جزئيًا | شيفرة pickup تعيد accepted:false بعد محاولة رمز خاطئة | تثبيت شرط status/accepted/version في اختبار contract وواجهة الاستلام |
+| GAP-11 | قائمة فئات أنواع return/payments/status | قد تكون من Enum C# لا من نصوص Flutter القديمة | انقل من source enum الفعلي واختبار JSON؛ لا تفترض كتابة English لفظية دائمًا |
+| GAP-12 | التغطية العملية لمستخدم الطبيب/الوكيل بحسب سياسة المؤسسة | هل المطلوب شاشة إدارة اعتماد في الهاتف أم تبقى بالداشبورد؟ | حفظ X01–X18 شرطيًا؛ لا تفتحها دون صلاحية إدارية واضحة ولو كانت API موجودة |
+| GAP-13 | العقود بعد SHA 4f8c947 | قد يتغير السيرفر بين كتابة الخطة ووقت التنفيذ | راجع commit diff وأعد استخراج DTOs والمخططات ثم أعد تشغيل الاختبارات |
+| GAP-14 | حالات صور المنتجات المتحولة ومزايدة الحيوان | ملكية صورة المنتج وسلسلة الأصل تختلف عن الصور الخاصة للملفات | اربط mediaIds بentity مالكها وتحقق من server ownership قبل عرض زر submit |
+| GAP-15 | إثبات تعايش التطبيق مع العميل والسائق والداشبورد | الوحدة تعمل فوق نفس الطلبات والحركة المخزنية والمالية | اختبارات تكامل cross-app: checkout,driver-handoff,auction,wallet,refund، وعدم تغيير Endpoint مستخدم قديم |
+
+## ح. تسليم الخطة للمطور وإعلان الاكتمال
+
+**حزمة التسليم الإجبارية عند تنفيذ التطبيق لاحقًا:** (1) هيكل شاشة مصمم بصريًا لكل H/C/F/I/T/N/P/A/G؛ (2) Route/DTO/Input/Output/guard لكل عملية كما في 01–08؛ (3) مصفوفة تتبع ScreenID → endpoint → contract tests → widget tests؛ (4) fixture حسابات وصلاحيات بيئة اختبار لا إنتاج؛ (5) evidence نجاح اختبارات ID/CL/FD/BM/PK/AU/PR؛ (6) APK Release ومعاينات RTL/dark وملفات artifacts؛ (7) فروقات العقد من SHA المثبت؛ (8) قائمة فجوات مغلقة بالأدلة أو موثقة كتطوير سيرفر منفصل؛ (9) إثبات عدم تعديل endpoints العميل والسائق والداشبورد.
+
+**شروط عدم إعلان “100%”:** شاشة من 92 بلا مصدر قراءة أو حالة خطأ أو تنقل؛ زر إداري دون صلاحية؛ حساب إجمالي من بيانات جزئية على أنه إجمالي كامل؛ تغيير مخزون/مال offline؛ خطأ accepted:false يعتبر نجاحًا؛ تكرار requestId بحمولة معدلة؛ عدم موافقة العميل حيث تتطلب؛ نسخ بيانات طبية إلى analytics/notification؛ اختبار APK دون حالات خطأ/صلاحيات؛ الادعاء بأن صيغة response مؤكدة فقط من اسم C# record دون اختبار HTTP.
+
+**إجراء القبول النهائي:** مهندس API + مطور تطبيق + مسؤول جودة يوقعون مصفوفة تغطية الـ92 وX المشروطة وE الموزعة على التطبيقات الأخرى، ثم يتم تنفيذ اختبارات staging الخالية من PII إنتاجي. هذه الوثيقة **خطة فقط**، ولا تمنح تأكيدًا بأن staging أو الإنتاج قد اجتاز اختبار التشغيل بالفعل.
+
+**المراجع:** [العقود 05](05-api-core-clinical.md)، [06](06-api-commerce-finance.md)، [07](07-api-field-pickup-marketplace.md)، [قاموس الحقول 08](08-domain-payloads.md)، [المصدر السيرفر 4f8c947](https://github.com/naba125555-ui/Ecommerce_Api/tree/4f8c947866cde3729b11697ec5c44ce41f516595/Ecommerce_APP/Agent).
