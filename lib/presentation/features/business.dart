@@ -5,6 +5,8 @@ import '../../application/workflows.dart';
 import '../../domain/models.dart';
 import '../../domain/screens.dart';
 import '../navigation.dart';
+import '../design/screen_design.dart';
+import 'home.dart';
 import '../shared/charts.dart';
 import '../shared/forms.dart';
 import '../shared/labels.dart';
@@ -31,10 +33,18 @@ class BusinessPage extends StatelessWidget{
     if(screen=='N05')return const AccountStatement();
     if(screen=='N06')return _RemoteList('/api/agent/finance/journals',query:app.scoped());
     if(screen=='I05')return const StockAlerts();
-    if(screen=='I10')return Resource(load:app.changes,builder:(data,r)=>PageBody(children:[
-      Notice(context.tr('تُعتمد فروق الجرد بواسطة مراجع مستقل. تتحدث الحالة من سجل العمليات.','Stock differences require an independent reviewer. Status follows the operation record.')),
-      const SizedBox(height:14),for(final row in rows(data).where((r)=>r['kind']=='StockCount'))RecordTile(row),
-    ]));
+    if(screen=='I10')return Resource(load:app.changes,builder:(data,refresh){
+      final counts=rows(data).where((row)=>row['kind']=='StockCount').toList();
+      return PageBody(children:[
+        Notice(context.tr('تُعتمد فروق الجرد بواسطة مراجع مستقل. تتحدث الحالة من سجل العمليات.','Stock differences require an independent reviewer. Status follows the operation record.')),
+        const SizedBox(height:14),
+        if(counts.isEmpty)Empty(icon:Icons.difference_outlined,
+          text:context.tr('لا توجد فروق جرد مسجّلة في نطاقك.','No count discrepancies are recorded in your work context.')),
+        for(final row in counts)
+          RecordTile({...row,'title':'${context.tr('جرد المخزون','Stock count')} ${row['id']}'},
+            icon:Icons.checklist,subtitle:str(row['updatedAt']).isEmpty?null:display(context,row['updatedAt'])),
+      ]);
+    });
     if(screen=='G02')return OperationPage(embedded:true,operation:operations['proposal']!);
     if(screen=='I09')return OperationPage(embedded:true,operation:operations['stockCount']!);
     if(screen=='I07')return PageBody(children:[
@@ -51,17 +61,26 @@ class BusinessPage extends StatelessWidget{
       'paidAmount':null,'paymentMethod':'Cash'});
     if(screen=='A02'||screen=='A03'||screen=='A04')return AuctionWizard(screen:screen);
     if(screen=='A01')return Resource(identity:app.revision,load:()=>app.read('/api/agent/marketplace/auctions',query:app.scoped()),builder:(data,refresh)=>PageBody(children:[
-      SectionBanner(art:SectionArt.workspace,icon:Icons.gavel_outlined,title:context.tr('مزادات الفرع','Branch auctions')),
-      const SizedBox(height:12),
       FilledButton.icon(onPressed:()=>context.open('A02'),icon:const Icon(Icons.add),label:Text(context.tr('إنشاء مزاد','Create auction'))),const SizedBox(height:16),
-      if(maps(obj(data)['auctions']).isEmpty)const Empty(),for(final a in maps(obj(data)['auctions']))RecordTile(a,icon:Icons.gavel_outlined,onTap:()=>context.open('A05',id:numId(a['id']))),
+      if(maps(obj(data)['auctions']).isEmpty)
+        Empty(icon:Icons.gavel_outlined,text:context.tr('لا توجد مزادات في نطاق العمل الحالي.','There are no auctions in the current work context.')),
+      for(final a in maps(obj(data)['auctions']))RecordTile(a,icon:Icons.gavel_outlined,
+        subtitle:a['startAt']==null?null:display(context,a['startAt']),
+        onTap:()=>context.open('A05',id:numId(a['id']),seed:a)),
     ]));
     if(['N01','N02','N03','N04'].contains(screen))return Resource(identity:app.revision,load:()=>app.read('/api/agent/operations/cashbox',query:app.scoped()),builder:(data,refresh){
       final box=obj(data),shifts=maps(box['shifts']),active=shifts.where((r)=>r['status']=='Active').firstOrNull;
       if(screen=='N04'){
         final shift=id==null?active:shifts.where((s)=>numId(s['id'])==id).firstOrNull;
         if(shift==null)return PageBody(children:[Empty(text:context.tr('لا توجد وردية مفتوحة','No active shift'))]);
-        return OperationPage(embedded:true,operation:operations['closeShift']!,id:numId(shift['id']),seed:shift);
+        if(shift['status']!='Active')return PageBody(children:[RecordDetails({...payload(shift),'status':shift['status']})]);
+        return OperationPage(
+          embedded:true,operation:operations['closeShift']!,id:numId(shift['id']),seed:shift,
+          summary:{
+            'expectedClosing':payload(shift)['expectedClosing']??box['currentBalance'],
+            'currencyCode':box['currencyCode'],
+          },
+        );
       }
       return PageBody(children:[
         SectionBanner(art:SectionArt.commerce,icon:Icons.account_balance_wallet_outlined,
@@ -73,10 +92,19 @@ class BusinessPage extends StatelessWidget{
           Heading(context.tr('الوردية النقدية','Cash shift')),
           if(active==null)BusyButton(label:context.tr('فتح وردية','Open shift'),run:()async{await openOperation(context,'openShift');refresh();})
           else... [Facts(payload(active)),const SizedBox(height:12),FilledButton(onPressed:()=>context.open('N04',id:numId(active['id'])),child:Text(context.tr('مطابقة وإقفال الوردية','Reconcile and close shift')))],
-          Heading(context.tr('الورديات السابقة','Previous shifts')),for(final shift in shifts)RecordTile(shift,onTap:()=>context.open('N04',id:numId(shift['id']))),
+          if(shifts.any((shift)=>shift['status']!='Active'))Heading(context.tr('الورديات السابقة','Previous shifts')),
+          for(final shift in shifts.where((shift)=>shift['status']!='Active'))
+            RecordTile({...shift,'title':'${context.tr('وردية','Shift')} #${shift['id']}'},
+              subtitle:shift['closedAt']==null?null:display(context,shift['closedAt']),
+              icon:Icons.history,onTap:()=>context.open('N04',id:numId(shift['id']),seed:shift)),
         ],
         if(screen=='N01')... [const SizedBox(height:12),OutlinedButton(onPressed:()=>context.open('N02'),child:Text(context.tr('عرض الحركات','View transactions')))],
-        if(screen=='N02')... [Heading(context.tr('حركات الصندوق','Cash transactions')),for(final t in maps(box['transactions']))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(t))],
+        if(screen=='N02')... [
+          Heading(context.tr('الحركات المسجلة','Recorded transactions')),
+          if(maps(box['transactions']).isEmpty)
+            Empty(icon:Icons.receipt_long_outlined,text:context.tr('لا توجد حركات مسجلة على هذا الصندوق.','This cashbox has no recorded transactions.')),
+          for(final t in maps(box['transactions']))Padding(padding:const EdgeInsets.only(bottom:8),child:Facts(t)),
+        ],
       ]);
     });
     if(screen=='T09')return PageBody(children:[
@@ -114,11 +142,7 @@ class BusinessPage extends StatelessWidget{
           _ => true,
         },
         header: [
-          if (['I01','T06','T11','P01','P02','G01'].contains(screen)) ...[
-            SectionBanner(art:SectionArt.commerce, title:context.app.tr(screenById(screen).ar,screenById(screen).en)),
-            const SizedBox(height:10),
-          ],
-          if (screen == 'I01') _Shortcuts(const ['I05','I06','I07','I09']),
+          if (screen == 'I01') _Shortcuts(const ['I05','I06','I07','I09','I10']),
           if (screen == 'T06') _Shortcuts(const ['T02','T08','T09']),
           if (screen == 'T11') _Shortcuts(const ['T12','T13','T14']),
           if (screen == 'G01') FilledButton.icon(
@@ -164,16 +188,37 @@ class BusinessPage extends StatelessWidget{
       if(screen=='I08'||screen=='T13')return OperationPage(embedded:true,operation:operations[screen=='I08'?'receiveTransfer':'receivePurchase']!,id:id,seed:row);
       if(screen=='N07')return OperationPage(embedded:true,operation:operations['settle']!,id:id,seed:row);
       if(screen=='I04')return _RemoteList('/api/Inventory/$id/transactions');
-      if(screen=='I02'||screen=='I03'||screen=='T04')return PageBody(children:[
-        if(screen=='T04')
-          RecordTile(row,icon:Icons.inventory_2_outlined,imageUrl:productImage(row),subtitle:str(row['sku']))
-        else
-          _StockTile(row:row),
+      if(screen=='I02')return PageBody(children:[
+        _StockTile(row:row),
+        Heading(context.tr('الرصيد في المخزن','Warehouse balance'),icon:Icons.inventory_2_outlined),
         Facts(row,fields:['quantityOnHand','availableQuantity','reservedQuantity','averageCost']),
-        Heading(context.tr('الدفعات والصلاحية','Batches and expiry')),
-        for(final batch in maps(row['batches']))Padding(padding:const EdgeInsets.only(bottom:12),child:Facts(batch)),
-        if(screen=='I02')...[_InlineLink('I03',id!),_InlineLink('I04',id!)],
-        if(app.allows(1))BusyButton(label:context.tr('حجز دفعة للمراجعة','Quarantine a batch'),run:()async{await openOperation(context,'hold');refresh();}),
+        Heading(context.tr('تتبّع الصنف','Stock tracking')),
+        _InlineLink('I03',id!),
+        _InlineLink('I04',id!),
+      ]);
+      if(screen=='I03')return PageBody(children:[
+        _StockTile(row:row),
+        Heading(context.tr('الدفعات المسجلة','Recorded batches'),icon:Icons.qr_code_2),
+        if(maps(row['batches']).isEmpty)
+          Empty(icon:Icons.qr_code_2,text:context.tr('لا توجد دفعات مسجلة لهذا الصنف.','No batches are recorded for this item.')),
+        for(final batch in maps(row['batches']))
+          Padding(padding:const EdgeInsets.only(bottom:8),child:Facts(batch)),
+        if(app.allows(Cap.inventory))
+          BusyButton(icon:Icons.pause_circle_outline,label:context.tr('حجز دفعة للمراجعة','Quarantine a batch'),
+            run:()async{await openOperation(context,'hold');refresh();}),
+      ]);
+      if(screen=='T04')return PageBody(children:[
+        RecordTile(row,icon:Icons.inventory_2_outlined,imageUrl:productImage(row),subtitle:str(row['sku'])),
+        Heading(context.tr('بيانات المتغير','Variant details')),
+        Facts(row,fields:['name','sku','price','salePrice','isAvailable','description']),
+        if(maps(row['batches']).isNotEmpty)...[
+          Heading(context.tr('الدفعات','Batches')),
+          for(final batch in maps(row['batches']))Padding(padding:const EdgeInsets.only(bottom:8),child:Facts(batch)),
+        ],
+        if(app.canOpen(screenById('I01')))OutlinedButton.icon(
+          onPressed:()=>context.open('I01'),icon:const Icon(Icons.warehouse_outlined),
+          label:Text(context.tr('فتح مخزون نطاق العمل','Open warehouse inventory')),
+        ),
       ]);
       if(screen=='T07')return PageBody(children:[Panel(child:Column(children:[const BrandLogo(size:54),const SizedBox(height:14),Text(str(row['documentNumber']),style:Theme.of(context).textTheme.titleLarge),StatusTag(row['isPosted']==true?'Completed':'Draft')])),
         const SizedBox(height:14),Facts(row),Heading(context.tr('الأصناف','Invoice items')),for(final line in maps(row['items']))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(line)),
@@ -199,17 +244,51 @@ class BusinessPage extends StatelessWidget{
         if(screen=='A07')return PageBody(children:[Facts(row),Heading(context.tr('المعروض والمزايدات','Lots and bids')),
           for(final lot in maps(row['items']))... [Facts(lot),_EmbeddedRecords(load:()=>app.read('/api/AuctionBids/auction-item/${lot['id']}'))]]);
         final review=obj(row['review']);
-        return PageBody(children:[Facts(row),Heading(context.tr('حالة المراجعة','Review status')),Facts(payload(review)),StatusTag(str(review['status'])),
-          Heading(context.tr('المعروض','Lots')),for(final lot in maps(row['items']))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(lot)),
-          if(['Draft','NeedsChanges','Rejected'].contains(review['status']))BusyButton(label:context.tr('إرسال للمراجعة','Submit for review'),run:()async{await openOperation(context,'submitAuction',id:id,seed:row);refresh();}),
-          if(review['status']=='Approved')BusyButton(label:context.tr('نشر المزاد','Publish auction'),run:()async{await openOperation(context,'publishAuction',id:id,seed:row);refresh();}),
-          const SizedBox(height:12),_InlineLink('A07',id!),_InlineLink('A08',id!),_InlineLink('A09',id!),
-          OutlinedButton(onPressed:()=>openOperation(context,'cancelAuction',id:id,seed:row),child:Text(context.tr('إلغاء المزاد','Cancel auction'))),
+        final reviewStatus=str(review['status']);
+        final lots=maps(row['items']);
+        if(screen=='A06')return PageBody(children:[
+          RecordTile(row,icon:Icons.gavel_outlined,subtitle:context.tr('قرار المراجعة والنشر','Review and publishing decision')),
+          Heading(context.tr('قرار المراجعة','Review decision'),icon:Icons.fact_check_outlined),
+          if(reviewStatus.isEmpty)Empty(icon:Icons.fact_check_outlined,
+            text:context.tr('لا يوجد قرار مراجعة مسجّل لهذا المزاد.','There is no recorded review decision for this auction.')),
+          if(reviewStatus.isNotEmpty)Facts({...payload(review),'status':reviewStatus}),
+          const SizedBox(height:12),
+          if(['Draft','NeedsChanges','Rejected'].contains(reviewStatus))
+            BusyButton(icon:Icons.send_outlined,label:context.tr('إرسال للمراجعة','Submit for review'),
+              run:()async{await openOperation(context,'submitAuction',id:id,seed:row);refresh();}),
+          if(reviewStatus=='Approved')BusyButton(icon:Icons.publish_outlined,label:context.tr('نشر المزاد','Publish auction'),
+            run:()async{await openOperation(context,'publishAuction',id:id,seed:row);refresh();}),
+          OutlinedButton(onPressed:()=>openOperation(context,'cancelAuction',id:id,seed:row),
+            child:Text(context.tr('إلغاء المزاد','Cancel auction'))),
+        ]);
+        return PageBody(children:[
+          RecordTile(row,icon:Icons.gavel_outlined),
+          Facts(row,fields:['startAt','endAt','terms','guaranteeAmount']),
+          Heading(context.tr('العناصر المعروضة','Auction lots'),icon:Icons.sell_outlined),
+          if(lots.isEmpty)Empty(icon:Icons.sell_outlined,
+            text:context.tr('لا توجد عناصر معروضة في هذا المزاد.','This auction has no listed lots.')),
+          for(final lot in lots)Padding(padding:const EdgeInsets.only(bottom:8),child:Facts(lot)),
+          Heading(context.tr('إدارة المزاد','Auction management')),
+          _InlineLink('A06',id!),_InlineLink('A07',id!),_InlineLink('A08',id!),_InlineLink('A09',id!),
         ]);
       }
-      if(screen.startsWith('G'))return PageBody(children:[Facts(d),const SizedBox(height:12),StatusTag(str(row['status'])),
+
+      if(screen=='G04')return PageBody(children:[
+        RecordTile({...row,'title':titleOf(row)},icon:Icons.rule_outlined),
+        Heading(context.tr('ملاحظات المراجع','Reviewer notes')),
+        if(str(d['reviewNotes']??row['reviewNotes']).isEmpty)
+          Empty(icon:Icons.speaker_notes_outlined,text:context.tr('لا توجد ملاحظات مراجعة مسجلة.','There are no recorded review notes.'))
+        else Panel(child:SelectableText(str(d['reviewNotes']??row['reviewNotes']))),
+        if(d['linkedEntityId']!=null)Fact(context.tr('السجل المرتبط','Linked record'),d['linkedEntityId']),
+        if(row['status']=='NeedsChanges')...[
+          const SizedBox(height:12),
+          BusyButton(label:context.tr('تعديل الاقتراح','Revise proposal'),
+            run:()async{await openOperation(context,'reviseProposal',id:id,seed:row,initial:d);refresh();}),
+        ],
+      ]);
+      if(screen=='G03')return PageBody(children:[RecordTile(row,icon:Icons.lightbulb_outline),Facts(d),
         const SizedBox(height:12),OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>Scaffold(appBar:AppBar(title:Text(context.tr('مرفقات الاقتراح','Proposal attachments'))),body:CaseAttachments(recordId:id)))),icon:const Icon(Icons.attach_file),label:Text(context.tr('مرفقات الاقتراح','Proposal attachments'))),
-        if(screen=='G03')_InlineLink('G04',id!),if(row['status']=='NeedsChanges')... [const SizedBox(height:14),
+        _InlineLink('G04',id!),if(row['status']=='NeedsChanges')... [const SizedBox(height:14),
           BusyButton(label:context.tr('استكمال الاقتراح','Revise proposal'),run:()async{await openOperation(context,'reviseProposal',id:id,seed:row,initial:d);refresh();})],
         if(d['linkedEntityId']!=null)Notice('${context.tr('تم الربط بالسجل','Linked record')} #${d['linkedEntityId']}'),
       ]);
@@ -247,7 +326,7 @@ class _StockTile extends StatelessWidget {
 
 class _InlineLink extends StatelessWidget{
   const _InlineLink(this.route,this.id);final String route;final int id;
-  @override Widget build(BuildContext context){final spec=screenById(route);return RecordTile({'title':context.app.tr(spec.ar,spec.en)},onTap:()=>context.open(route,id:id));}
+  @override Widget build(BuildContext context){final spec=screenById(route);return RecordTile({'title':context.app.tr(spec.ar,spec.en)},icon:screenDesigns[route]!.icon,onTap:()=>context.open(route,id:id));}
 }
 class _Shortcuts extends StatelessWidget{
   const _Shortcuts(this.routes);final List<String> routes;
@@ -256,23 +335,34 @@ class _Shortcuts extends StatelessWidget{
 }
 class BusinessHub extends StatelessWidget{
   const BusinessHub({super.key});
-  @override Widget build(BuildContext context)=>PageBody(children:[
-    SectionBanner(art:SectionArt.commerce,icon:Icons.storefront_outlined,
-      title:context.tr('إدارة الفرع','Manage your branch'),
-      subtitle:context.tr('نقطة البيع والمخزون والصندوق','Point of sale, inventory and cashbox')),
-    Heading(context.tr('عمليات الفرع','Branch operations')),
-    LayoutBuilder(builder:(context,grid)=>Wrap(spacing:8,runSpacing:8,children:[
-    for(final entry in [('T02',Icons.point_of_sale_outlined),('I01',Icons.inventory_2_outlined),('T06',Icons.receipt_long_outlined),('T09',Icons.request_quote_outlined),
-      ('T11',Icons.shopping_bag_outlined),('T12',Icons.add_shopping_cart),('T10',Icons.local_shipping_outlined),('N01',Icons.account_balance_wallet_outlined),
-      ('N05',Icons.account_balance_outlined),('N06',Icons.menu_book_outlined),('N08',Icons.bar_chart),('P01',Icons.storefront_outlined),
-      ('P02',Icons.move_to_inbox_outlined),('A01',Icons.gavel_outlined),('G01',Icons.lightbulb_outline)])
-      if(context.app.canOpen(screenById(entry.$1)))
-        SizedBox(width:grid.maxWidth<340?grid.maxWidth:(grid.maxWidth-8)/2,
-          child:ActionTile(title:context.app.tr(screenById(entry.$1).ar,screenById(entry.$1).en),
-            icon:entry.$2,onTap:()=>context.open(entry.$1))),
-    ])),
-    if(context.app.access.grants.isEmpty)Notice(context.tr('لا يوجد تفويض تجاري نشط. تواصل مع الإدارة لتحديد نطاقك.','No active business delegation. Contact your administrator to assign a work context.')),
-  ]);
+  @override
+  Widget build(BuildContext context) {
+    final app = context.app;
+    final groups = [
+      (context.tr('البيع والفواتير', 'Sales and billing'), ['T02', 'T06', 'T09', 'T03']),
+      (context.tr('المخزون والتوريد', 'Stock and procurement'), ['I01', 'I06', 'T11', 'T12', 'T10']),
+      (context.tr('الصندوق والحسابات', 'Cash and accounts'), ['N01', 'N03', 'N05', 'N06', 'N08']),
+      (context.tr('الاستلام والسوق', 'Pickup and marketplace'), ['P01', 'P02', 'A01', 'G01']),
+    ];
+    return PageBody(children: [
+      if (app.grant case final grant?)
+        RecordTile({'title': grantName(context, grant)}, icon: Icons.warehouse_outlined,
+          subtitle: context.tr('تغيير نطاق عمليات الفرع', 'Change branch work context'),
+          onTap: () => context.open('H06'))
+      else
+        Empty(
+          icon: Icons.warehouse_outlined,
+          text: context.tr('لا يوجد تفويض تجاري نشط في هذا الحساب.', 'This account has no active trading delegation.'),
+          action: OutlinedButton(onPressed: () => context.open('H06'),
+            child: Text(context.tr('عرض نطاق العمل', 'View work context'))),
+        ),
+      for (final group in groups)
+        if (group.$2.any((route) => app.canOpen(screenById(route)))) ...[
+          Heading(group.$1),
+          WorkspaceActions(group.$2),
+        ],
+    ]);
+  }
 }
 class _RecordSelector extends StatelessWidget{
   const _RecordSelector({required this.target});final String target;
@@ -297,7 +387,7 @@ class _RemoteList extends StatelessWidget{
 }
 class _EmbeddedRecords extends StatelessWidget{
   const _EmbeddedRecords({super.key,required this.load});final Future<dynamic> Function() load;
-  @override Widget build(BuildContext context)=>Resource(embedded:true,load:load,builder:(data,refresh)=>Column(children:[
+  @override Widget build(BuildContext context)=>Resource(embedded:true,load:load,builder:(data,refresh)=>Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
     if(data is Map)RecordDetails(payload(obj(data))),
     if(rows(data).isEmpty&&data is! Map)const Empty(),
     for(final row in rows(data))Padding(padding:const EdgeInsets.only(bottom:10),child:RecordDetails(payload(row)))]));
@@ -421,9 +511,6 @@ class _PointOfSaleState extends State<PointOfSale> {
         load:(cursor)=>app.page('/api/agent/commerce/inventory',query:app.scoped(),afterId:cursor),
         include:(row)=>decimal(row['availableQuantity'])>0,
         header:[
-          SectionBanner(art:SectionArt.commerce,icon:Icons.point_of_sale_outlined,
-            title:context.tr('البيع من مخزنك','Sell from your inventory')),
-          const SizedBox(height:12),
           TextField(controller:searchController,textInputAction:TextInputAction.search,
             decoration:InputDecoration(prefixIcon:const Icon(Icons.search),
               hintText:context.tr('اسم الصنف أو رمزه','Product name or SKU'),
@@ -543,7 +630,6 @@ class _AuctionWizardState extends State<AuctionWizard>{
     final fields=operations['auction']!.fields.where((f)=>widget.screen=='A02'?f.kind!=InputKind.lines&&f.kind!=InputKind.photos:
       widget.screen=='A03'?f.kind==InputKind.lines:f.kind==InputKind.photos).toList();
     return Form(key:form,child:PageBody(children:[
-      Padding(padding:const EdgeInsets.only(bottom:20),child:LinearProgressIndicator(value:widget.screen == 'A02' ? 0.33 : widget.screen == 'A03' ? 0.66 : 1.0)),
       for(final f in fields)Padding(padding:const EdgeInsets.only(bottom:14),child:InputControl(spec:f,value:draft[f.key],parentValues:draft,onChanged:(v)=>setState(()=>draft[f.key]=v))),
       if(widget.screen!='A04')FilledButton(onPressed:(){if(!form.currentState!.validate())return;form.currentState!.save();context.open(widget.screen=='A02'?'A03':'A04');},child:Text(context.tr('متابعة','Continue')))
       else BusyButton(label:context.tr('مراجعة وحفظ مسودة المزاد','Review and save auction'),run:()async{

@@ -22,10 +22,6 @@ class FieldPage extends StatelessWidget{
           '/api/agent/field/${tasks ? 'tasks' : 'campaigns'}', afterId: afterId,
         ),
         header: [
-          SectionBanner(art:SectionArt.field,icon:Icons.assignment_outlined,
-            title:tasks?context.tr('العمل الميداني','Field work'):context.tr('الحملات الميدانية','Field campaigns'),
-            subtitle:tasks?context.tr('المهام والزيارات المسندة','Assigned tasks and visits'):null),
-          const SizedBox(height:10),
           if (tasks) Wrap(spacing: 8, children: [
             ActionChip(avatar: const Icon(Icons.calendar_month_outlined), label: Text(context.tr('التقويم', 'Calendar')), onPressed: () => context.open('F03')),
             ActionChip(avatar: const Icon(Icons.vaccines_outlined), label: Text(context.tr('الحملات', 'Campaigns')), onPressed: () => context.open('F09')),
@@ -41,8 +37,15 @@ class FieldPage extends StatelessWidget{
       );
     }
     if(screen=='F03')return const FieldCalendar();
-    if(id==null)return Resource(load:()=>app.all('/api/agent/field/tasks'),builder:(data,refresh)=>PageBody(children:[
-      for(final task in rows(data))for(final visit in maps(task['visits']))RecordTile(visit,onTap:()=>context.open(screen,id:numId(visit['id']),seed:visit))]));
+    if (id==null) {
+      final target = screen=='F10'||screen=='F11'||screen=='F12' ? 'F09' : 'F01';
+      return PageBody(children:[Empty(
+        icon:Icons.event_note_outlined,
+        text:context.tr('افتح المهمة أو الحملة المتعلقة بهذا الإجراء أولًا.','Open the task or campaign related to this action first.'),
+        action:OutlinedButton(onPressed:()=>context.open(target),
+          child:Text(target=='F09'?context.tr('عرض الحملات','View campaigns'):context.tr('عرض المهام','View tasks'))),
+      )]);
+    }
     if(screen=='F04')return DirectionsPage(id:id!,seed:seed);
     final campaign=['F10','F11','F12'].contains(screen);
     final task=screen=='F02';
@@ -85,7 +88,7 @@ class FieldPage extends StatelessWidget{
         const SizedBox(height:12),BusyButton(label:context.tr('توثيق هدر أو إرجاع','Record waste or return'),run:()async{await openOperation(context,'vaccinate',id:id,seed:row,initial:{'outcome':'waste'});refresh();}),
         Heading(context.tr('مطابقة العهدة','Custody reconciliation')),
         Resource(embedded:true,load:()=>app.read('/api/agent/field/campaigns/$id/reconciliation'),builder:(result,r)=>Column(children:[Facts(obj(result)),
-          for(final key in ['allocations','outcomes','temperatures','stops'])...[
+          for(final key in ['allocations','outcomes','temperatures','stops'])if(maps(obj(result)[key]).isNotEmpty)...[
             Heading(context.tr(key=='allocations'?'الدفعات المخصصة':key=='outcomes'?'النتائج':key=='temperatures'?'سجل الحرارة':'المحطات',key)),
             for(final item in maps(obj(result)[key]))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(payload(item)))],
         ])),
@@ -137,7 +140,7 @@ class _VisitCheckInState extends State<VisitCheckIn>{
   Json coordinates={};
   @override Widget build(BuildContext context)=>PageBody(children:[Facts(widget.visit),const SizedBox(height:16),
     Notice(context.tr('وثق موقع الوصول قبل بدء المعاينة.','Record your arrival location before starting the visit.')),
-    const SizedBox(height:16),BusyButton(icon:Icons.my_location,label:context.tr('تحديد موقعي الحالي','Use my current location'),run:()async{final p=await currentPosition();setState(()=>coordinates={'latitude':p.latitude,'longitude':p.longitude});}),
+    const SizedBox(height:16),BusyButton(icon:Icons.my_location,label:context.tr('تحديد موقعي الحالي','Use my current location'),run:()async{final p=await currentPosition();if(!mounted)return;setState(()=>coordinates={'latitude':p.latitude,'longitude':p.longitude});}),
     if(coordinates.isNotEmpty)...[const SizedBox(height:12),Facts(coordinates)],const SizedBox(height:16),
     BusyButton(label:context.tr('بدء الزيارة','Start visit'),run:()async{await openOperation(context,'visitState',id:numId(widget.visit['id']),seed:widget.visit,initial:coordinates);}),
   ]);

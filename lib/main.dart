@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'application/agent_app.dart';
 import 'data/remote_repository.dart';
 import 'presentation/design/brand_theme.dart';
-import 'presentation/features/general.dart';
+import 'presentation/features/entry.dart';
 import 'presentation/shared/scope.dart';
 import 'presentation/shared/widgets.dart';
 import 'presentation/shell.dart';
@@ -18,6 +18,6 @@ class MazraaAgent extends StatelessWidget{
     theme:Brand.theme(Brightness.light),darkTheme:Brand.theme(Brightness.dark),
     themeMode:app.theme=='dark'?ThemeMode.dark:app.theme=='light'?ThemeMode.light:ThemeMode.system,
     home:app.starting?const Scaffold(body:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[BrandLogo(size:86),SizedBox(height:24),CircularProgressIndicator()]))):
-      app.signedIn?AppShell(key:ValueKey(app.repo.session!.userId)):const SignInPage(),
+      app.signedIn?AppShell(key:ValueKey(app.repo.session!.userId)):const EntryPage(),
   )));
 }

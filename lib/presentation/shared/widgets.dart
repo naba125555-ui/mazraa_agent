@@ -28,14 +28,14 @@ class Panel extends StatelessWidget{
 }
 class PageBody extends StatelessWidget{
   const PageBody({super.key,required this.children});final List<Widget> children;
-  @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.fromLTRB(18,8,18,32),
+  @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.fromLTRB(16,6,16,28),
     physics:const AlwaysScrollableScrollPhysics(),children:children);
 }
 class Heading extends StatelessWidget{
   const Heading(this.title,{super.key,this.icon,this.action});final String title;final IconData? icon;final Widget? action;
   @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.only(top:22,bottom:12),child:Row(children:[
     if(icon!=null)...[Icon(icon,size:22,color:Theme.of(context).colorScheme.primary),const SizedBox(width:8)],
-    Expanded(child:Text(title,style:Theme.of(context).textTheme.titleMedium)),if(action!=null)action!,
+    Expanded(child:Semantics(header:true,child:Text(title,style:Theme.of(context).textTheme.titleMedium))),if(action!=null)action!,
   ]));
 }
 class Notice extends StatelessWidget{
@@ -57,9 +57,20 @@ String failureText(BuildContext context,Object e){
 }
 class Empty extends StatelessWidget{
   const Empty({super.key,this.text,this.action,this.icon=Icons.inbox_outlined});final String? text;final Widget? action;final IconData icon;
-  @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.symmetric(vertical:40,horizontal:20),child:Column(mainAxisSize:MainAxisSize.min,children:[
-    Icon(icon,size:55,color:Theme.of(context).colorScheme.primary.withValues(alpha:.6)),const SizedBox(height:16),
-    Text(text??context.tr('لا توجد سجلات حاليًا','No records yet'),textAlign:TextAlign.center),if(action!=null)...[const SizedBox(height:16),action!]]));
+  @override Widget build(BuildContext context) {
+    final theme=Theme.of(context), color=theme.colorScheme;
+    return Panel(
+      padding:const EdgeInsets.symmetric(vertical:28,horizontal:18),
+      child:Column(mainAxisSize:MainAxisSize.min,children:[
+        CircleAvatar(backgroundColor:color.primaryContainer,radius:26,
+          child:Icon(icon,size:26,color:color.onPrimaryContainer)),
+        const SizedBox(height:13),
+        Text(text??context.tr('لا توجد سجلات لعرضها','No records to show'),
+          style:theme.textTheme.bodyLarge,textAlign:TextAlign.center),
+        if(action!=null)...[const SizedBox(height:14),action!],
+      ]),
+    );
+  }
 }
 class Resource extends StatefulWidget{
   const Resource({super.key,required this.load,required this.builder,this.identity,this.embedded=false});
@@ -84,22 +95,55 @@ class _ResourceState extends State<Resource>{
 }
 class StatusTag extends StatelessWidget{
   const StatusTag(this.value,{super.key});final String value;
-  @override Widget build(BuildContext context){final c=Theme.of(context).colorScheme;
-    final color=['Rejected','Cancelled','revoked','conflict'].contains(value)?c.error:
-      ['Pending','Assigned','Requested','Draft','NeedsChanges','local'].contains(value)?c.secondary:c.primary;
-    return Container(padding:const EdgeInsets.symmetric(horizontal:9,vertical:3),decoration:BoxDecoration(color:color.withValues(alpha:.1),borderRadius:BorderRadius.circular(8)),
-      child:Text(word(context,value),style:TextStyle(color:color,fontSize:11,fontWeight:FontWeight.w700)));}
+  @override Widget build(BuildContext context) {
+    if(value.isEmpty)return const SizedBox.shrink();
+    final c=Theme.of(context).colorScheme;
+    final color=['Rejected','Cancelled','revoked','conflict','Failed'].contains(value)?c.error:
+      ['Pending','Assigned','Requested','Draft','NeedsChanges','local','Scheduled','PendingApproval'].contains(value)?c.secondary:c.primary;
+    return Container(
+      padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),
+      decoration:BoxDecoration(
+        color:color.withValues(alpha:.10),borderRadius:BorderRadius.circular(8),
+      ),
+      child:Row(mainAxisSize:MainAxisSize.min,children:[
+        Icon(Icons.circle,size:6,color:color),
+        const SizedBox(width:5),
+        Flexible(child:Text(word(context,value),style:TextStyle(color:color,fontSize:11.5,fontWeight:FontWeight.w700))),
+      ]),
+    );
+  }
 }
 class RecordTile extends StatelessWidget{
   const RecordTile(this.data,{super.key,this.onTap,this.icon=Icons.description_outlined,this.subtitle,this.trailing,this.imageUrl});
   final Json data;final VoidCallback? onTap;final IconData icon;final String? subtitle,imageUrl;final Widget? trailing;
-  @override Widget build(BuildContext context){final status=str(data['status']??payload(data)['status']);return Padding(padding:const EdgeInsets.only(bottom:10),child:Panel(onTap:onTap,child:Row(children:[
-    ProductThumbnail(url:imageUrl,size:imageUrl==null?44:54,icon:icon),const SizedBox(width:12),
-    Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(titleOf(data),style:Theme.of(context).textTheme.titleMedium),
-      if(subtitle?.isNotEmpty==true)Text(subtitle!,maxLines:2,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),if(status.isNotEmpty)...[const SizedBox(height:4),StatusTag(status)]])),
-    if(trailing!=null)trailing!
-    else if(onTap!=null)Icon(Directionality.of(context)==TextDirection.rtl?Icons.chevron_left:Icons.chevron_right,size:21),
-  ])));}
+  @override Widget build(BuildContext context) {
+    final theme=Theme.of(context);
+    final status=str(data['status']??payload(data)['status']);
+    final title=titleOf(data);
+    return Padding(
+      padding:const EdgeInsets.only(bottom:8),
+      child:Panel(
+        padding:const EdgeInsets.symmetric(horizontal:12,vertical:11),
+        onTap:onTap,
+        child:Row(children:[
+          ProductThumbnail(url:imageUrl,size:imageUrl==null?42:54,icon:icon),
+          const SizedBox(width:11),
+          Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Text(title=='#—'?context.tr('سجل بلا اسم','Untitled record'):title,
+              style:theme.textTheme.titleMedium,maxLines:2,overflow:TextOverflow.ellipsis),
+            if(subtitle?.isNotEmpty==true)
+              Text(subtitle!,maxLines:2,overflow:TextOverflow.ellipsis,style:theme.textTheme.bodySmall),
+            if(status.isNotEmpty)...[const SizedBox(height:5),StatusTag(status)],
+          ])),
+          if(trailing!=null)trailing!
+          else if(onTap!=null)Padding(padding:const EdgeInsetsDirectional.only(start:6),child:Icon(
+            Directionality.of(context)==TextDirection.rtl?Icons.chevron_left:Icons.chevron_right,
+            size:21,color:theme.colorScheme.onSurfaceVariant,
+          )),
+        ]),
+      ),
+    );
+  }
 }
 String display(BuildContext context,Object? v){
   if(v==null)return '—';if(v is bool)return context.tr(v?'نعم':'لا',v?'Yes':'No');
@@ -112,7 +156,9 @@ class Fact extends StatelessWidget{
   const Fact(this.name,this.value,{super.key});final String name;final Object? value;
   @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.symmetric(vertical:6),child:Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
     Expanded(child:Text(word(context,name),style:TextStyle(color:Theme.of(context).colorScheme.onSurfaceVariant))),const SizedBox(width:12),
-    Expanded(child:SelectableText(display(context,value),textAlign:TextAlign.end))]));
+    Expanded(child:name=='status'&&value!=null
+      ?Align(alignment:AlignmentDirectional.centerEnd,child:StatusTag(str(value)))
+      :SelectableText(display(context,value),textAlign:TextAlign.end))]));
 }
 class Facts extends StatelessWidget{
   const Facts(this.data,{super.key,this.fields});final Json data;final List<String>? fields;

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'scope.dart';
 
 const words=<String,List<String>>{
+  'In':['وارد','Incoming'],'Out':['صادر','Outgoing'],
+  'Unread':['غير مقروء','Unread'],'sku':['رمز الصنف','SKU'],'price':['السعر','Price'],
+  'salePrice':['سعر البيع','Sale price'],'Sheep':['أغنام','Sheep'],'Goat':['ماعز','Goat'],
+  'Cattle':['أبقار','Cattle'],'Camel':['إبل','Camel'],'Warehouse':['مخزن','Warehouse'],
   'committed':['تم اعتماد العملية','Operation committed'],'requestId':['مرجع العملية','Operation reference'],
   'items':['الأصناف','Items'],'lines':['البنود','Lines'],'batches':['الدفعات','Batches'],
   'photoMediaIds':['صور المعروض','Lot photos'],'type':['النوع','Type'],

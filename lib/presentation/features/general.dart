@@ -3,71 +3,75 @@ import 'package:flutter/material.dart';
 import '../../domain/models.dart';
 import '../../domain/screens.dart';
 import '../navigation.dart';
+import '../design/screen_design.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
-import '../shared/section_banner.dart';
+import 'home.dart';
 import '../shared/forms.dart';
 
 Future<Json?> _editProfile(BuildContext context)=>openOperation(context,'profile',seed:context.app.user,initial:context.app.user);
 Future<Json?> _changePassword(BuildContext context)=>openOperation(context,'password');
 
-class SignInPage extends StatefulWidget{
-  const SignInPage({super.key});
-  @override State<SignInPage> createState()=>_SignInPageState();
-}
-class _SignInPageState extends State<SignInPage>{
-  final email=TextEditingController(),password=TextEditingController(),form=GlobalKey<FormState>();
-  bool hidden=true,busy=false;Object? error;
-  @override void dispose(){email.dispose();password.dispose();super.dispose();}
-  @override Widget build(BuildContext context)=>Scaffold(body:BotanicalBackground(child:SafeArea(child:Center(child:ConstrainedBox(
-    constraints:const BoxConstraints(maxWidth:460),child:Form(key:form,child:PageBody(children:[
-      const SizedBox(height:16),
-      const Align(alignment:AlignmentDirectional.centerStart,child:BrandLogo(size:52)),
-      const SizedBox(height:14),
-      SectionBanner(art:SectionArt.workspace,
-        title:context.tr('مزرعتي للطبيب والوكيل','Mazraa for doctors and agents')),
-      Heading(context.tr('تسجيل الدخول','Sign in')),
-
-      TextFormField(controller:email,keyboardType:TextInputType.emailAddress,textDirection:TextDirection.ltr,
-        autofillHints:const [AutofillHints.username],decoration:InputDecoration(labelText:context.tr('البريد الإلكتروني','Email'),prefixIcon:const Icon(Icons.alternate_email)),
-        validator:(v)=>(v??'').contains('@')?null:context.tr('أدخل بريدًا صالحًا','Enter a valid email')),const SizedBox(height:16),
-      TextFormField(controller:password,obscureText:hidden,textDirection:TextDirection.ltr,autofillHints:const [AutofillHints.password],
-        decoration:InputDecoration(labelText:context.tr('كلمة المرور','Password'),prefixIcon:const Icon(Icons.lock_outline),suffixIcon:IconButton(
-          onPressed:()=>setState(()=>hidden=!hidden),icon:Icon(hidden?Icons.visibility_outlined:Icons.visibility_off_outlined))),
-        validator:(v)=>(v??'').isEmpty?context.tr('أدخل كلمة المرور','Enter your password'):null),const SizedBox(height:18),
-      if(error!=null)...[Notice(failureText(context,error!),error:true),const SizedBox(height:16)],
-      FilledButton(onPressed:busy?null:()async{
-        if(!form.currentState!.validate())return;setState((){busy=true;error=null;});
-        try{await context.app.login(email.text,password.text);}catch(e){if(mounted)setState(()=>error=e);}
-        finally{if(mounted)setState(()=>busy=false);}},child:busy?const SizedBox.square(dimension:20,child:CircularProgressIndicator(strokeWidth:2)):Text(context.tr('تسجيل الدخول','Sign in'))),
-      TextButton(onPressed:()=>showDialog<void>(context:context,builder:(c)=>AlertDialog(title:Text(context.tr('استعادة الدخول','Recover access')),
-        content:Text(context.tr('حساب الطبيب والوكيل يُدار بواسطة الإدارة. تواصل مع مسؤول الفرع لاستعادة كلمة المرور أو تجديد الاعتماد.','Doctor and agent accounts are managed by your organization. Contact your branch administrator to recover access or renew approval.')),
-        actions:[TextButton(onPressed:()=>Navigator.pop(c),child:Text(context.tr('فهمت','Got it')))])),child:Text(context.tr('هل نسيت كلمة المرور؟','Forgot password?'))),
-      TextButton.icon(onPressed:()=>context.app.preferences(language:context.app.ar?'en':'ar'),icon:const Icon(Icons.language),label:Text(context.app.ar?'English':'العربية')),
-    ])))))));
-}
-
 class GeneralPage extends StatelessWidget{
   const GeneralPage(this.id,{super.key});final String id;
   @override Widget build(BuildContext context){final app=context.app;
     switch(id){
-      case 'H01':case 'H05':return const Empty();
-      case 'H02':return const SignInPage();
-      case 'H03':return PageBody(children:[Notice(context.tr('تواصل مع مسؤول الفرع لاستعادة حساب الطبيب والوكيل.','Contact your branch administrator to recover your account.')),
-        const SizedBox(height:16),FilledButton(onPressed:()=>context.open('H10'),child:Text(context.tr('الدعم','Support')))]);
-      case 'H04':return PageBody(children:[
-        Panel(child:Column(children:[const BrandLogo(size:64),const SizedBox(height:12),Text(str(app.user['name']),style:Theme.of(context).textTheme.titleLarge),
-          StatusTag(app.access.doctor?'Approved':'Pending'),const SizedBox(height:8),Text(context.tr('الاعتماد البيطري','Veterinary approval')),
-          const SizedBox(height:14),StatusTag(app.access.dispenser?'Approved':'Pending'),Text(context.tr('ترخيص الصرف المستقل','Independent dispensing license'))])),
-        Heading(context.tr('الترخيص','License')),Facts(obj(app.profile['profile'])),
-        Heading(context.tr('الصلاحيات الفعلية','Effective permissions')),
-        Panel(child:Wrap(spacing:6,runSpacing:6,children:[for(final p in app.access.permissions)Chip(label:Text(p))])),
-        const SizedBox(height:16),BusyButton(label:context.tr('تحديث الصلاحيات','Refresh access'),run:app.refreshAccess),
-      ]);
-      case 'H06':return PageBody(children:[Notice(context.tr('اختر المخزن والصندوق اللذين تعمل ضمنهما. تغيير النطاق يفرغ سلة البيع الحالية.','Choose your warehouse and cashbox. Switching context clears the current sale cart.')),
-        const SizedBox(height:16),if(app.access.grants.isEmpty)const Empty(),for(final g in app.access.grants)Padding(padding:const EdgeInsets.only(bottom:12),child:Panel(onTap:()=>app.selectGrant(g.id),child:Column(children:[
-          Row(children:[Icon(g.id==app.grantId?Icons.radio_button_checked:Icons.radio_button_off),const SizedBox(width:10),Expanded(child:Text('${context.tr('المخزن','Warehouse')} #${g.warehouse}'))]),
-          Fact(context.tr('الفرع','Store'),g.store),Fact(context.tr('الصندوق','Cashbox'),g.cashbox),Fact(context.tr('ينتهي في','Ends at'),g.json['endsAt'])])))]);
+      case 'H04':
+        final privileges = [
+          ('C01', context.tr('ممارسة العمل البيطري','Veterinary practice'), app.access.doctor),
+          ('C13', context.tr('ترخيص صرف الدواء','Dispensing authorization'), app.access.dispenser),
+          for (final route in ['I01','T02','T12','N01','P01','A01'])
+            (route, app.tr(screen(route).ar,screen(route).en), app.canOpen(screen(route))),
+        ];
+        final license=obj(app.profile['profile']);
+        return PageBody(children:[
+          if(str(app.user['name']).isNotEmpty)
+            RecordTile({'title':app.user['name']},icon:Icons.person_outline,subtitle:str(app.user['email'])),
+          Heading(context.tr('حالة الوصول','Access status')),
+          for(final item in privileges)
+            RecordTile({'title':item.$2},icon:screenDesigns[item.$1]!.icon,
+              subtitle:context.tr(item.$3?'متاح في هذا النطاق':'غير متاح في هذا النطاق',
+                item.$3?'Available in this context':'Unavailable in this context'),
+              trailing:Icon(item.$3?Icons.check_circle_outline:Icons.lock_outline,size:21)),
+          if(license.isNotEmpty)...[
+            Heading(context.tr('بيانات الترخيص','License details')),Facts(license),
+          ],
+          const SizedBox(height:14),
+          BusyButton(icon:Icons.refresh,label:context.tr('تحديث الصلاحيات','Refresh access'),run:app.refreshAccess),
+        ]);
+      case 'H06':
+        final active=app.access.grants.where((grant)=>grant.active).toList();
+        return PageBody(children:[
+          if(app.basket.isNotEmpty)
+            Notice(context.tr('تغيير نطاق العمل يفرغ سلة البيع الحالية.','Changing work context clears the current sale cart.')),
+          if(active.isEmpty)
+            Empty(icon:Icons.warehouse_outlined,
+              text:context.tr('لم يُسند إليك مخزن نشط بعد. تواصل مع الإدارة لإضافة نطاق عمل.',
+                'No active warehouse is assigned. Contact your administrator to add a work context.')),
+          for(final grant in active)
+            Padding(padding:const EdgeInsets.only(bottom:8),child:Panel(
+              onTap:grant.id==app.grantId?null:()async{
+                if(app.basket.isNotEmpty&&!await confirm(context,context.tr('تغيير النطاق وإفراغ السلة الحالية؟','Change context and clear the current cart?')))return;
+                if(!context.mounted)return;
+                app.selectGrant(grant.id);
+                toast(context,context.tr('تم تغيير نطاق العمل','Work context changed'));
+              },
+              child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+                Row(children:[
+                  Icon(grant.id==app.grantId?Icons.radio_button_checked:Icons.radio_button_off,
+                    color:Theme.of(context).colorScheme.primary),
+                  const SizedBox(width:9),
+                  Expanded(child:Text(grantName(context,grant),style:Theme.of(context).textTheme.titleMedium)),
+                  if(grant.id==app.grantId)
+                    Text(context.tr('محدد','Selected'),style:Theme.of(context).textTheme.labelMedium),
+                ]),
+                const SizedBox(height:6),
+                Fact(context.tr('الفرع','Store'),grant.json['storeName']??grant.store),
+                if(grant.cashbox!=null)Fact(context.tr('الصندوق','Cashbox'),grant.json['cashBoxName']??grant.cashbox),
+                if(grant.json['endsAt']!=null)Fact(context.tr('ينتهي في','Ends at'),grant.json['endsAt']),
+              ]),
+            )),
+        ]);
       case 'H07':return const NotificationsPage();
       case 'H08':return PageBody(children:[Panel(child:Column(children:[const BrandLogo(size:70),const SizedBox(height:12),
         Text(str(app.user['name']),style:Theme.of(context).textTheme.titleLarge),Text(str(app.user['email']))])),
@@ -95,7 +99,7 @@ class GeneralPage extends StatelessWidget{
       case 'H10':return const SupportPage();
       case 'H11':return Resource(load:()=>app.read('/api/users/me/sessions'),builder:(data,refresh)=>PageBody(children:[
         BusyButton(label:context.tr('تغيير كلمة المرور','Change password'),run:()async{await _changePassword(context);}),const SizedBox(height:16),
-        for(final row in rows(data))RecordTile({'title':row['deviceName']??'#${row['id']}'},subtitle:display(context,row['createdAt']),trailing:IconButton(icon:const Icon(Icons.logout),onPressed:()async{
+        for(final row in rows(data))RecordTile({'title':row['deviceName']??'#${row['id']}'},subtitle:display(context,row['createdAt']),trailing:IconButton(tooltip:context.tr('إلغاء الجلسة','Revoke session'),icon:const Icon(Icons.logout),onPressed:()async{
           if(!await confirm(context,context.tr('إلغاء هذه الجلسة؟','Revoke this session?')))return;
           try{await app.repo.write('DELETE','/api/users/me/sessions/${row['id']}',null);refresh();}catch(e){if(context.mounted)toast(context,failureText(context,e));}}))]));
       default:throw StateError('Unknown general screen: $id');
@@ -107,7 +111,7 @@ class NotificationsPage extends StatelessWidget{
   const NotificationsPage({super.key});
   @override Widget build(BuildContext context){final app=context.app;return Resource(load:()=>app.read('/api/notifications',query:{'pageSize':100}),builder:(data,refresh)=>PageBody(children:[
     Align(alignment:AlignmentDirectional.centerEnd,child:TextButton(onPressed:()async{await app.repo.write('POST','/api/notifications/mark-all-read',{});refresh();},child:Text(context.tr('قراءة الكل','Mark all read')))),
-    if(rows(data).isEmpty)const Empty(),for(final n in rows(data))RecordTile({'title':n['title'],'status':n['isRead']==true?'':'Pending'},subtitle:str(n['body']),icon:Icons.notifications_none,onTap:()async{
+    if(rows(data).isEmpty)Empty(icon:Icons.notifications_none,text:context.tr('لا توجد إشعارات جديدة.','No notifications yet.')),for(final n in rows(data))RecordTile({'title':n['title'],'status':n['isRead']==true?'':'Unread'},subtitle:str(n['body']),icon:Icons.notifications_none,onTap:()async{
       await app.repo.write('POST','/api/notifications/mark-read',[n['id']]);refresh();
       Json payload=obj(n['data']);if(n['dataJson'] is String){try{payload=obj(jsonDecode(n['dataJson']));}catch(_){}}
       final type=str(n['eventType']??payload['eventType']),id=numId(n['entityId']??payload['entityId']);
@@ -118,7 +122,8 @@ class NotificationsPage extends StatelessWidget{
     })]));}
 }
 String? notificationDestination(String type){
-  if(type.startsWith('vet.case.')||type=='vet.message'||type=='vet.record.updated'||type=='vet.appointment')return 'C02';
+  if(type=='vet.message')return 'C04';
+  if(type.startsWith('vet.case.')||type=='vet.record.updated'||type=='vet.appointment')return 'C02';
   if(type.startsWith('vet.prescription'))return 'C12';
   if(type.startsWith('agent.campaign.'))return 'F10';
   if(type.startsWith('agent.task.'))return 'F02';
@@ -140,7 +145,9 @@ class _SupportPageState extends State<SupportPage>{
     TextField(controller:message,maxLines:4,decoration:InputDecoration(labelText:context.tr('الرسالة','Message'))),const SizedBox(height:12),
     BusyButton(label:context.tr('إرسال التذكرة','Send ticket'),run:()async{if(subject.text.trim().isEmpty||message.text.trim().isEmpty)return;
       await context.app.repo.write('POST','/api/Support/tickets',{'subject':subject.text.trim(),'message':message.text.trim(),'priority':'normal'});subject.clear();message.clear();refresh();}),
-    Heading(context.tr('تذاكري','My tickets')),for(final t in rows(data))RecordTile(t,onTap:()=>Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>TicketPage(id:numId(t['id']))))),
+    Heading(context.tr('تذاكري','My tickets')),
+    if(rows(data).isEmpty)Empty(icon:Icons.support_agent,text:context.tr('لا توجد تذاكر دعم في حسابك.','There are no support tickets in your account.')),
+    for(final t in rows(data))RecordTile(t,onTap:()=>Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>TicketPage(id:numId(t['id']))))),
   ]));
 }
 class TicketPage extends StatefulWidget{

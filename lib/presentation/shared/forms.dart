@@ -28,13 +28,14 @@ Future<Json?> openOperation(
     return null;
   }
   return Navigator.of(context).push<Json>(MaterialPageRoute(
+    settings: RouteSettings(name: 'operation/${operation.key}'),
     builder: (_) => OperationPage(operation: operation, id: id, seed: seed, initial: initial),
   ));
 }
 
 class OperationPage extends StatefulWidget{
-  const OperationPage({super.key,required this.operation,this.id,this.seed=const {},this.initial=const {},this.embedded=false});
-  final Operation operation;final int? id;final Json seed,initial;final bool embedded;
+  const OperationPage({super.key,required this.operation,this.id,this.seed=const {},this.initial=const {},this.summary=const {},this.embedded=false});
+  final Operation operation;final int? id;final Json seed,initial,summary;final bool embedded;
   @override State<OperationPage> createState()=>_OperationPageState();
 }
 class _OperationPageState extends State<OperationPage>{
@@ -92,33 +93,68 @@ class _OperationPageState extends State<OperationPage>{
       ]);
       return widget.embedded ? denial : Scaffold(appBar: AppBar(title: Text(app.tr(op.ar, op.en))), body: denial);
     }
-    final content=Form(key:form,child:PageBody(children:[
-      if(op.version)Padding(padding:const EdgeInsets.only(bottom:14),child:StatusTag(str(widget.seed['status']))),
-      if(op.key=='profile')Padding(padding:const EdgeInsets.only(bottom:16),child:BusyButton(icon:Icons.account_circle_outlined,label:context.tr('تحديث الصورة الشخصية','Update profile photo'),run:()async{
-        final image=await ImagePicker().pickImage(source:ImageSource.gallery,maxWidth:1000,imageQuality:85);if(image==null)return;
-        await app.repo.upload('/api/users/me/avatar',image.name,await image.readAsBytes(),{});await app.refreshAccess();
-      })),
-      if(review)...[
-        Notice(context.tr('راجع البيانات قبل التأكيد. لن تُعتمد العملية إلا بعد تأكيد السيرفر.','Review before confirming. The operation is final only after server confirmation.')),
-        const SizedBox(height:14),Facts(values),const SizedBox(height:12),
-        if(quoted!=null)...[Heading(context.tr('العرض النهائي والضريبة','Final quote and tax')),RecordDetails(payload(quoted!))],
-        for(final field in op.fields.where((f)=>f.kind==InputKind.lines))...[
-          Heading(word(context,field.key)),for(final row in maps(values[field.key]))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(row))],
-        TextButton(onPressed:busy?null:()=>setState((){review=false;if(op.key=='sale'){values['quoteId']=null;quoted=null;}}),child:Text(context.tr('تعديل البيانات','Edit details'))),
-      ],
-      Offstage(offstage:review,child:Column(children:[for(final field in op.fields.where((f)=>!(op.key=='visitState'&&widget.seed['status']=='Scheduled'&&['diagnosis','findings','treatment','recommendations'].contains(f.key))))Padding(padding:const EdgeInsets.only(bottom:15),
-        child:InputControl(spec:field,value:values[field.key],parentValues:values,onChanged:(v)=>setState(()=>values[field.key]=v)))])),
-      if(error!=null)...[Notice(failureText(context,error!),error:true),const SizedBox(height:14)],
-      FilledButton.icon(onPressed:!allowed||busy?null:submit,
-        icon:busy?const SizedBox.square(dimension:18,child:CircularProgressIndicator(strokeWidth:2)):Icon(review?Icons.verified_outlined:Icons.fact_check_outlined),
-        label:Text(review?context.tr('تأكيد العملية','Confirm operation'):context.tr('مراجعة البيانات','Review details'))),
-      if(op.key=='note')TextButton.icon(onPressed:busy?null:()async{
-        if(!form.currentState!.validate())return;form.currentState!.save();
-        await app.saveNote({'caseId':widget.id,...values});if(!context.mounted)return;
-        toast(context,context.tr('حُفظت مسودة لمدة 24 ساعة','Draft saved for 24 hours'));Navigator.pop(context);
-      },icon:const Icon(Icons.save_outlined),label:Text(context.tr('حفظ مسودة محلية','Save a local draft'))),
+    final primary = FilledButton.icon(
+      onPressed:busy?null:submit,
+      icon:busy?const SizedBox.square(dimension:18,child:CircularProgressIndicator(strokeWidth:2))
+        :Icon(review?Icons.verified_outlined:Icons.arrow_forward),
+      label:Text(review?context.tr('تأكيد العملية','Confirm operation'):context.tr('مراجعة البيانات','Review details')),
+    );
+    final status=str(widget.seed['status']);
+    final content=Form(key:form,child:Column(children:[
+      Expanded(child:PageBody(children:[
+        if(widget.summary.isNotEmpty)...[Facts(widget.summary),const SizedBox(height:10)],
+        if(op.version&&status.isNotEmpty)
+          Align(alignment:AlignmentDirectional.centerStart,child:StatusTag(status)),
+        if(op.key=='profile')Padding(padding:const EdgeInsets.only(bottom:12),child:BusyButton(icon:Icons.account_circle_outlined,label:context.tr('تحديث الصورة الشخصية','Update profile photo'),run:()async{
+          final image=await ImagePicker().pickImage(source:ImageSource.gallery,maxWidth:1000,imageQuality:85);if(image==null)return;
+          await app.repo.upload('/api/users/me/avatar',image.name,await image.readAsBytes(),{});await app.refreshAccess();
+        })),
+        if(review)...[
+          Heading(context.tr('البيانات المدخلة','Entered details'),icon:Icons.fact_check_outlined),
+          Facts({
+            for(final entry in values.entries)
+              if(!entry.key.toLowerCase().contains('password'))entry.key:entry.value,
+          }),
+          if(quoted!=null)...[Heading(context.tr('العرض النهائي والضريبة','Final quote and tax')),RecordDetails(payload(quoted!))],
+          for(final field in op.fields.where((f)=>f.kind==InputKind.lines))...[
+            Heading(word(context,field.key)),
+            for(final row in maps(values[field.key]))
+              Padding(padding:const EdgeInsets.only(bottom:8),child:Facts(row)),
+          ],
+          TextButton.icon(
+            onPressed:busy?null:()=>setState((){review=false;if(op.key=='sale'){values['quoteId']=null;quoted=null;}}),
+            icon:const Icon(Icons.edit_outlined),
+            label:Text(context.tr('تعديل البيانات','Edit details')),
+          ),
+        ],
+        Offstage(offstage:review,child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+          if (!widget.embedded)
+            Heading(context.tr('تفاصيل العملية','Operation details'),icon:Icons.edit_note),
+          for(final field in op.fields.where((f)=>!(op.key=='visitState'&&widget.seed['status']=='Scheduled'&&['diagnosis','findings','treatment','recommendations'].contains(f.key))))
+            Padding(padding:const EdgeInsets.only(bottom:13),
+              child:InputControl(key:ValueKey(field.key),spec:field,value:values[field.key],parentValues:values,onChanged:(v)=>setState(()=>values[field.key]=v))),
+        ])),
+        if(op.key=='note'&&!review)TextButton.icon(onPressed:busy?null:()async{
+          if(!form.currentState!.validate())return;form.currentState!.save();
+          await app.saveNote({'caseId':widget.id,...values});if(!context.mounted)return;
+          toast(context,context.tr('حُفظت مسودة لمدة 24 ساعة','Draft saved for 24 hours'));Navigator.pop(context);
+        },icon:const Icon(Icons.save_outlined),label:Text(context.tr('حفظ مسودة محلية','Save a local draft'))),
+      ])),
+      Material(
+        color:Theme.of(context).colorScheme.surface,
+        child:Padding(
+          padding:const EdgeInsets.fromLTRB(16,8,16,10),
+          child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+            if(error!=null)...[Notice(failureText(context,error!),error:true),const SizedBox(height:8)],
+            primary,
+          ]),
+        ),
+      ),
     ]));
-    return widget.embedded?content:Scaffold(appBar:AppBar(title:Text(app.tr(op.ar,op.en))),body:BotanicalBackground(child:content));
+    return widget.embedded?content:Scaffold(
+      appBar:AppBar(title:Text(app.tr(op.ar,op.en))),
+      body:SafeArea(top:false,child:content),
+    );
   }
 }
 
@@ -141,15 +177,12 @@ class InputControl extends StatelessWidget{
           final result=DateTime(date.year,date.month,date.day,time.hour,time.minute).toUtc().toIso8601String();state.didChange(result);onChanged(result);
         },icon:const Icon(Icons.event_outlined),label:Text(value==null?title:'$title · ${display(context,value)}')),
           if(state.hasError)Text(state.errorText!,style:TextStyle(color:Theme.of(context).colorScheme.error))]));
-      case InputKind.reference:return FormField<int>(initialValue:value==null?null:numId(value),validator:(v)=>f.required&&(v??0)<=0?context.tr('اختر السجل','Select a record'):null,
-        builder:(state)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[OutlinedButton.icon(onPressed:()async{
-          final result=await chooseReference(context,f.source!,parentValues:parentValues);if(result==null)return;
-          final id=numId(result['id']);state.didChange(id);onChanged(id);
-        },icon:const Icon(Icons.search),label:Text(value==null?title:'$title · #$value')),
-          if(state.hasError)Text(state.errorText!,style:TextStyle(color:Theme.of(context).colorScheme.error))]));
+      case InputKind.reference:return _ReferenceInput(
+        spec:f,value:value,parentValues:parentValues,onChanged:onChanged,
+      );
       case InputKind.lines:return LineItems(mode:f.mode!,value:maps(value),onChanged:onChanged,parentValues:parentValues);
       case InputKind.photos:return PhotoCollector(value:value is List?(value as List).map(numId).toList():[],items:maps(parentValues['items']),onChanged:onChanged);
-      default:return TextFormField(key:ValueKey('${f.key}:${f.key=='code'||f.key=='accessCode'?value:''}'),initialValue:value==null?'':str(value),decoration:InputDecoration(labelText:title,
+      default:return TextFormField(key:ValueKey('${f.key}:${f.key=='code'||f.key=='accessCode'?value:''}'),initialValue:value==null?'':str(value),decoration:InputDecoration(labelText:title,counterText:'',
           suffixText:f.required?null:context.tr('اختياري','Optional'),suffixIcon:f.key=='code'||f.key=='accessCode'?IconButton(icon:const Icon(Icons.qr_code_scanner),onPressed:()async{final code=await scanCode(context);if(code!=null)onChanged(code);}):null),
         obscureText:f.key.toLowerCase().contains('password'),autocorrect:!f.key.toLowerCase().contains('password'),enableSuggestions:!f.key.toLowerCase().contains('password'),
         maxLines:f.kind==InputKind.longText?4:1,maxLength:f.kind==InputKind.longText?4000:200,
@@ -171,6 +204,54 @@ String normalizeNumber(String value){const arabic='٠١٢٣٤٥٦٧٨٩',persian
 
 Future<Json?> chooseReference(BuildContext context,String source,{Json parentValues=const {}})=>showModalBottomSheet<Json>(context:context,
   isScrollControlled:true,useSafeArea:true,builder:(_)=>FractionallySizedBox(heightFactor:.88,child:ReferencePicker(source:source,parentValues:parentValues)));
+class _ReferenceInput extends StatefulWidget {
+  const _ReferenceInput({required this.spec,required this.value,required this.parentValues,required this.onChanged});
+  final InputSpec spec;
+  final Object? value;
+  final Json parentValues;
+  final ValueChanged<Object?> onChanged;
+
+  @override
+  State<_ReferenceInput> createState()=>_ReferenceInputState();
+}
+
+class _ReferenceInputState extends State<_ReferenceInput> {
+  Json? selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final title=word(context,widget.spec.key);
+    final id=numId(widget.value);
+    final value=selected==null||id!=numId(selected!['id'])?'#$id':titleOf(selected!);
+    return FormField<int>(
+      initialValue:id,
+      validator:(value)=>widget.spec.required&&(value??0)<=0
+        ?context.tr('اختر السجل','Select a record'):null,
+      builder:(field)=>InputDecorator(
+        decoration:InputDecoration(
+          labelText:title,errorText:field.errorText,
+          contentPadding:const EdgeInsets.symmetric(horizontal:12,vertical:5),
+        ),
+        child:TextButton.icon(
+          style:TextButton.styleFrom(alignment:AlignmentDirectional.centerStart,
+            minimumSize:const Size(48,48)),
+          icon:const Icon(Icons.search, size:20),
+          label:Text(id==0?context.tr('اختيار','Choose'):value,
+            maxLines:2,overflow:TextOverflow.ellipsis),
+          onPressed:()async{
+            final result=await chooseReference(context,widget.spec.source!,parentValues:widget.parentValues);
+            if (result==null||!mounted) return;
+            final id=numId(result['id']);
+            field.didChange(id);
+            setState(()=>selected=result);
+            widget.onChanged(id);
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class ReferencePicker extends StatefulWidget{
   const ReferencePicker({super.key,required this.source,this.parentValues=const {}});final String source;final Json parentValues;
   @override State<ReferencePicker> createState()=>_ReferencePickerState();
