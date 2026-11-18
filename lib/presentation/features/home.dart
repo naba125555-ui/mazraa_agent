@@ -131,6 +131,7 @@ class HomePage extends StatelessWidget {
           subtitle: context.tr('الاستشارات والزيارات والمخزون والمبيعات، وفق صلاحياتك.',
               'Clinical work, visits and branch commerce — based on your access.'),
           art: 'assets/images/agent_workspace.webp',
+          emblem: 'assets/decorations/agent_honeycomb.svg',
           icon: Icons.spa_outlined,
         ),
         const SizedBox(height: 14),
