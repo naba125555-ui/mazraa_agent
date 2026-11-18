@@ -11,6 +11,7 @@ import '../shared/labels.dart';
 import '../shared/paged_records.dart';
 import '../shared/scope.dart';
 import '../shared/section_banner.dart';
+import '../design/agent_ui.dart';
 import '../shared/product_thumbnail.dart';
 import '../shared/widgets.dart';
 import 'clinical.dart';
@@ -254,25 +255,143 @@ class _Shortcuts extends StatelessWidget{
   @override Widget build(BuildContext context)=>Wrap(spacing:8,runSpacing:8,children:[for(final route in routes)if(context.app.canOpen(screenById(route)))ActionChip(
     label:Text(context.app.tr(screenById(route).ar,screenById(route).en)),onPressed:()=>context.open(route))]);
 }
-class BusinessHub extends StatelessWidget{
+
+class _HubEntry {
+  const _HubEntry(this.route, this.icon, this.color);
+  final String route;
+  final IconData icon;
+  final Color color;
+}
+
+/// T01 — operations-first workspace with permission-aware categories.
+class BusinessHub extends StatelessWidget {
   const BusinessHub({super.key});
-  @override Widget build(BuildContext context)=>PageBody(children:[
-    SectionBanner(art:SectionArt.commerce,icon:Icons.storefront_outlined,
-      title:context.tr('إدارة الفرع','Manage your branch'),
-      subtitle:context.tr('نقطة البيع والمخزون والصندوق','Point of sale, inventory and cashbox')),
-    Heading(context.tr('عمليات الفرع','Branch operations')),
-    LayoutBuilder(builder:(context,grid)=>Wrap(spacing:8,runSpacing:8,children:[
-    for(final entry in [('T02',Icons.point_of_sale_outlined),('I01',Icons.inventory_2_outlined),('T06',Icons.receipt_long_outlined),('T09',Icons.request_quote_outlined),
-      ('T11',Icons.shopping_bag_outlined),('T12',Icons.add_shopping_cart),('T10',Icons.local_shipping_outlined),('N01',Icons.account_balance_wallet_outlined),
-      ('N05',Icons.account_balance_outlined),('N06',Icons.menu_book_outlined),('N08',Icons.bar_chart),('P01',Icons.storefront_outlined),
-      ('P02',Icons.move_to_inbox_outlined),('A01',Icons.gavel_outlined),('G01',Icons.lightbulb_outline)])
-      if(context.app.canOpen(screenById(entry.$1)))
-        SizedBox(width:grid.maxWidth<340?grid.maxWidth:(grid.maxWidth-8)/2,
-          child:ActionTile(title:context.app.tr(screenById(entry.$1).ar,screenById(entry.$1).en),
-            icon:entry.$2,onTap:()=>context.open(entry.$1))),
-    ])),
-    if(context.app.access.grants.isEmpty)Notice(context.tr('لا يوجد تفويض تجاري نشط. تواصل مع الإدارة لتحديد نطاقك.','No active business delegation. Contact your administrator to assign a work context.')),
-  ]);
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.app;
+    final grant = app.grant;
+    final type = Theme.of(context).textTheme;
+    const green = AgentPalette.forest;
+    const blue = AgentPalette.blue;
+    const amber = AgentPalette.amber;
+    const violet = AgentPalette.violet;
+    final groups = <(String, IconData, List<_HubEntry>)>[
+      (context.tr('البيع والمخزون', 'Sales and inventory'),
+        Icons.shopping_bag_outlined, [
+          const _HubEntry('T02', Icons.point_of_sale_rounded, green),
+          const _HubEntry('I01', Icons.inventory_2_outlined, green),
+          const _HubEntry('T06', Icons.receipt_long_outlined, blue),
+          const _HubEntry('T09', Icons.request_quote_outlined, violet),
+          const _HubEntry('T11', Icons.shopping_bag_outlined, amber),
+          const _HubEntry('T12', Icons.add_shopping_cart_rounded, amber),
+          const _HubEntry('T10', Icons.local_shipping_outlined, blue),
+        ]),
+      (context.tr('المالية والتقارير', 'Finance and reporting'),
+        Icons.account_balance_wallet_outlined, [
+          const _HubEntry('N01', Icons.account_balance_wallet_outlined, green),
+          const _HubEntry('N03', Icons.punch_clock_outlined, violet),
+          const _HubEntry('N05', Icons.account_balance_outlined, amber),
+          const _HubEntry('N06', Icons.menu_book_outlined, blue),
+          const _HubEntry('N08', Icons.query_stats_outlined, green),
+        ]),
+      (context.tr('الاستلام والمزادات', 'Pickup and marketplace'),
+        Icons.store_mall_directory_outlined, [
+          const _HubEntry('P01', Icons.storefront_outlined, green),
+          const _HubEntry('P02', Icons.move_to_inbox_outlined, blue),
+          const _HubEntry('A01', Icons.gavel_outlined, amber),
+          const _HubEntry('G01', Icons.lightbulb_outline, violet),
+        ]),
+    ];
+    final available = groups.map((section) => (
+      section.$1, section.$2,
+      section.$3.where((entry) => app.canOpen(screenById(entry.route))).toList(),
+    )).where((section) => section.$3.isNotEmpty).toList();
+
+    return PageBody(children: [
+      AgentHero(
+        title: context.tr('عمليات الفرع', 'Branch operations'),
+        subtitle: context.tr('إدارة المبيعات والمخزون والصندوق ونقاط الاستلام.',
+          'Manage sales, inventory, cash and pickup points.'),
+        art: 'assets/images/agent_commerce.webp',
+        icon: Icons.storefront_outlined),
+      const SizedBox(height: 14),
+      AgentSurface(onTap: () => context.open('H06'), padding: const EdgeInsets.all(13),
+        child: Row(children: [
+          Container(width: 44, height: 44,
+            decoration: BoxDecoration(color: AgentPalette.mint,
+              borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.warehouse_outlined, color: green)),
+          const SizedBox(width: 11),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(context.tr('النطاق المعتمد للعمل', 'Approved work context'),
+                style: type.labelLarge),
+              Text(grant == null
+                  ? context.tr('لم يتم اختيار مخزن مفوض', 'No authorized warehouse selected')
+                  : context.tr('فرع', 'Store') + ' #' + grant.store.toString() + ' · ' +
+                    context.tr('مخزن', 'Warehouse') + ' #' + grant.warehouse.toString(),
+                style: type.bodySmall, maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+            ])),
+          const Icon(Icons.unfold_more_rounded, color: green),
+        ])),
+      if (app.allows(Cap.sell | Cap.cash)) ...[
+        const SizedBox(height: 12),
+        Material(
+          color: green,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(onTap: () => context.open('T02'),
+            child: Padding(padding: const EdgeInsets.all(16),
+              child: Row(children: [
+                const CircleAvatar(backgroundColor: Color(0xFF248A5F),
+                  radius: 24, child: Icon(Icons.point_of_sale_outlined,
+                    color: Colors.white, size: 27)),
+                const SizedBox(width: 13),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(context.tr('بدء عملية بيع', 'Start a new sale'),
+                      style: type.titleMedium?.copyWith(color: Colors.white)),
+                    Text(context.tr('الأصناف والكميات والتسعير المعتمد من السيرفر',
+                        'Products, quantities and server-approved pricing'),
+                      style: type.bodySmall?.copyWith(
+                        color: const Color(0xFFE1F2E8))),
+                  ])),
+                const Icon(Icons.arrow_forward_ios_rounded,
+                  color: Colors.white, size: 18),
+              ]))),
+        ),
+      ],
+      for (final section in available) ...[
+        AgentSectionHeading(title: section.$1, icon: section.$2),
+        LayoutBuilder(builder: (context, constraints) {
+          final count = constraints.maxWidth >= 450 ? 4 : 3;
+          final width = (constraints.maxWidth - 10 * (count - 1)) / count;
+          return Wrap(spacing: 10, runSpacing: 10, children: [
+            for (final entry in section.$3)
+              SizedBox(width: width,
+                child: AgentAction(
+                  title: app.tr(screenById(entry.route).ar,
+                    screenById(entry.route).en),
+                  icon: entry.icon, color: entry.color,
+                  onTap: () => context.open(entry.route))),
+          ]);
+        }),
+      ],
+      if (available.isEmpty) ...[
+        const SizedBox(height: 22),
+        Notice(context.tr(
+          'لا توجد صلاحيات تجارية فعالة في نطاق العمل الحالي. راجع التفويض مع الإدارة.',
+          'No active commercial permissions for this work context. Contact your administrator.')),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(onPressed: () => context.open('H04'),
+          icon: const Icon(Icons.verified_user_outlined),
+          label: Text(context.tr('مراجعة الاعتماد', 'Review access'))),
+      ],
+      const SizedBox(height: 28),
+    ]);
+  }
 }
 class _RecordSelector extends StatelessWidget{
   const _RecordSelector({required this.target});final String target;
