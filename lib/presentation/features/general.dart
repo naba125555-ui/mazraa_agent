@@ -115,7 +115,67 @@ class _SignInPageState extends State<SignInPage> {
                       prefixIcon: const Icon(Icons.alternate_email_rounded)),
                     validator: (v) {
                       final email = (v ?? '').trim();
-                      if (!RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+{
+                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                        return context.tr('أدخل بريدًا إلكترونيًا صحيحًا',
+                          'Enter a valid email address');
+                      }
+                      return null;
+                    }),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: password,
+                    enabled: !busy,
+                    obscureText: hidden,
+                    textDirection: TextDirection.ltr,
+                    textInputAction: TextInputAction.done,
+                    autofillHints: const [AutofillHints.password],
+                    onFieldSubmitted: (_) => submit(),
+                    decoration: InputDecoration(
+                      labelText: context.tr('كلمة المرور', 'Password'),
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        tooltip: context.tr(hidden ? 'إظهار كلمة المرور' : 'إخفاء كلمة المرور',
+                          hidden ? 'Show password' : 'Hide password'),
+                        onPressed: () => setState(() => hidden = !hidden),
+                        icon: Icon(hidden ? Icons.visibility_outlined :
+                          Icons.visibility_off_outlined))),
+                    validator: (v) => (v ?? '').isEmpty
+                      ? context.tr('أدخل كلمة المرور', 'Password is required') : null),
+                  if (error != null) ...[
+                    const SizedBox(height: 17),
+                    Notice(failureText(context, error!), error: true),
+                  ],
+                  const SizedBox(height: 22),
+                  FilledButton.icon(
+                    onPressed: busy ? null : submit,
+                    icon: busy
+                      ? const SizedBox.square(dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.login_rounded),
+                    label: Text(context.tr('تسجيل الدخول بأمان', 'Secure sign in'))),
+                  Align(alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton(
+                      onPressed: busy ? null : recovery,
+                      child: Text(context.tr('هل نسيت كلمة المرور؟', 'Forgot password?')))),
+                ])),
+            const SizedBox(height: 18),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.verified_user_outlined, size: 17,
+                color: colors.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Flexible(child: Text(context.tr(
+                'لا تُفتح أدوات الفرع إلا بعد التحقق من التفويض.',
+                'Branch tools require verified authorization.'),
+                textAlign: TextAlign.center, style: type.bodySmall)),
+            ]),
+          ],
+        ))),
+      )),
+    )));
+  }
+}
+
+class GeneralPage extends StatelessWidget {
   const GeneralPage(this.id,{super.key});final String id;
   @override Widget build(BuildContext context){final app=context.app;
     switch(id){
