@@ -76,7 +76,7 @@ void main(){
       await tester.pumpWidget(host(app,ScreenPage(route,key:ValueKey(route))));
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull,reason:route);
-      if (['H02','H05','C01','T01'].contains(route)) {
+      if (['H02','H05','C01','F01','T01'].contains(route)) {
         expect(find.byType(AgentHero), findsOneWidget, reason: route);
       } else {
         expect(find.byType(SectionBanner), findsOneWidget, reason: route);
