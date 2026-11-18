@@ -124,6 +124,7 @@ class _ConsultationsOverviewState extends State<ConsultationsOverview> {
             'الإحالات الطبية، سجلات الفحص، الوصفات والمتابعة.',
             'Referrals, examinations, prescriptions and follow-up.'),
           art: 'assets/images/agent_clinical.webp',
+          emblem: 'assets/decorations/agent_medical_emblem.svg',
           icon: Icons.medical_services_outlined),
         const SizedBox(height: 16),
         TextField(
@@ -254,6 +255,7 @@ class _ConsultationDetail extends StatelessWidget {
         subtitle: context.tr('المعلومات الطبية والقرارات في مسار واحد.',
           'Medical record and next steps in one workspace.'),
         art: 'assets/images/agent_clinical.webp',
+          emblem: 'assets/decorations/agent_medical_emblem.svg',
         icon: Icons.medical_services_outlined),
       const SizedBox(height: 13),
       AgentSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
