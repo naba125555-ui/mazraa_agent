@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// Shared, accessible visual language for the agent rebuild.
 /// These widgets render native Flutter controls; artwork is decoration only.
@@ -45,10 +46,11 @@ class AgentSurface extends StatelessWidget {
 class AgentHero extends StatelessWidget {
   const AgentHero({super.key, required this.title, required this.subtitle,
     this.art = 'assets/images/agent_workspace.webp', this.icon = Icons.eco_outlined,
-    this.trailing});
+    this.trailing, this.emblem});
   final String title, subtitle, art;
   final IconData icon;
   final Widget? trailing;
+  final String? emblem;
   @override
   Widget build(BuildContext context) {
     final type = Theme.of(context).textTheme;
@@ -68,6 +70,11 @@ class AgentHero extends StatelessWidget {
               colors: const [Color(0xFA075333), Color(0xE60A613E),
                 Color(0x700B6441), Color(0x150B6441)],
               stops: const [0, .38, .78, 1])))),
+          if (emblem != null)
+            PositionedDirectional(top: 10, end: 12,
+              child: Opacity(opacity: .9,
+                child: SvgPicture.asset(emblem!, width: 46, height: 46,
+                  semanticsLabel: 'Mazraa'))),
           Padding(padding: const EdgeInsets.all(20),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center, children: [
