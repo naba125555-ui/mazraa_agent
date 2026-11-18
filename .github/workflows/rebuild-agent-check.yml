@@ -1,0 +1,66 @@
+name: Agent rebuild — verify and build preview
+on:
+  push:
+    branches: [feat/agent-rebuild-ui]
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/rebuild-agent-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: agent-rebuild-preview-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  CI: 'true'
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+jobs:
+  verify-and-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.8'
+          channel: stable
+          cache: true
+      - name: Resolve packages
+        run: flutter pub get
+      - name: Validate structure
+        run: python3 tool/check_structure.py
+      - name: Format Dart sources for this checkout
+        run: dart format lib test
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos
+      - name: Run widget and application tests
+        run: flutter test --reporter expanded
+      - name: Build ARM64 release preview
+        run: |
+          bash tool/prepare_android.sh
+          flutter build apk --release --no-pub --target-platform android-arm64 --split-per-abi --tree-shake-icons
+          test -s build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+      - name: Upload installable preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-rebuild-arm64-preview
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload visual test captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-rebuild-ui-verification
+          path: build/previews/
+          if-no-files-found: warn
+          retention-days: 14
