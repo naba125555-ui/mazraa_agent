@@ -9,6 +9,7 @@ import '../shared/forms.dart';
 import '../shared/paged_records.dart';
 import '../shared/scope.dart';
 import '../shared/section_banner.dart';
+import '../design/agent_ui.dart';
 import '../shared/widgets.dart';
 
 class FieldPage extends StatelessWidget{
@@ -22,22 +23,38 @@ class FieldPage extends StatelessWidget{
           '/api/agent/field/${tasks ? 'tasks' : 'campaigns'}', afterId: afterId,
         ),
         header: [
-          SectionBanner(art:SectionArt.field,icon:Icons.assignment_outlined,
-            title:tasks?context.tr('العمل الميداني','Field work'):context.tr('الحملات الميدانية','Field campaigns'),
-            subtitle:tasks?context.tr('المهام والزيارات المسندة','Assigned tasks and visits'):null),
-          const SizedBox(height:10),
-          if (tasks) Wrap(spacing: 8, children: [
-            ActionChip(avatar: const Icon(Icons.calendar_month_outlined), label: Text(context.tr('التقويم', 'Calendar')), onPressed: () => context.open('F03')),
-            ActionChip(avatar: const Icon(Icons.vaccines_outlined), label: Text(context.tr('الحملات', 'Campaigns')), onPressed: () => context.open('F09')),
+          if (tasks)
+            AgentHero(
+              title: context.tr('العمل الميداني', 'Field work'),
+              subtitle: context.tr('مهامك وزياراتك المسندة، حسب التاريخ والحالة.',
+                'Assigned tasks and visits by date and status.'),
+              art: 'assets/images/agent_field.webp',
+              icon: Icons.location_on_outlined,
+              emblem: 'assets/decorations/agent_medical_emblem.svg')
+          else
+            SectionBanner(art: SectionArt.field, icon: Icons.vaccines_outlined,
+              title: context.tr('الحملات الميدانية', 'Field campaigns')),
+          const SizedBox(height: 13),
+          if (tasks) Wrap(spacing: 8, runSpacing: 8, children: [
+            ActionChip(
+              avatar: const Icon(Icons.calendar_month_outlined),
+              label: Text(context.tr('التقويم', 'Calendar')),
+              onPressed: () => context.open('F03')),
+            ActionChip(
+              avatar: const Icon(Icons.vaccines_outlined),
+              label: Text(context.tr('الحملات', 'Campaigns')),
+              onPressed: () => context.open('F09')),
           ]),
-          const SizedBox(height: 14),
+          AgentSectionHeading(
+            title: tasks
+              ? context.tr('المهام والزيارات', 'Tasks and visits')
+              : context.tr('الحملات المتاحة', 'Available campaigns'),
+            icon: tasks ? Icons.assignment_outlined : Icons.vaccines_outlined),
         ],
-        itemBuilder: (row) => RecordTile(
-          row,
-          icon: tasks ? Icons.assignment_outlined : Icons.vaccines_outlined,
-          subtitle: display(context, row['scheduledDate'] ?? payload(row)['scheduledAt']),
-          onTap: () => context.open(tasks ? 'F02' : 'F10', id: numId(row['id']), seed: row),
-        ),
+        itemBuilder: (row) => _FieldCard(
+          row: row, campaign: !tasks,
+          onOpen: () => context.open(tasks ? 'F02' : 'F10',
+            id: numId(row['id']), seed: row)),
       );
     }
     if(screen=='F03')return const FieldCalendar();
@@ -48,14 +65,59 @@ class FieldPage extends StatelessWidget{
     final task=screen=='F02';
     return Resource(identity:'$screen:$id:${app.revision}',load:()=>app.record(campaign?'campaign':task?'task':'visit',id!,fresh:true),builder:(data,refresh){
       final root=obj(data),row=campaign?obj(root['campaign']):root,d=payload(row);
-      if(screen=='F02')return PageBody(children:[
-        SectionBanner(art:SectionArt.field,title:titleOf(row),subtitle:display(context,row['scheduledDate'])),
-        const SizedBox(height:12),
-        Facts(row,fields:['description','status','priority']),
-        const SizedBox(height:16),if(!['Completed','Cancelled','Rejected'].contains(row['status']))BusyButton(label:context.tr('تحديث حالة المهمة','Update task state'),run:()async{await openOperation(context,'taskState',id:id,seed:row);refresh();}),
-        const SizedBox(height:10),OutlinedButton.icon(onPressed:()=>context.open('F04',id:id,seed:row),icon:const Icon(Icons.near_me_outlined),label:Text(context.tr('الموقع والملاحة','Directions'))),
-        Heading(context.tr('الزيارات','Visits')),for(final visit in maps(row['visits']))RecordTile(visit,onTap:()=>context.open('F06',id:numId(visit['id']),seed:visit)),
-        if(['Accepted','InProgress'].contains(row['status']))OutlinedButton.icon(onPressed:()async{await openOperation(context,'createVisit',id:id,seed:row);refresh();},icon:const Icon(Icons.add_location_alt_outlined),label:Text(context.tr('إضافة زيارة','Add a visit'))),
+      if(screen=='F02')return PageBody(children: [
+        AgentHero(
+          title: titleOf(row),
+          subtitle: context.tr('تفاصيل المهمة وإجراءات الزيارة', 'Task and visit actions'),
+          art: 'assets/images/agent_field.webp',
+          icon: Icons.assignment_turned_in_outlined,
+          emblem: 'assets/decorations/agent_medical_emblem.svg'),
+        const SizedBox(height: 14),
+        AgentSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Expanded(child: Text(context.tr('المهمة', 'Task') + ' #' + str(row['id']),
+                style: Theme.of(context).textTheme.titleMedium)),
+              if(str(row['status']).isNotEmpty) StatusTag(str(row['status'])),
+            ]),
+            if (row['description'] != null) ...[
+              const SizedBox(height: 10),
+              Text(str(row['description']), style: Theme.of(context).textTheme.bodyMedium),
+            ],
+            if (row['scheduledDate'] != null) ...[
+              const SizedBox(height: 8),
+              Fact(context.tr('الموعد', 'Schedule'), row['scheduledDate']),
+            ],
+            if (row['priority'] != null)
+              Fact(context.tr('الأولوية', 'Priority'), row['priority']),
+          ])),
+        AgentSectionHeading(title: context.tr('إجراءات المهمة', 'Task actions'),
+          icon: Icons.task_alt_outlined),
+        if(!['Completed','Cancelled','Rejected'].contains(row['status']))
+          BusyButton(label: context.tr('تحديث حالة المهمة', 'Update task state'),
+            run: () async { await openOperation(context, 'taskState', id:id, seed:row); refresh(); }),
+        const SizedBox(height: 9),
+        OutlinedButton.icon(onPressed: () => context.open('F04', id:id, seed:row),
+          icon: const Icon(Icons.near_me_outlined),
+          label: Text(context.tr('الموقع والملاحة', 'Directions'))),
+        AgentSectionHeading(title: context.tr('الزيارات المرتبطة', 'Related visits'),
+          icon: Icons.event_note_outlined),
+        if(maps(row['visits']).isEmpty)
+          AgentSurface(child: Text(context.tr('لا توجد زيارات مسجلة لهذه المهمة بعد.',
+            'No visits have been registered for this task yet.'))),
+        for(final visit in maps(row['visits']))
+          _FieldCard(row:visit, campaign:false,
+            onOpen: () => context.open('F06', id:numId(visit['id']),seed:visit)),
+        if(['Accepted','InProgress'].contains(row['status'])) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await openOperation(context,'createVisit',id:id,seed:row);
+              refresh();
+            },
+            icon: const Icon(Icons.add_location_alt_outlined),
+            label: Text(context.tr('إضافة زيارة', 'Add a visit'))),
+        ],
       ]);
       if(screen=='F05')return VisitCheckIn(visit:row);
       if(screen=='F06')return PageBody(children:[Facts(row),Heading(context.tr('إجراءات الزيارة','Visit actions')),
@@ -102,6 +164,55 @@ class FieldPage extends StatelessWidget{
     });
   }
 }
+
+class _FieldCard extends StatelessWidget {
+  const _FieldCard({required this.row, required this.campaign,
+    required this.onOpen});
+  final Json row;
+  final bool campaign;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = row['scheduledDate'] ?? payload(row)['scheduledAt'];
+    final status = str(row['status']);
+    final title = titleOf(row);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AgentSurface(onTap: onOpen, padding: const EdgeInsets.all(13),
+        child: Row(children: [
+          Container(width: 52, height: 52,
+            decoration: BoxDecoration(
+              color: campaign
+                ? AgentPalette.violet.withValues(alpha: .11) : AgentPalette.mint,
+              borderRadius: BorderRadius.circular(16)),
+            child: Icon(campaign ? Icons.vaccines_outlined
+              : Icons.location_on_outlined,
+              color: campaign ? AgentPalette.violet : AgentPalette.forest,
+              size: 27)),
+          const SizedBox(width: 11),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge),
+              if(date != null)
+                Text(display(context,date), maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall),
+              if(status.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                StatusTag(status),
+              ],
+            ])),
+          Icon(Directionality.of(context) == TextDirection.rtl
+            ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+            color: Theme.of(context).colorScheme.primary),
+        ]),
+      ),
+    );
+  }
+}
+
 class _FieldLink extends StatelessWidget{
   const _FieldLink(this.route,this.id,this.icon);final String route;final int id;final IconData icon;
   @override Widget build(BuildContext context){final titles={
