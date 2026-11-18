@@ -5,7 +5,6 @@ import '../../domain/screens.dart';
 import '../navigation.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
-import '../shared/section_banner.dart';
 import '../design/agent_ui.dart';
 import '../shared/forms.dart';
 
