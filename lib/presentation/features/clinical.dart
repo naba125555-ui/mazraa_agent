@@ -256,7 +256,7 @@ class _ConsultationDetail extends StatelessWidget {
         subtitle: context.tr('المعلومات الطبية والقرارات في مسار واحد.',
           'Medical record and next steps in one workspace.'),
         art: 'assets/images/agent_clinical.webp',
-        icon: Icons.stethoscope_outlined),
+        icon: Icons.medical_services_outlined),
       const SizedBox(height: 13),
       AgentSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
         children: [
