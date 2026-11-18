@@ -89,6 +89,7 @@ class _SignInPageState extends State<SignInPage> {
               subtitle: context.tr('آمن، سريع، ومُخصص لصلاحياتك.',
                 'Secure, responsive and tailored to your permissions.'),
               art: 'assets/images/agent_clinical.webp',
+              emblem: 'assets/decorations/agent_medical_emblem.svg',
               icon: Icons.medical_services_outlined),
             const SizedBox(height: 24),
             AgentSurface(padding: const EdgeInsets.all(20),
