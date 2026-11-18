@@ -12,7 +12,6 @@ import '../navigation.dart';
 import '../shared/forms.dart';
 import '../shared/paged_records.dart';
 import '../shared/scope.dart';
-import '../shared/section_banner.dart';
 import '../design/agent_ui.dart';
 import '../shared/widgets.dart';
 
@@ -230,7 +229,6 @@ class _ConsultationDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = context.app;
     final detail = payload(row);
     final animal = obj(row['animal']);
     final customer = obj(row['customer']);
