@@ -25,7 +25,7 @@ class HomePage extends StatelessWidget {
 
     final primaryActions = <_ActionSpec>[
       if (doctor) _ActionSpec('C01', context.tr('الاستشارات', 'Consultations'),
-        Icons.stethoscope_rounded, AgentPalette.forest),
+        Icons.medical_services_outlined, AgentPalette.forest),
       if (doctor) _ActionSpec('F01', context.tr('المهام الميدانية', 'Field tasks'),
         Icons.location_on_outlined, AgentPalette.blue),
       if (doctor) _ActionSpec('F03', context.tr('جدول الزيارات', 'Visit calendar'),
