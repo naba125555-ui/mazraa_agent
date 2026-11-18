@@ -173,10 +173,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             else
               const SizedBox.shrink(),
         ]),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: available.indexOf(index),
-          onDestinationSelected: (destination) => selectTab(available[destination]),
-          destinations: [for (final tab in available) destinations[tab]],
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            boxShadow: [BoxShadow(
+              color: Theme.of(context).colorScheme.shadow.withValues(alpha: .075),
+              blurRadius: 18, offset: const Offset(0, -5))],
+          ),
+          child: NavigationBar(
+            selectedIndex: available.indexOf(index),
+            onDestinationSelected: (destination) => selectTab(available[destination]),
+            destinations: [for (final tab in available) destinations[tab]],
+          ),
         ),
       ),
     ));
@@ -194,9 +201,22 @@ class ScreenPage extends StatelessWidget{
     else if(spec.area==Area.clinical){body=ClinicalPage(route,id:id,seed:seed);}
     else if(spec.area==Area.field){body=FieldPage(route,id:id,seed:seed);}
     else{body=BusinessPage(route,id:id,seed:seed);}
-    return Scaffold(appBar:AppBar(title:route=='H05'?const BrandLogo(size:44):Text(app.tr(spec.ar,spec.en)),
-      leading:route=='H05'?IconButton(tooltip:context.tr('حسابي','My account'),icon:const Icon(Icons.account_circle_outlined),onPressed:()=>context.open('H08')):null,
-      actions:[if(route!='H07')IconButton(tooltip:context.tr('الإشعارات','Notifications'),icon:const Icon(Icons.notifications_none),onPressed:()=>context.open('H07'))]),
-      body:BotanicalBackground(child:body));
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: route == 'H05' ? null : AppBar(
+        backgroundColor: colors.primary,
+        foregroundColor: Colors.white,
+        title: Text(app.tr(spec.ar, spec.en), style: const TextStyle(
+          color: Colors.white, fontWeight: FontWeight.w800)),
+        actions: [
+          if (route != 'H07')
+            IconButton(
+              tooltip: context.tr('الإشعارات', 'Notifications'),
+              icon: const Icon(Icons.notifications_none_rounded),
+              onPressed: () => context.open('H07')),
+        ],
+      ),
+      body: BotanicalBackground(child: body),
+    );
   }
 }
