@@ -27,6 +27,21 @@ Widget host(AgentApp app,Widget child)=>AppScope(app:app,child:MaterialApp(local
   localizationsDelegates:GlobalMaterialLocalizations.delegates,supportedLocales:const [Locale('ar'),Locale('en')],
   theme:Brand.theme(app.theme=='dark'?Brightness.dark:Brightness.light),
   home:NavScope(open:(route,{id,seed}){},child:child)));
+
+class ObservedRepository extends FakeRepository {
+  final List<String> requestedPaths = [];
+  @override
+  Future<dynamic> read(String path, {Json? query}) async {
+    requestedPaths.add(path);
+    if (path == '/api/vet/cases') return [
+      {'id': 1, 'status': 'Assigned', 'version': 1},
+      {'id': 2, 'status': 'Active', 'version': 1},
+      {'id': 3, 'status': 'Closed', 'version': 1},
+    ];
+    return super.read(path, query: query);
+  }
+}
+
 void main(){
   setUpAll(()async{final loader=FontLoader('Cairo')..addFont(rootBundle.load('assets/fonts/Cairo.ttf'));await loader.load();});
   for(final language in ['ar','en'])for(final mode in ['light','dark']){
@@ -113,6 +128,36 @@ void main(){
     await tester.pumpAndSettle();
     expect(requested, [0, 2, 2]);
     expect(find.text('Record 3'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
+
+  testWidgets('Consultation list is paginated without per-card detail requests', (tester) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repo = ObservedRepository();
+    final app = AgentApp(repo);
+    app.starting = false;
+    app.language = 'ar';
+    app.bootstrap = FakeRepository.bootstrap;
+    app.profile = {'profile': {'isAvailable': true}};
+    app.user = {'name': 'د. أحمد'};
+    app.access = Access.from(app.bootstrap, {});
+    app.grantId = 1;
+    await tester.pumpWidget(host(app, const ScreenPage('C01')));
+    await tester.pumpAndSettle();
+    expect(find.text('استشارة #1'), findsOneWidget);
+    expect(find.text('استشارة #2'), findsOneWidget);
+    expect(repo.requestedPaths.where((path) => path == '/api/vet/cases').length, 1);
+    expect(repo.requestedPaths.where((path) => path.startsWith('/api/vet/cases/')), isEmpty);
+    await tester.tap(find.text('جديدة'));
+    await tester.pumpAndSettle();
+    expect(find.text('استشارة #1'), findsOneWidget);
+    expect(find.text('استشارة #2'), findsNothing);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
   });
