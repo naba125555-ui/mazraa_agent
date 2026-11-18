@@ -314,6 +314,7 @@ class BusinessHub extends StatelessWidget {
         subtitle: context.tr('إدارة المبيعات والمخزون والصندوق ونقاط الاستلام.',
           'Manage sales, inventory, cash and pickup points.'),
         art: 'assets/images/agent_commerce.webp',
+        emblem: 'assets/decorations/agent_honeycomb.svg',
         icon: Icons.storefront_outlined),
       const SizedBox(height: 14),
       AgentSurface(onTap: () => context.open('H06'), padding: const EdgeInsets.all(13),
