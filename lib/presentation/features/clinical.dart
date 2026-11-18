@@ -12,29 +12,14 @@ import '../navigation.dart';
 import '../shared/forms.dart';
 import '../shared/paged_records.dart';
 import '../shared/scope.dart';
-import '../shared/section_banner.dart';
+import '../design/agent_ui.dart';
 import '../shared/widgets.dart';
 
 class ClinicalPage extends StatelessWidget{
   const ClinicalPage(this.screen,{super.key,this.id,this.seed=const {}});
   final String screen;final int? id;final Json seed;
   @override Widget build(BuildContext context){final app=context.app;
-    if (screen == 'C01') {
-      return PagedRecords(
-        key: ValueKey(app.revision),
-        load: (afterId) => app.page('/api/vet/cases', afterId: afterId),
-        header: [
-          SectionBanner(art:SectionArt.clinical,icon:Icons.monitor_heart_outlined,
-            title:context.tr('عيادتي البيطرية','Veterinary practice'),
-            subtitle:context.tr('الإحالات والاستشارات','Referrals and consultations')),
-          const SizedBox(height:12),
-          ActionTile(title:context.tr('الوصفات وطلبات الصرف','Prescriptions and dispensing'),
-            icon:Icons.medication_outlined,onTap:()=>context.open('C12')),
-          const SizedBox(height:12),
-        ],
-        itemBuilder: (row)=>_ConsultationTile(caseRow:row),
-      );
-    }
+    if (screen == 'C01') return const ConsultationsOverview();
     if((screen=='C12'||screen=='C13'||screen=='C14')&&id==null)return Resource(load:()=>app.all('/api/vet/prescriptions'),builder:(data,refresh)=>PageBody(children:[
       if(rows(data).isEmpty)const Empty(),for(final row in rows(data).reversed)RecordTile(row,icon:Icons.medication_outlined,onTap:()=>context.open(screen,id:numId(row['id'])))]));
     if(id==null)return const Empty();
@@ -50,23 +35,7 @@ class ClinicalPage extends StatelessWidget{
     final rx=['C12','C13','C14'].contains(screen);
     return Resource(identity:'$screen:$id:${app.revision}',load:()=>app.record(rx?'prescription':'case',id!,fresh:true),builder:(data,refresh){
       final row=obj(data),d=payload(row),versioned=rx?row:d;
-      if(screen=='C02')return PageBody(children:[
-        SectionBanner(art:SectionArt.clinical,icon:Icons.pets_outlined,
-          title:str(obj(row['animal'])['name']).isEmpty ? context.tr('استشارة بيطرية','Veterinary consultation') : str(obj(row['animal'])['name'])),
-        const SizedBox(height:12),
-        Panel(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(context.tr('الإحالة','Referral'),style:Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height:8),StatusTag(str(versioned['status'])),Fact('id',id),if(d['reason']!=null)Fact('reason',d['reason'])])),
-        if(versioned['status']=='Assigned')...[
-          const SizedBox(height:16),BusyButton(label:context.tr('قبول الاستشارة','Accept consultation'),run:()async{await openOperation(context,'accept',id:id,seed:versioned);refresh();}),
-          const SizedBox(height:10),OutlinedButton(onPressed:()async{await openOperation(context,'decline',id:id,seed:versioned);refresh();},child:Text(context.tr('اعتذار','Decline'))),
-        ]else...[
-          if(row['animal'] is Map)...[Heading(context.tr('الحيوان','Animal')),Facts(obj(row['animal']))],
-          Heading(context.tr('سجل الحالة','Case record')),
-          for(final route in [('C03',Icons.auto_awesome_outlined),('C04',Icons.forum_outlined),('C05',Icons.attach_file),('C06',Icons.pets_outlined),
-            ('C08',Icons.edit_note),('C09',Icons.event_outlined),('C10',Icons.medication_outlined),('C15',Icons.update),('C16',Icons.task_alt)])
-            _RouteTile(route.$1,route.$2,id:id),
-        ],
-      ]);
+      if(screen=='C02')return _ConsultationDetail(id:id!, row:row, refresh:refresh);
       if(screen=='C06'||screen=='C07')return PageBody(children:[
         Facts(obj(row['animal'])),const SizedBox(height:14),Notice(context.tr('الحيوان مرتبط بإحالة العميل. لتقييم حيوان آخر، يرسل العميل إحالة جديدة.','The animal is linked to this customer referral. Another animal requires a separate customer referral.')),
         Heading(context.tr('الفحوص والزيارات','Examinations and visits')),
@@ -99,34 +68,273 @@ class ClinicalPage extends StatelessWidget{
     });
   }
 }
+/// C01 — server-paginated consultation queue. Text filters operate on fetched
+/// authorized data; opening a card is the only trigger for a details GET.
+class ConsultationsOverview extends StatefulWidget {
+  const ConsultationsOverview({super.key});
+  @override
+  State<ConsultationsOverview> createState() => _ConsultationsOverviewState();
+}
+
+class _ConsultationsOverviewState extends State<ConsultationsOverview> {
+  final search = TextEditingController();
+  String filter = 'all';
+
+  @override
+  void dispose() {
+    search.dispose();
+    super.dispose();
+  }
+
+  bool matches(Json row) {
+    final status = str(row['status']).toLowerCase();
+    final permittedStatus = switch (filter) {
+      'new' => status == 'assigned' || status == 'requested',
+      'active' => status == 'active' || status == 'consulting',
+      'done' => status == 'closed' || status == 'cancelled',
+      _ => true,
+    };
+    if (!permittedStatus) return false;
+    final term = search.text.trim().toLowerCase();
+    if (term.isEmpty) return true;
+    final animal = obj(row['animal']);
+    return [
+      row['id'], row['animalName'], animal['name'], row['caseNumber'],
+      row['status'], row['customerName'],
+    ].any((v) => str(v).toLowerCase().contains(term));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.app;
+    final chips = [
+      ('all', context.tr('الكل', 'All')),
+      ('new', context.tr('جديدة', 'New')),
+      ('active', context.tr('قيد المتابعة', 'Active')),
+      ('done', context.tr('منتهية', 'Closed')),
+    ];
+    return PagedRecords(
+      key: ValueKey('${app.revision}:$filter:${search.text}'),
+      load: (afterId) => app.page('/api/vet/cases', afterId: afterId),
+      include: matches,
+      header: [
+        AgentHero(
+          title: context.tr('الاستشارات البيطرية', 'Veterinary consultations'),
+          subtitle: context.tr(
+            'الإحالات الطبية، سجلات الفحص، الوصفات والمتابعة.',
+            'Referrals, examinations, prescriptions and follow-up.'),
+          art: 'assets/images/agent_clinical.webp',
+          emblem: 'assets/decorations/agent_medical_emblem.svg',
+          icon: Icons.medical_services_outlined),
+        const SizedBox(height: 16),
+        TextField(
+          controller: search,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            hintText: context.tr('ابحث برقم الاستشارة أو الحيوان',
+              'Search by case or animal'),
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: search.text.isEmpty ? null : IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () { search.clear(); setState(() {}); })),
+        ),
+        const SizedBox(height: 12),
+        Wrap(spacing: 7, runSpacing: 7, children: [
+          for (final entry in chips)
+            ChoiceChip(
+              label: Text(entry.$2),
+              selected: filter == entry.$1,
+              onSelected: (_) => setState(() => filter = entry.$1),
+              selectedColor: AgentPalette.mint),
+        ]),
+        const SizedBox(height: 15),
+        AgentSurface(
+          onTap: () => context.open('C12'),
+          padding: const EdgeInsets.all(12),
+          child: Row(children: [
+            const Icon(Icons.medication_outlined, color: AgentPalette.forest),
+            const SizedBox(width: 12),
+            Expanded(child: Text(context.tr('الوصفات وطلبات الصرف',
+              'Prescriptions and dispensing'),
+              style: Theme.of(context).textTheme.labelLarge)),
+            Icon(Directionality.of(context) == TextDirection.rtl
+              ? Icons.chevron_left_rounded : Icons.chevron_right_rounded),
+          ])),
+        AgentSectionHeading(title: context.tr('قائمة الاستشارات', 'Consultation queue'),
+          icon: Icons.format_list_bulleted_rounded),
+      ],
+      itemBuilder: (row) => _ConsultationTile(caseRow: row),
+    );
+  }
+}
+
 class _ConsultationTile extends StatelessWidget {
   const _ConsultationTile({required this.caseRow});
   final Json caseRow;
 
   @override
-  Widget build(BuildContext context){
-    final id=numId(caseRow['id']);
-    final pending=caseRow['status']=='Assigned';
-    Widget tile([Json? detail]){
-      final animal=obj(detail?['animal']);
-      final title=str(animal['name']);
-      final reason=str(payload(detail??{})['reason']);
-      return RecordTile(
-        {...caseRow,'title':title.isEmpty
-          ?(pending?context.tr('إحالة جديدة','New referral'):'${context.tr('استشارة','Consultation')} #$id')
-          :title},
-        icon:pending?Icons.mark_email_unread_outlined:Icons.pets_outlined,
-        subtitle:[if(reason.isNotEmpty)reason,display(context,caseRow['updatedAt'])].join(' · '),
-        onTap:()=>context.open('C02',id:id,seed:caseRow),
-      );
-    }
-    if(pending||id==0)return tile();
-    return FutureBuilder<Json>(
-      future:context.app.record('case',id),
-      builder:(context,snapshot)=>tile(snapshot.data),
+  Widget build(BuildContext context) {
+    final id = numId(caseRow['id']);
+    final status = str(caseRow['status']);
+    final animal = obj(caseRow['animal']);
+    final named = str(caseRow['animalName'] ?? animal['name']);
+    final title = named.isEmpty
+      ? '${context.tr('استشارة', 'Consultation')} #$id' : named;
+    final subtitle = str(caseRow['customerName']);
+    final latest = caseRow['updatedAt'] ?? caseRow['createdAt'];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AgentSurface(
+        onTap: id == 0 ? null : () => context.open('C02', id: id, seed: caseRow),
+        child: Row(children: [
+          Container(height: 55, width: 55,
+            decoration: BoxDecoration(color: AgentPalette.mint,
+              borderRadius: BorderRadius.circular(16)),
+            child: const Icon(Icons.pets_outlined,
+              color: AgentPalette.forest, size: 28)),
+          const SizedBox(width: 11),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge),
+              if (subtitle.isNotEmpty) Text(subtitle, maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 6),
+              Row(children: [
+                if (status.isNotEmpty) StatusTag(status),
+                if (latest != null) ...[
+                  const SizedBox(width: 6),
+                  Flexible(child: Text(display(context, latest),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall)),
+                ],
+              ]),
+            ])),
+          Icon(Directionality.of(context) == TextDirection.rtl
+            ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+            color: AgentPalette.forest),
+        ]),
+      ),
     );
   }
 }
+
+/// C02 — a clinical workflow dashboard, not a dump of raw JSON fields.
+class _ConsultationDetail extends StatelessWidget {
+  const _ConsultationDetail({required this.id, required this.row,
+    required this.refresh});
+  final int id;
+  final Json row;
+  final VoidCallback refresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = payload(row);
+    final animal = obj(row['animal']);
+    final customer = obj(row['customer']);
+    final status = str(detail['status'] ?? row['status']);
+    final name = str(animal['name']);
+    final assigned = status.toLowerCase() == 'assigned';
+    final actions = [
+      ('C03', context.tr('السجل المشترك', 'Shared history'), Icons.auto_awesome_outlined, AgentPalette.violet),
+      ('C04', context.tr('محادثة العميل', 'Customer chat'), Icons.chat_bubble_outline_rounded, AgentPalette.blue),
+      ('C05', context.tr('المرفقات', 'Attachments'), Icons.attach_file_rounded, AgentPalette.amber),
+      ('C06', context.tr('ملف الحيوان', 'Animal record'), Icons.pets_outlined, AgentPalette.forest),
+      ('C08', context.tr('التقييم الطبي', 'Clinical notes'), Icons.edit_note_rounded, AgentPalette.emerald),
+      ('C09', context.tr('طلب زيارة', 'Schedule visit'), Icons.event_rounded, AgentPalette.blue),
+      ('C10', context.tr('إصدار وصفة', 'Issue prescription'), Icons.medication_outlined, AgentPalette.forest),
+      ('C15', context.tr('المتابعة', 'Follow-up'), Icons.monitor_heart_outlined, AgentPalette.violet),
+      ('C16', context.tr('إغلاق الحالة', 'Close case'), Icons.task_alt_rounded, AgentPalette.amber),
+    ];
+
+    return PageBody(children: [
+      AgentHero(
+        title: name.isEmpty ? context.tr('تفاصيل الاستشارة البيطرية',
+          'Veterinary consultation details') : name,
+        subtitle: context.tr('المعلومات الطبية والقرارات في مسار واحد.',
+          'Medical record and next steps in one workspace.'),
+        art: 'assets/images/agent_clinical.webp',
+          emblem: 'assets/decorations/agent_medical_emblem.svg',
+        icon: Icons.medical_services_outlined),
+      const SizedBox(height: 13),
+      AgentSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(child: Text('${context.tr('الاستشارة', 'Case')} #$id',
+              style: Theme.of(context).textTheme.titleMedium)),
+            if (status.isNotEmpty) StatusTag(status),
+          ]),
+          if (detail['reason'] != null) ...[
+            const SizedBox(height: 10),
+            Text(context.tr('سبب الاستشارة', 'Reason'),
+              style: Theme.of(context).textTheme.bodySmall),
+            Text(str(detail['reason']),
+              style: Theme.of(context).textTheme.bodyLarge),
+          ],
+          if (detail['version'] != null || row['version'] != null) ...[
+            const SizedBox(height: 8),
+            Text('${context.tr('إصدار السجل', 'Record version')}: ${detail['version'] ?? row['version']}',
+              style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ])),
+      AgentSectionHeading(title: context.tr('العميل والحيوان', 'Customer and animal'),
+        icon: Icons.pets_outlined),
+      AgentSurface(child: Column(children: [
+        if (customer['name'] != null) Fact(context.tr('العميل', 'Customer'), customer['name']),
+        if (customer['phone'] != null) Fact(context.tr('الهاتف', 'Phone'), customer['phone']),
+        if (animal['name'] != null) Fact(context.tr('الحيوان', 'Animal'), animal['name']),
+        if (animal['species'] != null) Fact(context.tr('النوع', 'Species'), animal['species']),
+        if (animal['breed'] != null) Fact(context.tr('السلالة', 'Breed'), animal['breed']),
+        if (animal['age'] != null) Fact(context.tr('العمر', 'Age'), animal['age']),
+        if (customer.isEmpty && animal.isEmpty)
+          Text(context.tr('لا تتوفر معلومات إضافية لهذا السجل.',
+            'No additional details were provided for this record.')),
+      ])),
+      if (assigned) ...[
+        AgentSectionHeading(title: context.tr('قرار التكليف', 'Assignment decision'),
+          icon: Icons.assignment_turned_in_outlined),
+        Notice(context.tr(
+          'قبول هذه الإحالة يتيح الانتقال إلى الملاحظات والمحادثة وفق الصلاحيات الحالية.',
+          'Accepting this case opens clinical activities within your permissions.')),
+        const SizedBox(height: 14),
+        BusyButton(
+          label: context.tr('قبول الاستشارة', 'Accept consultation'),
+          run: () async {
+            await openOperation(context, 'accept', id: id,
+              seed: detail); refresh();
+          }),
+        const SizedBox(height: 9),
+        OutlinedButton.icon(
+          onPressed: () async {
+            await openOperation(context, 'decline', id: id,
+              seed: detail); refresh();
+          },
+          icon: const Icon(Icons.close_outlined),
+          label: Text(context.tr('الاعتذار عن التكليف', 'Decline assignment'))),
+      ] else ...[
+        AgentSectionHeading(title: context.tr('إدارة الحالة', 'Case workflow'),
+          icon: Icons.dashboard_customize_outlined),
+        LayoutBuilder(builder: (context, width) {
+          final columns = width.maxWidth > 390 ? 3 : 2;
+          final cell = (width.maxWidth - 10 * (columns - 1)) / columns;
+          return Wrap(spacing: 10, runSpacing: 10, children: [
+            for (final entry in actions)
+              SizedBox(width: cell, child: AgentAction(
+                title: entry.$2, icon: entry.$3, color: entry.$4,
+                onTap: () => context.open(entry.$1, id: id))),
+          ]);
+        }),
+        const SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed: refresh,
+          icon: const Icon(Icons.refresh_rounded),
+          label: Text(context.tr('تحديث بيانات الاستشارة', 'Refresh case'))),
+      ],
+    ]);
+  }
+}
+
 class _RouteTile extends StatelessWidget{
   const _RouteTile(this.route,this.icon,{this.id});
   final String route;final IconData icon;final int? id;
