@@ -574,9 +574,8 @@ class _PointOfSaleState extends State<PointOfSale> {
                  !'${titleOf(product)} ${str(product['sku'])}'.toLowerCase().contains(search)){
                 return const SizedBox.shrink();
               }
-              return RecordTile(product,imageUrl:productImage(product),icon:Icons.add_shopping_cart,
-                subtitle:'${display(context,product['salePrice']??product['price'])} ${app.currency}  ·  ${context.tr('متاح','Available')} ${display(context,stock['availableQuantity'])}',
-                onTap:()=>add(product,stock));
+              return _SaleProductTile(product: product, stock: stock,
+                onAdd: () => add(product, stock));
             },
           );
         },
@@ -593,6 +592,62 @@ class _PointOfSaleState extends State<PointOfSale> {
         ])),
       )),
     ]);
+  }
+}
+
+class _SaleProductTile extends StatelessWidget {
+  const _SaleProductTile({
+    required this.product,
+    required this.stock,
+    required this.onAdd,
+  });
+  final Json product, stock;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.app;
+    final colors = Theme.of(context).colorScheme;
+    final type = Theme.of(context).textTheme;
+    final price = product['salePrice'] ?? product['price'];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AgentSurface(onTap: onAdd,
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          ProductThumbnail(url: productImage(product), size: 64,
+            icon: Icons.inventory_2_outlined),
+          const SizedBox(width: 12),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(titleOf(product), maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: type.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+              if (str(product['sku']).isNotEmpty)
+                Text(str(product['sku']), maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: type.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
+              const SizedBox(height: 6),
+              AgentPill(
+                label: context.tr('متاح', 'Available') + ' ' +
+                  display(context, stock['availableQuantity']),
+                color: AgentPalette.emerald, icon: Icons.inventory_2_outlined),
+              const SizedBox(height: 6),
+              Text(display(context, price) + ' ' + app.currency,
+                style: type.titleMedium?.copyWith(
+                  color: colors.primary, fontWeight: FontWeight.w900)),
+            ])),
+          const SizedBox(width: 8),
+          Container(width: 43, height: 43,
+            decoration: BoxDecoration(
+              color: AgentPalette.emerald,
+              borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.add_shopping_cart_rounded,
+              color: Colors.white)),
+        ]),
+      ),
+    );
   }
 }
 class BusinessInsights extends StatefulWidget{
