@@ -9,6 +9,7 @@ import 'package:mazraa_agent/application/agent_app.dart';
 import 'package:mazraa_agent/domain/models.dart';
 import 'package:mazraa_agent/domain/screens.dart';
 import 'package:mazraa_agent/presentation/design/brand_theme.dart';
+import 'package:mazraa_agent/presentation/design/agent_ui.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
 import 'package:mazraa_agent/presentation/shared/scope.dart';
@@ -60,7 +61,11 @@ void main(){
       await tester.pumpWidget(host(app,ScreenPage(route,key:ValueKey(route))));
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull,reason:route);
-      expect(find.byType(SectionBanner),findsOneWidget,reason:route);
+      if (['H02','H05','C01'].contains(route)) {
+        expect(find.byType(AgentHero), findsOneWidget, reason: route);
+      } else {
+        expect(find.byType(SectionBanner), findsOneWidget, reason: route);
+      }
       if(route=='T02')expect(find.text('عرض السلة'),findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     }
