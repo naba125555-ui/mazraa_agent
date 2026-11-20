@@ -233,7 +233,7 @@ class LoginHeaderWave extends StatelessWidget {
                   ),
                 ),
                 Positioned.fill(
-                  top: 0,
+                  top: 55,
                   child: Image.asset(
                     imageAsset,
                     alignment: Alignment.topLeft,
@@ -321,7 +321,7 @@ class _HeaderWaveClipper extends CustomClipper<Path> {
           w * .49, h * .69 + d)
       ..cubicTo(w * .66, h * .67 + d, w * .75, h * .86 + d,
           w * .88, h * .75 + d)
-      ..quadraticBezierTo(w * .97, h * .68 + d, w, h * .59 + d)
+      ..quadraticBezierTo(w * .97, h * .80 + d, w, h * .75 + d)
       ..lineTo(w, 0)
       ..lineTo(0, 0)
       ..close();
