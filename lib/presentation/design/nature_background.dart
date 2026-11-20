@@ -101,7 +101,7 @@ class NatureBackdrop extends StatelessWidget {
                   opacity: dark ? .19 : .27,
                   child: _Botanical(
                     'assets/decorations/mazraa_sprig.svg',
-                    width: width.clamp(290.0, 580.0) * .37,
+                    width: width.clamp(290.0, 580.0).toDouble() * .37,
                     flip: rtl,
                   ),
                 ),
@@ -113,7 +113,7 @@ class NatureBackdrop extends StatelessWidget {
                   opacity: dark ? .13 : .12,
                   child: _Botanical(
                     'assets/decorations/mazraa_sprig.svg',
-                    width: width.clamp(290.0, 580.0) * .39,
+                    width: width.clamp(290.0, 580.0).toDouble() * .39,
                     flip: !rtl,
                   ),
                 ),
@@ -125,7 +125,7 @@ class NatureBackdrop extends StatelessWidget {
                   opacity: dark ? .25 : .22,
                   child: _Botanical(
                     'assets/decorations/mazraa_sprig.svg',
-                    width: width.clamp(290.0, 580.0) * .36,
+                    width: width.clamp(290.0, 580.0).toDouble() * .36,
                     flip: rtl,
                   ),
                 ),
@@ -151,7 +151,7 @@ class NatureBackdrop extends StatelessWidget {
                   opacity: dark ? .9 : .72,
                   child: _Botanical(
                     'assets/decorations/mazraa_branch.svg',
-                    width: width.clamp(290.0, 570.0) * .30,
+                    width: width.clamp(290.0, 570.0).toDouble() * .30,
                     flip: !rtl,
                   ),
                 ),
@@ -161,7 +161,7 @@ class NatureBackdrop extends StatelessWidget {
                 end: -12,
                 child: _Botanical(
                   'assets/decorations/mazraa_flora.svg',
-                  width: width.clamp(290.0, 570.0) * .34,
+                  width: width.clamp(290.0, 570.0).toDouble() * .34,
                   flip: rtl,
                 ),
               ),
