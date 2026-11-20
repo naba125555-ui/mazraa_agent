@@ -237,9 +237,9 @@ class _SignInPageState extends State<SignInPage> {
             ),
           ),
           PositionedDirectional(
-            top: top + 78,
+            top: top + 65,
             start: 17,
-            width: screenWidth > 550 ? 267 : 191,
+            width: screenWidth > 550 ? 267 : 176,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
