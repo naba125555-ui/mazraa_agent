@@ -42,6 +42,7 @@ class RemoteRepository implements AgentRepository {
   @override int epoch=0;
   @override void Function()? onExpired;
   Future<Session?>? _rotating;int? _rotatingEpoch;
+  bool _rememberSession=true;
   bool _auth(String p)=>p.toLowerCase().startsWith('/api/auth/');
   bool _sameOrigin(String p){final uri=Uri.tryParse(p);return uri!=null&&(!uri.hasAuthority||uri.origin==Uri.parse(baseUrl).origin);}
   @override Future<void> restore()async{
@@ -59,14 +60,18 @@ class RemoteRepository implements AgentRepository {
       final r=await refreshClient.post<dynamic>('/api/auth/refresh',data:{'refreshToken':old.refresh,'deviceName':'mazraa-agent'});
       final next=Session(obj(r.data));
       if(epoch!=expected||session?.refresh!=old.refresh||!next.usable||old.userId!=next.userId)return null;
-      session=next;await secure.write(key:'session',value:jsonEncode(next.json));return next;
+      session=next;
+      if(_rememberSession)await secure.write(key:'session',value:jsonEncode(next.json));
+      return next;
     }();
     _rotating=future;return future.whenComplete((){if(identical(_rotating,future))_rotating=null;});
   }
-  @override Future<void> login(String email,String password)async{
+  @override Future<void> login(String email,String password,{bool remember=true})async{
     final value=Session(obj(await write('POST','/api/auth/login',{'email':email.trim(),'password':password,'deviceName':'mazraa-agent'})));
     if(!value.usable)throw const Failure(401,'');
-    epoch++;session=value;await secure.write(key:'session',value:jsonEncode(value.json));
+    epoch++;session=value;_rememberSession=remember;
+    if(remember){await secure.write(key:'session',value:jsonEncode(value.json));}
+    else{await secure.delete(key:'session');}
   }
   @override Future<void> logout()async{
     final old=session;
