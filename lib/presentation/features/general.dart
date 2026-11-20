@@ -5,7 +5,6 @@ import '../../domain/screens.dart';
 import '../navigation.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
-import '../shared/section_banner.dart';
 import '../shared/forms.dart';
 import 'sign_in.dart';
 export 'sign_in.dart' show SignInPage;
