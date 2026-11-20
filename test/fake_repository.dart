@@ -10,7 +10,7 @@ class FakeRepository implements AgentRepository {
   final List<Json> writes=[];
   Failure? nextFailure;
   @override Future<void> restore()async{}
-  @override Future<void> login(String email,String password)async{}
+  @override Future<void> login(String email,String password,{bool remember=true})async{}
   @override Future<void> logout()async{session=null;epoch++;}
   @override Future<String?> local(String key,{bool secure=false})async=>storage[key];
   @override Future<void> save(String key,String? value,{bool secure=false})async{if(value==null){storage.remove(key);}else{storage[key]=value;}}
