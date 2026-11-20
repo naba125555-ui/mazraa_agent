@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../design/nature_background.dart';
+import '../design/login_scenery.dart';
 
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
@@ -96,11 +96,11 @@ class _SignInPageState extends State<SignInPage> {
         resizeToAvoidBottomInset: true,
         body: Stack(
           children: [
-            // The backdrop is built from live Flutter gradients and paths.
-            // No source image or screenshot is used as a page background.
+            // The full-screen background is composed of live clipped Flutter layers.
+            // The replaceable WebP image is restricted to the header.
             Positioned.fill(
               child: IgnorePointer(
-                child: NatureBackdrop(dark: dark, showOrnaments: false),
+                child: LoginScenery(dark: dark),
               ),
             ),
             SafeArea(
@@ -147,14 +147,14 @@ class _SignInPageState extends State<SignInPage> {
     final top = MediaQuery.paddingOf(context).top;
     final screenWidth = MediaQuery.sizeOf(context).width;
     return SizedBox(
-      height: top + 202,
+      height: top + 224,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            child: NatureWaveBand(
+            child: LoginHeaderWave(
               dark: dark,
-              reverse: rtl,
+              photoOnLeft: rtl,
             ),
           ),
           PositionedDirectional(
@@ -237,15 +237,15 @@ class _SignInPageState extends State<SignInPage> {
             ),
           ),
           PositionedDirectional(
-            top: top + 73,
-            end: 17,
+            top: top + 78,
+            start: 17,
             width: screenWidth > 550 ? 267 : 191,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   context.tr('مرحباً بك', 'Welcome'),
-                  textAlign: TextAlign.end,
+                  textAlign: TextAlign.start,
                   maxLines: 1,
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
@@ -263,7 +263,7 @@ class _SignInPageState extends State<SignInPage> {
                     'سجّل الدخول للوصول إلى عمليات الطبيب والوكيل',
                     'Sign in to access doctor and agent operations',
                   ),
-                  textAlign: TextAlign.end,
+                  textAlign: TextAlign.start,
                   maxLines: 3,
                   style: const TextStyle(
                     color: Colors.white,
