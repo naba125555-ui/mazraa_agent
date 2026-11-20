@@ -28,6 +28,51 @@ Widget host(AgentApp app,Widget child)=>AppScope(app:app,child:MaterialApp(local
   home:NavScope(open:(route,{id,seed}){},child:child)));
 void main(){
   setUpAll(()async{final loader=FontLoader('Cairo')..addFont(rootBundle.load('assets/fonts/Cairo.ttf'));await loader.load();});
+  // H02 is independently rendered in four locale/theme combinations.
+  for (final language in ['ar', 'en']) {
+    for (final mode in ['light', 'dark']) {
+      testWidgets('Sign-in $language $mode uses real controls without overflow',
+          (tester) async {
+        tester.view.physicalSize = const Size(430, 932);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final app = fixture(language, mode);
+        final boundaryKey = GlobalKey();
+        await tester.pumpWidget(host(
+          app,
+          RepaintBoundary(
+            key: boundaryKey,
+            child: const ScreenPage('H02'),
+          ),
+        ));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.byType(TextFormField), findsNWidgets(2));
+        expect(
+          find.text(language == 'ar' ? 'مرحباً بك' : 'Welcome'),
+          findsOneWidget,
+        );
+        final boundary = boundaryKey.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
+        final bytes = await tester.runAsync(() async {
+          final screenshot = await boundary.toImage();
+          try {
+            return await screenshot.toByteData(format: ui.ImageByteFormat.png);
+          } finally {
+            screenshot.dispose();
+          }
+        });
+        expect(bytes, isNotNull);
+        final file = File('build/previews/login-$language-$mode.png');
+        file.parent.createSync(recursive: true);
+        file.writeAsBytesSync(bytes!.buffer.asUint8List());
+        await tester.pumpWidget(const SizedBox.shrink());
+        app.dispose();
+      });
+    }
+  }
+
   for(final language in ['ar','en'])for(final mode in ['light','dark']){
     testWidgets('Home $language $mode renders at phone size with no overflow',(tester)async{
       tester.view.physicalSize=const Size(430,932);tester.view.devicePixelRatio=1;
