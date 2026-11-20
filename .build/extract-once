@@ -1,6 +1,7 @@
-Build request: widget-rendered agricultural login with reusable nature waves.
-Implementation source commit: 6f323099c711926c1e46372775a0e1037765600a
+Build request: final full-bleed Mazraa Agent login with accurate tests.
+Source commit: 154ebaa694b94c9290321dd406b1197d0c3d4fae
 Date: 2026-11-21
-Build: release ARM64, split-per-ABI, tree-shake, obfuscated; UI previews (ar/en, light/dark).
-Assets: independent transparent SVG illustrations; no screenshot backgrounds.
-Server API contract: unchanged. Documentation directory: read-only/untouched.
+Target: Android ARM64 optimized release APK.
+Checks: 92 route structure, analyze, tests, four direct SignInPage previews (ar/en × light/dark).
+Assets: transparent SVG; backgrounds and wave bands painted with reusable Flutter widgets.
+Docs: untouched.
