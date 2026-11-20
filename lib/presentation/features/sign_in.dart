@@ -17,7 +17,6 @@ class _SignInPageState extends State<SignInPage> {
   static const Color _forest = Color(0xFF004936);
   static const Color _emerald = Color(0xFF007A53);
   static const Color _mint = Color(0xFFB8FFDB);
-  static const Color _gold = Color(0xFFE6BC76);
 
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
