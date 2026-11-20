@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 370"><defs>
+<linearGradient id="cowhide" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#353F37"/><stop offset=".48" stop-color="#111D19"/><stop offset="1" stop-color="#59625A"/></linearGradient>
+<linearGradient id="cream" x1="0" y1="0" x2=".85" y2="1"><stop stop-color="#FFFDF0"/><stop offset=".5" stop-color="#E6DAC7"/><stop offset="1" stop-color="#C6B6A4"/></linearGradient>
+<linearGradient id="wool" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFF3D5"/><stop offset=".6" stop-color="#E9D9B2"/><stop offset="1" stop-color="#BEA879"/></linearGradient>
+<linearGradient id="goat" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#FEFAED"/><stop offset=".6" stop-color="#EBE2D1"/><stop offset="1" stop-color="#AEA99A"/></linearGradient>
+<linearGradient id="snout" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#E1BEB0"/><stop offset=".5" stop-color="#BE9187"/><stop offset="1" stop-color="#8D6561"/></linearGradient>
+</defs>
+<!-- Entire asset stays transparent; all hills, waves and gradients live in Flutter. -->
+<!-- Cow behind -->
+<path d="M-45 181 Q-32 91 145 104 Q245 106 277 211 L281 317 L-24 323Z" fill="url(#cowhide)"/>
+<path d="M22 117 Q68 104 84 132 Q63 191 71 319 L6 321Q26 224 22 117" fill="url(#cream)"/>
+<path d="M158 111 Q205 118 212 150 Q195 197 219 247 L167 249 Q178 166 158 111" fill="url(#cream)"/>
+<path d="M152 100 Q183 35 243 55 L272 94 Q257 135 249 195 L215 254 L167 205 Q128 151 152 100Z" fill="url(#cream)" stroke="#A5A59A" stroke-width="3"/>
+<path d="M174 111 Q183 59 202 62 Q216 129 196 172Z" fill="url(#cowhide)"/>
+<path d="M234 90Q240 49 252 72Q260 117 251 159Z" fill="url(#cowhide)"/>
+<path d="M154 99 Q103 51 102 113 Q131 158 172 139Z" fill="url(#cowhide)" stroke="#765E50" stroke-width="3"/>
+<path d="M247 91 Q306 42 307 108 Q274 150 245 131Z" fill="url(#cowhide)" stroke="#765E50" stroke-width="3"/>
+<path d="M174 66 Q157 24 165 11 Q185 35 190 60 M245 63Q262 21 268 16Q275 43 259 74" fill="#D6B08B" stroke="#96785C" stroke-width="3"/>
+<path d="M187 195 Q216 184 243 200 Q263 226 237 252 Q207 266 181 241 Q172 219 187 195Z" fill="url(#snout)" stroke="#9B7D6B" stroke-width="2"/>
+<ellipse cx="191" cy="224" rx="10" ry="6" fill="#795754"/><ellipse cx="233" cy="224" rx="10" ry="6" fill="#795754"/>
+<ellipse cx="183" cy="158" rx="10" ry="13" fill="#352B24"/><circle cx="180" cy="153" r="3.5" fill="#F7E9CC"/>
+<ellipse cx="241" cy="158" rx="10" ry="13" fill="#352B24"/><circle cx="238" cy="153" r="3.5" fill="#F7E9CC"/>
+<!-- Sheep left front -->
+<circle cx="237" cy="272" r="32" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="232.28610002795523" cy="294.07956390591846" r="35" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="218.65522431748624" cy="313.76646446289743" r="38" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="197.58448975665115" cy="328.9273205218519" r="32" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="171.35723738124955" cy="337.91921808387445" r="35" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="142.81559694390708" cy="339.7677455244535" r="38" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="115.05249805519166" cy="334.2725862125439" r="32" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="91.07650326856054" cy="322.02922592577295" r="35" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="73.48578364503545" cy="304.364422726521" r="38" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="64.18656660396316" cy="283.19243213908993" r="32" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="64.18656660396314" cy="260.8075678609101" r="35" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="73.48578364503543" cy="239.63557727347904" r="38" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="91.07650326856051" cy="221.97077407422705" r="32" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="115.05249805519169" cy="209.72741378745607" r="35" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="142.81559694390705" cy="204.23225447554645" r="38" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="171.3572373812495" cy="206.08078191612555" r="32" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="197.58448975665112" cy="215.07267947814805" r="35" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="218.65522431748627" cy="230.23353553710263" r="38" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/><circle cx="232.28610002795523" cy="249.9204360940815" r="32" fill="url(#wool)" stroke="#D9C69D" stroke-width="2"/>
+<ellipse cx="151" cy="282" rx="98" ry="75" fill="url(#wool)" stroke="#C8B590" stroke-width="3"/>
+<path d="M102 233 Q104 196 151 194 Q201 201 200 261 Q205 299 172 327 Q123 341 102 298 Q90 272 102 233Z" fill="url(#cream)" stroke="#C8B7A0" stroke-width="3"/>
+<path d="M100 254 Q44 230 57 282 Q90 302 110 276Z" fill="url(#wool)" stroke="#C1A880" stroke-width="2"/>
+<path d="M199 252 Q253 230 233 281 Q213 302 189 272Z" fill="url(#wool)" stroke="#C1A880" stroke-width="2"/>
+<ellipse cx="128" cy="269" rx="8" ry="10" fill="#46372B"/><circle cx="126" cy="265" r="2.5" fill="white"/>
+<ellipse cx="176" cy="268" rx="8" ry="10" fill="#46372B"/><circle cx="174" cy="265" r="2.5" fill="white"/>
+<path d="M141 303 Q151 294 162 301 L153 314Z" fill="#986E66"/><path d="M153 312Q147 323 136 315 M153 312Q163 322 172 314" stroke="#80645C" stroke-width="2.5" fill="none"/>
+<!-- Goat in the right foreground -->
+<path d="M261 321 Q268 251 347 243 Q419 231 489 304 L510 358 L264 357Z" fill="url(#goat)" stroke="#C9C0AB" stroke-width="3"/>
+<path d="M335 249 Q314 195 343 153 Q369 115 415 133 Q455 158 449 219 Q445 275 413 298 Q369 311 343 282Z" fill="url(#goat)" stroke="#B7AB94" stroke-width="3"/>
+<path d="M360 147 Q319 100 317 54 Q352 70 378 128 M411 136 Q412 69 454 40 Q458 93 434 154" fill="#B9A384" stroke="#84664B" stroke-width="5"/>
+<path d="M346 171 Q291 133 290 190 Q310 227 352 208Z" fill="url(#cream)" stroke="#BBA78F" stroke-width="3"/>
+<path d="M444 168 Q504 129 499 186 Q478 217 447 205Z" fill="url(#cream)" stroke="#BBA78F" stroke-width="3"/>
+<path d="M364 255 Q396 236 429 254 Q439 277 414 292 Q385 305 365 280Z" fill="url(#cream)" stroke="#B4A897" stroke-width="2"/>
+<path d="M391 289 Q393 320 414 342 Q437 309 429 280" fill="#E5DFD0" stroke="#C9BFA8" stroke-width="2"/>
+<ellipse cx="361" cy="215" rx="9" ry="11" fill="#594C35"/><circle cx="359" cy="212" r="3" fill="white"/>
+<ellipse cx="431" cy="213" rx="9" ry="11" fill="#594C35"/><circle cx="429" cy="210" r="3" fill="white"/>
+<path d="M381 274Q396 261 407 275Q397 286 381 274" fill="#9A7E75"/>
+</svg>
