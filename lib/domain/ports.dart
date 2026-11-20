@@ -5,7 +5,7 @@ abstract interface class AgentRepository {
   Session? get session;
   int get epoch;
   Future<void> restore();
-  Future<void> login(String email,String password);
+  Future<void> login(String email,String password,{bool remember=true});
   Future<void> logout();
   Future<dynamic> read(String path,{Json? query});
   Future<dynamic> write(String method,String path,Object? body);
