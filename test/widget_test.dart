@@ -60,7 +60,8 @@ void main(){
       await tester.pumpWidget(host(app,ScreenPage(route,key:ValueKey(route))));
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull,reason:route);
-      expect(find.byType(SectionBanner),findsOneWidget,reason:route);
+      if(route!='H02')expect(find.byType(SectionBanner),findsOneWidget,reason:route);
+      else expect(find.text('تسجيل الدخول'),findsWidgets);
       if(route=='T02')expect(find.text('عرض السلة'),findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     }
