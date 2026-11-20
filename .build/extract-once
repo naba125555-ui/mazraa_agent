@@ -1,5 +1,5 @@
-Build requested: redesigned Mazraa Agent H02 sign-in UI.
-Source commit before build marker: 7fb7ad7fc6852064b80dfa154fec75cbaf32bf56
+Build request: final corrected H02 sign-in screen.
+Source: fbe4456a47dae162c2d5a3e83d511b65f472e7bb
 Date: 2026-11-20
-Target: smallest practical ARM64 release APK; one ABI, obfuscated, tree-shaken.
-Documentation folders remain unchanged.
+Target: single optimized release ARM64 APK.
+Documentation folders unchanged.
