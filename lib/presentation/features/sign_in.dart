@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../design/nature_background.dart';
 
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
 
-/// H02: a responsive, bilingual, image-backed sign-in screen.
+/// H02: a responsive, bilingual sign-in screen with real painted waves.
 /// The authentication contract remains owned by AgentApp / RemoteRepository.
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -101,7 +100,7 @@ class _SignInPageState extends State<SignInPage> {
             // No source image or screenshot is used as a page background.
             Positioned.fill(
               child: IgnorePointer(
-                child: NatureBackdrop(dark: dark),
+                child: NatureBackdrop(dark: dark, showOrnaments: false),
               ),
             ),
             SafeArea(
@@ -159,50 +158,27 @@ class _SignInPageState extends State<SignInPage> {
             ),
           ),
           PositionedDirectional(
-            start: -18,
-            bottom: 2,
-            width: screenWidth > 550 ? 333 : 272,
-            height: 158,
-            child: IgnorePointer(
-              child: Transform.flip(
-                flipX: rtl,
-                child: SvgPicture.asset(
-                  'assets/decorations/mazraa_animals.svg',
-                  fit: BoxFit.contain,
-                  alignment: Alignment.bottomLeft,
-                  excludeFromSemantics: true,
-                ),
-              ),
-            ),
-          ),
-          PositionedDirectional(
-            top: top + 36,
-            end: -18,
-            width: 112,
-            height: 112,
-            child: IgnorePointer(
-              child: NatureIllustration(
-                asset: 'assets/decorations/mazraa_flora.svg',
-                width: 112,
-                opacity: .84,
-                flip: rtl,
-              ),
-            ),
-          ),
-          PositionedDirectional(
             top: top + 8,
             start: 15,
             child: Row(
               textDirection: TextDirection.ltr,
               mainAxisSize: MainAxisSize.min,
               children: [
-                ClipOval(
-                  child: Image.asset(
-                    'assets/branding/mazraa.png',
-                    height: 40,
-                    width: 40,
-                    fit: BoxFit.cover,
-                    semanticLabel: 'Mazraa',
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0x3300CF8A),
+                    border: Border.all(
+                      color: const Color(0xAAFFE8A8),
+                      width: 1.2,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.eco_outlined,
+                    size: 25,
+                    color: Color(0xFFFFE7A9),
                   ),
                 ),
                 const SizedBox(width: 8),
