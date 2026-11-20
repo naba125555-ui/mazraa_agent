@@ -1,5 +1,5 @@
-Build request: final corrected H02 sign-in screen.
-Source: fbe4456a47dae162c2d5a3e83d511b65f472e7bb
-Date: 2026-11-20
-Target: single optimized release ARM64 APK.
-Documentation folders unchanged.
+Build request: image-backed H02 Flutter sign-in matching supplied light/dark references.
+Source code and assets commit: c75a85ab956a0db08453355ef6069b674f7f2326
+Date: 2026-11-21
+Target: single optimized ARM64 release APK, four locale/theme widget previews.
+Docs directory: read only, unchanged.
