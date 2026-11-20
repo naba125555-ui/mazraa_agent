@@ -3,5 +3,5 @@ Date: 2026-11-21
 Target: Android ARM64 optimized release APK and visual widget test previews.
 Implementation: transparent photo-side mask, opaque forest-green text side, mirrored header on RTL/LTR, gold and emerald clipped wave ribbons, radial mint page, three widget footer swells.
 Hero: assets/images/login_header_yemeni_store_secure_access_hero.webp
-Checks: Flutter analyze, widget tests and four ar/en x light/dark previews.
+Checks: Flutter analyze, widget tests and four ar/en x light/dark previews with pre-cached hero image.
 Authentication contract unchanged. Documentation untouched.
