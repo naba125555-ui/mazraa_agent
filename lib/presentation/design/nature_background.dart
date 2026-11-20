@@ -272,9 +272,9 @@ class _NatureWavePainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
     return Path()
-      ..moveTo(0, h * .59)
-      ..cubicTo(w * .20, h * .78, w * .37, h * .26, w * .60, h * .45)
-      ..cubicTo(w * .78, h * .61, w * .89, h * .50, w, h * .82);
+      ..moveTo(0, h * .58)
+      ..cubicTo(w * .18, h * .77, w * .32, h * .40, w * .52, h * .72)
+      ..cubicTo(w * .70, h * .98, w * .85, h * .80, w, h * .90);
   }
 
   void _header(Canvas canvas, Size size) {
@@ -304,9 +304,9 @@ class _NatureWavePainter extends CustomPainter {
     final headerFill = Path()
       ..moveTo(0, 0)
       ..lineTo(w, 0)
-      ..lineTo(w, h * .82)
-      ..cubicTo(w * .89, h * .50, w * .78, h * .61, w * .60, h * .45)
-      ..cubicTo(w * .37, h * .26, w * .20, h * .78, 0, h * .59)
+      ..lineTo(w, h * .90)
+      ..cubicTo(w * .85, h * .80, w * .70, h * .98, w * .52, h * .72)
+      ..cubicTo(w * .32, h * .40, w * .18, h * .77, 0, h * .58)
       ..close();
     canvas.drawPath(
       headerFill,
