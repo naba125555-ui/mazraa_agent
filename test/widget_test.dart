@@ -9,6 +9,7 @@ import 'package:mazraa_agent/application/agent_app.dart';
 import 'package:mazraa_agent/domain/models.dart';
 import 'package:mazraa_agent/domain/screens.dart';
 import 'package:mazraa_agent/presentation/design/brand_theme.dart';
+import 'package:mazraa_agent/presentation/design/nature_background.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
 import 'package:mazraa_agent/presentation/shared/scope.dart';
@@ -49,6 +50,9 @@ void main(){
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         expect(find.byType(TextFormField), findsNWidgets(2));
+        // No image-backed full-screen background; these are live widgets.
+        expect(find.byType(NatureBackdrop), findsOneWidget);
+        expect(find.byType(NatureWaveBand), findsWidgets);
         expect(
           find.text(language == 'ar' ? 'مرحباً بك' : 'Welcome'),
           findsOneWidget,
