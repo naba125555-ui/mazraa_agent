@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import 'package:mazraa_agent/domain/models.dart';
 import 'package:mazraa_agent/domain/screens.dart';
 import 'package:mazraa_agent/presentation/design/brand_theme.dart';
 import 'package:mazraa_agent/presentation/design/nature_background.dart';
+import 'package:mazraa_agent/presentation/features/sign_in.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
 import 'package:mazraa_agent/presentation/shared/scope.dart';
@@ -28,7 +30,26 @@ Widget host(AgentApp app,Widget child)=>AppScope(app:app,child:MaterialApp(local
   theme:Brand.theme(app.theme=='dark'?Brightness.dark:Brightness.light),
   home:NavScope(open:(route,{id,seed}){},child:child)));
 void main(){
-  setUpAll(()async{final loader=FontLoader('Cairo')..addFont(rootBundle.load('assets/fonts/Cairo.ttf'));await loader.load();});
+  setUpAll(() async {
+    final loader = FontLoader('Cairo')
+      ..addFont(rootBundle.load('assets/fonts/Cairo.ttf'));
+    await loader.load();
+
+    // The test binding does not bundle MaterialIcons automatically. Load the
+    // installed Flutter font for faithful visual snapshots when available.
+    final root = Platform.environment['FLUTTER_ROOT'];
+    if (root != null) {
+      final iconFile = File(
+        '$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+      );
+      if (iconFile.existsSync()) {
+        final iconBytes = await iconFile.readAsBytes();
+        final icons = FontLoader('MaterialIcons')
+          ..addFont(Future.value(ByteData.sublistView(iconBytes)));
+        await icons.load();
+      }
+    }
+  });
   // H02 is independently rendered in four locale/theme combinations.
   for (final language in ['ar', 'en']) {
     for (final mode in ['light', 'dark']) {
@@ -44,7 +65,7 @@ void main(){
           app,
           RepaintBoundary(
             key: boundaryKey,
-            child: const ScreenPage('H02'),
+            child: const SignInPage(),
           ),
         ));
         await tester.pumpAndSettle();
