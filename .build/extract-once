@@ -1,4 +1,5 @@
-Build request for the refreshed permission-aware Mazraa Agent home screen.
-Source update: f07b082c59b910adad4ab7042d4b32e8aceb7d42
-Requested: 2026-11-18
-Artifacts: ARM64 release APK and widget-test previews.
+Build requested: redesigned Mazraa Agent H02 sign-in UI.
+Source commit before build marker: 7fb7ad7fc6852064b80dfa154fec75cbaf32bf56
+Date: 2026-11-20
+Target: smallest practical ARM64 release APK; one ABI, obfuscated, tree-shaken.
+Documentation folders remain unchanged.
