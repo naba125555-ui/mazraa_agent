@@ -7,45 +7,11 @@ import '../shared/scope.dart';
 import '../shared/widgets.dart';
 import '../shared/section_banner.dart';
 import '../shared/forms.dart';
+import 'sign_in.dart';
+export 'sign_in.dart' show SignInPage;
 
 Future<Json?> _editProfile(BuildContext context)=>openOperation(context,'profile',seed:context.app.user,initial:context.app.user);
 Future<Json?> _changePassword(BuildContext context)=>openOperation(context,'password');
-
-class SignInPage extends StatefulWidget{
-  const SignInPage({super.key});
-  @override State<SignInPage> createState()=>_SignInPageState();
-}
-class _SignInPageState extends State<SignInPage>{
-  final email=TextEditingController(),password=TextEditingController(),form=GlobalKey<FormState>();
-  bool hidden=true,busy=false;Object? error;
-  @override void dispose(){email.dispose();password.dispose();super.dispose();}
-  @override Widget build(BuildContext context)=>Scaffold(body:BotanicalBackground(child:SafeArea(child:Center(child:ConstrainedBox(
-    constraints:const BoxConstraints(maxWidth:460),child:Form(key:form,child:PageBody(children:[
-      const SizedBox(height:16),
-      const Align(alignment:AlignmentDirectional.centerStart,child:BrandLogo(size:52)),
-      const SizedBox(height:14),
-      SectionBanner(art:SectionArt.workspace,
-        title:context.tr('مزرعتي للطبيب والوكيل','Mazraa for doctors and agents')),
-      Heading(context.tr('تسجيل الدخول','Sign in')),
-
-      TextFormField(controller:email,keyboardType:TextInputType.emailAddress,textDirection:TextDirection.ltr,
-        autofillHints:const [AutofillHints.username],decoration:InputDecoration(labelText:context.tr('البريد الإلكتروني','Email'),prefixIcon:const Icon(Icons.alternate_email)),
-        validator:(v)=>(v??'').contains('@')?null:context.tr('أدخل بريدًا صالحًا','Enter a valid email')),const SizedBox(height:16),
-      TextFormField(controller:password,obscureText:hidden,textDirection:TextDirection.ltr,autofillHints:const [AutofillHints.password],
-        decoration:InputDecoration(labelText:context.tr('كلمة المرور','Password'),prefixIcon:const Icon(Icons.lock_outline),suffixIcon:IconButton(
-          onPressed:()=>setState(()=>hidden=!hidden),icon:Icon(hidden?Icons.visibility_outlined:Icons.visibility_off_outlined))),
-        validator:(v)=>(v??'').isEmpty?context.tr('أدخل كلمة المرور','Enter your password'):null),const SizedBox(height:18),
-      if(error!=null)...[Notice(failureText(context,error!),error:true),const SizedBox(height:16)],
-      FilledButton(onPressed:busy?null:()async{
-        if(!form.currentState!.validate())return;setState((){busy=true;error=null;});
-        try{await context.app.login(email.text,password.text);}catch(e){if(mounted)setState(()=>error=e);}
-        finally{if(mounted)setState(()=>busy=false);}},child:busy?const SizedBox.square(dimension:20,child:CircularProgressIndicator(strokeWidth:2)):Text(context.tr('تسجيل الدخول','Sign in'))),
-      TextButton(onPressed:()=>showDialog<void>(context:context,builder:(c)=>AlertDialog(title:Text(context.tr('استعادة الدخول','Recover access')),
-        content:Text(context.tr('حساب الطبيب والوكيل يُدار بواسطة الإدارة. تواصل مع مسؤول الفرع لاستعادة كلمة المرور أو تجديد الاعتماد.','Doctor and agent accounts are managed by your organization. Contact your branch administrator to recover access or renew approval.')),
-        actions:[TextButton(onPressed:()=>Navigator.pop(c),child:Text(context.tr('فهمت','Got it')))])),child:Text(context.tr('هل نسيت كلمة المرور؟','Forgot password?'))),
-      TextButton.icon(onPressed:()=>context.app.preferences(language:context.app.ar?'en':'ar'),icon:const Icon(Icons.language),label:Text(context.app.ar?'English':'العربية')),
-    ])))))));
-}
 
 class GeneralPage extends StatelessWidget{
   const GeneralPage(this.id,{super.key});final String id;
