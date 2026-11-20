@@ -69,6 +69,15 @@ void main(){
           ),
         ));
         await tester.pumpAndSettle();
+        // Wait for the asset decoder before taking the *first* light-mode
+        // screenshot; an Image widget can mount before its WebP frame arrives.
+        await tester.runAsync(() async {
+          await precacheImage(
+            const AssetImage(LoginHeaderWave.defaultImageAsset),
+            tester.element(find.byType(SignInPage)),
+          );
+        });
+        await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         expect(find.byType(TextFormField), findsNWidgets(2));
         // The page and gold/emerald waves are real Flutter gradient layers.
