@@ -1,6 +1,7 @@
-Build request: wave-only Mazraa Agent sign-in (pure Flutter painted curves).
+Build request: FINAL wave-only Mazraa Agent sign-in (pure Flutter painted paths).
 Date: 2026-11-21
-Target: Android ARM64 optimized release APK (one ABI).
-Changes: cubic bezier header/footer, emerald and gold layered gradients, mirrored RTL/LTR; no photos, SVG or image decorations on login.
-Verification: structure, analyze, widget tests for ar/en x light/dark, visual previews.
-Documentation and authentication API remain unchanged.
+Target: Android ARM64 optimized release APK.
+Visual QA: adjusted gold-and-emerald header wave lower so Arabic/English welcome labels never intersect wave trim.
+Implementation: responsive cubic paths, dark/light gradients, RTL mirroring, no images on login, auth untouched.
+Checks: structure, Flutter analyze, widget tests and ar/en x light/dark previews.
+Docs untouched.
