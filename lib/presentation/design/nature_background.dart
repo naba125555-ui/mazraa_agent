@@ -136,7 +136,7 @@ class NatureBackdrop extends StatelessWidget {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                height: 115,
+                height: (height * .20).clamp(130.0, 220.0),
                 child: NatureWaveBand(
                   dark: dark,
                   footer: true,
@@ -236,12 +236,15 @@ class _Botanical extends StatelessWidget {
       );
 }
 
+/// Pure canvas geometry: the artwork is created at runtime at the device's
+/// logical pixel size, and is never a bitmap, SVG or clipped screenshot.
 class _NatureWavePainter extends CustomPainter {
   const _NatureWavePainter({
     required this.dark,
     required this.footer,
     required this.reverse,
   });
+
   final bool dark;
   final bool footer;
   final bool reverse;
@@ -262,67 +265,128 @@ class _NatureWavePainter extends CustomPainter {
     if (reverse) canvas.restore();
   }
 
-  void _header(Canvas c, Size s) {
-    final w = s.width;
-    final h = s.height;
+  // The header wave is calculated entirely as proportions of the widget.
+  // Its three bezier sections intentionally leave plenty of clear space for
+  // the form and keep the title on the green area in either text direction.
+  Path _headerCurve(Size size) {
+    final w = size.width;
+    final h = size.height;
+    return Path()
+      ..moveTo(0, h * .59)
+      ..cubicTo(w * .20, h * .78, w * .37, h * .26, w * .60, h * .45)
+      ..cubicTo(w * .78, h * .61, w * .89, h * .50, w, h * .82);
+  }
 
-    final lower = Path()
-      ..moveTo(0, h * .62)
-      ..cubicTo(w * .28, h * .99, w * .43, h * .27, w * .68, h * .57)
-      ..cubicTo(w * .85, h * .78, w * .92, h * .61, w, h * .16)
+  void _header(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final curve = _headerCurve(size);
+    final rect = Offset.zero & size;
+
+    // A broad emerald edge is painted first, then the dark green top wave
+    // is filled over it, creating depth without any decorative image.
+    canvas.drawPath(
+      curve,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 23
+        ..strokeCap = StrokeCap.round
+        ..shader = const LinearGradient(
+          colors: [
+            Color(0xFF009567),
+            Color(0xFF14BD82),
+            Color(0xFF74CE91),
+            Color(0xFF008E65),
+          ],
+        ).createShader(rect),
+    );
+
+    final headerFill = Path()
+      ..moveTo(0, 0)
       ..lineTo(w, 0)
-      ..lineTo(0, 0)
+      ..lineTo(w, h * .82)
+      ..cubicTo(w * .89, h * .50, w * .78, h * .61, w * .60, h * .45)
+      ..cubicTo(w * .37, h * .26, w * .20, h * .78, 0, h * .59)
       ..close();
-    c.drawPath(
-      lower,
+    canvas.drawPath(
+      headerFill,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: NaturePalette.header(dark),
-        ).createShader(Offset.zero & s),
+          stops: const [0, .45, 1],
+          colors: dark
+              ? const [
+                  Color(0xFF002C24),
+                  Color(0xFF00634C),
+                  Color(0xFF003A2D),
+                ]
+              : const [
+                  Color(0xFF003B30),
+                  Color(0xFF008366),
+                  Color(0xFF005740),
+                ],
+        ).createShader(rect),
     );
-    final gold = Path()
-      ..moveTo(0, h * .625)
-      ..cubicTo(w * .28, h * .99, w * .43, h * .27, w * .68, h * .57)
-      ..cubicTo(w * .85, h * .78, w * .92, h * .61, w, h * .16);
-    c.drawPath(
-      gold,
+
+    // Separate gold and highlight paths produce the slim flowing trim.
+    canvas.drawPath(
+      curve,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round
         ..shader = const LinearGradient(
-          colors: [Color(0xFFFFD58A), Color(0xFFFFE5AF), Color(0xFF95D99D), Color(0xFFFFD58A)],
-        ).createShader(Offset.zero & s),
+          colors: [
+            Color(0xFFD39E4C),
+            Color(0xFFFFE9B5),
+            Color(0xFFFFD27A),
+            Color(0xFFFFF0BF),
+          ],
+        ).createShader(rect),
     );
-    final green = Path()
-      ..moveTo(0, h * .705)
-      ..cubicTo(w * .28, h * 1.09, w * .43, h * .38, w * .68, h * .64)
-      ..cubicTo(w * .85, h * .86, w * .92, h * .69, w, h * .25);
-    c.drawPath(
-      green,
+    canvas.drawPath(
+      curve,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 8
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF008F60), Color(0xFF1BD093), Color(0xFF98D58E)],
-        ).createShader(Offset.zero & s),
+        ..strokeWidth = 1.2
+        ..color = const Color(0xAAFFF5D4),
     );
   }
 
-  void _footer(Canvas c, Size s) {
-    final w = s.width;
-    final h = s.height;
-    for (var layer = 0; layer < 4; layer++) {
-      final y = h * (.31 + layer * .14);
-      final path = Path()
-        ..moveTo(0, y)
-        ..cubicTo(w * .24, y - 53, w * .36, y + 64, w * .55, y + 25)
-        ..cubicTo(w * .73, y - 13, w * .82, y - 49, w, y - 26)
+  Path _hillLine(Size size, int index) {
+    final w = size.width;
+    final h = size.height;
+    final offset = index * .105;
+    return Path()
+      ..moveTo(0, h * (.32 + offset))
+      ..cubicTo(
+        w * .17, h * (.12 + offset),
+        w * .32, h * (.77 + offset),
+        w * .55, h * (.49 + offset),
+      )
+      ..cubicTo(
+        w * .76, h * (.18 + offset),
+        w * .87, h * (.14 + offset),
+        w, h * (.38 + offset),
+      );
+  }
+
+  void _footer(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final rect = Offset.zero & size;
+
+    // Landscape bands mimic layered agricultural terraces. Each band is a
+    // real filled cubic path rather than a flattened background picture.
+    for (var i = 0; i < 5; i++) {
+      final line = _hillLine(size, i);
+      final path = Path.from(line)
         ..lineTo(w, h)
         ..lineTo(0, h)
         ..close();
-      c.drawPath(
+      final t = i / 4;
+      canvas.drawPath(
         path,
         Paint()
           ..shader = LinearGradient(
@@ -330,28 +394,49 @@ class _NatureWavePainter extends CustomPainter {
             end: Alignment.bottomRight,
             colors: dark
                 ? [
-                    Color.lerp(const Color(0xFF006649), const Color(0xFF00402F), layer / 4)!,
-                    Color.lerp(const Color(0xFF005C47), const Color(0xFF002C26), layer / 4)!,
+                    Color.lerp(
+                      const Color(0xFF007D58),
+                      const Color(0xFF00432F), t)!,
+                    Color.lerp(
+                      const Color(0xFF006345),
+                      const Color(0xFF002B25), t)!,
                   ]
                 : [
-                    Color.lerp(const Color(0xFFCAF4E1), const Color(0xFF5BCC9B), layer / 4)!,
-                    Color.lerp(const Color(0xFFB7EBC9), const Color(0xFF00845C), layer / 4)!,
+                    Color.lerp(
+                      const Color(0xFFC8F7DF),
+                      const Color(0xFF00996D), t)!,
+                    Color.lerp(
+                      const Color(0xFF8BDDB9),
+                      const Color(0xFF006547), t)!,
                   ],
-          ).createShader(Offset.zero & s),
+          ).createShader(rect),
       );
     }
-    final gold = Path()
-      ..moveTo(0, h * .69)
-      ..cubicTo(w * .23, h * .02, w * .41, h * 1.35, w * .62, h * .76)
-      ..cubicTo(w * .82, h * .24, w * .88, h * .18, w, h * .43);
-    c.drawPath(
-      gold,
+
+    // A gold-edged foreground swell ties the footer to the header. Unlike
+    // a stroked image outline, it scales correctly on any screen width.
+    final front = _hillLine(size, 3);
+    canvas.drawPath(
+      front,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 8
+        ..strokeWidth = 11
+        ..strokeCap = StrokeCap.round
         ..shader = const LinearGradient(
-          colors: [Color(0xFFFFD990), Color(0xFFFFE8B6), Color(0xFFC9DB8D), Color(0xFFFFD082)],
-        ).createShader(Offset.zero & s),
+          colors: [
+            Color(0xFFB78E3E),
+            Color(0xFFFFE9AA),
+            Color(0xFFFFD781),
+            Color(0xFFAFBB6C),
+          ],
+        ).createShader(rect),
+    );
+    canvas.drawPath(
+      front,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = const Color(0xBFFFF6D7),
     );
   }
 
