@@ -40,8 +40,8 @@ class AgentApp extends ChangeNotifier {
     }catch(e){accessError=e;}
     starting=false;notifyListeners();
   }
-  Future<void> login(String email,String password)async{
-    await repo.login(email,password);_reset();notifyListeners();await refreshAccess();
+  Future<void> login(String email,String password,{bool remember=true})async{
+    await repo.login(email,password,remember:remember);_reset();notifyListeners();await refreshAccess();
   }
   void _reset(){bootstrap={};profile={};summary={};user={};access=const Access();grantId=null;
     _records.clear();_variants.clear();basket.clear();sale={};auctionDraft={};prescriptionDraft={};revision++;scopeRevision++;}
