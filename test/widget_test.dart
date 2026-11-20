@@ -73,7 +73,14 @@ void main(){
         expect(find.byType(TextFormField), findsNWidgets(2));
         // No image-backed full-screen background; these are live widgets.
         expect(find.byType(NatureBackdrop), findsOneWidget);
+        expect(
+          tester.widget<NatureBackdrop>(find.byType(NatureBackdrop))
+              .showOrnaments,
+          isFalse,
+        );
         expect(find.byType(NatureWaveBand), findsWidgets);
+        // Login waves must remain vector-drawn Flutter paths, not pictures.
+        expect(find.byType(Image), findsNothing);
         expect(
           find.text(language == 'ar' ? 'مرحباً بك' : 'Welcome'),
           findsOneWidget,
