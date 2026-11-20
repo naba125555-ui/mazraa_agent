@@ -10,7 +10,7 @@ import 'package:mazraa_agent/application/agent_app.dart';
 import 'package:mazraa_agent/domain/models.dart';
 import 'package:mazraa_agent/domain/screens.dart';
 import 'package:mazraa_agent/presentation/design/brand_theme.dart';
-import 'package:mazraa_agent/presentation/design/nature_background.dart';
+import 'package:mazraa_agent/presentation/design/login_scenery.dart';
 import 'package:mazraa_agent/presentation/features/sign_in.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
@@ -71,16 +71,22 @@ void main(){
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         expect(find.byType(TextFormField), findsNWidgets(2));
-        // No image-backed full-screen background; these are live widgets.
-        expect(find.byType(NatureBackdrop), findsOneWidget);
+        // The page and gold/emerald waves are real Flutter gradient layers.
+        expect(find.byType(LoginScenery), findsOneWidget);
+        expect(find.byType(LoginHeaderWave), findsOneWidget);
+        final header =
+            tester.widget<LoginHeaderWave>(find.byType(LoginHeaderWave));
+        expect(header.photoOnLeft, language == 'ar');
+        expect(header.imageAsset, LoginHeaderWave.defaultImageAsset);
+        expect(find.byType(ClipPath), findsAtLeastNWidgets(5));
+        // Only the replaceable hero photograph is a bitmap; never the page.
+        final images = tester.widgetList<Image>(find.byType(Image)).toList();
+        expect(images, hasLength(1));
+        expect(images.single.image, isA<AssetImage>());
         expect(
-          tester.widget<NatureBackdrop>(find.byType(NatureBackdrop))
-              .showOrnaments,
-          isFalse,
+          (images.single.image as AssetImage).assetName,
+          'assets/images/login_header_yemeni_store_secure_access_hero.webp',
         );
-        expect(find.byType(NatureWaveBand), findsWidgets);
-        // Login waves must remain vector-drawn Flutter paths, not pictures.
-        expect(find.byType(Image), findsNothing);
         expect(
           find.text(language == 'ar' ? 'مرحباً بك' : 'Welcome'),
           findsOneWidget,
