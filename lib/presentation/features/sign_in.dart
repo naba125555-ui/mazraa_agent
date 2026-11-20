@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import '../design/nature_background.dart';
 
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
@@ -94,28 +97,11 @@ class _SignInPageState extends State<SignInPage> {
         resizeToAvoidBottomInset: true,
         body: Stack(
           children: [
+            // The backdrop is built from live Flutter gradients and paths.
+            // No source image or screenshot is used as a page background.
             Positioned.fill(
               child: IgnorePointer(
-                child: Transform.flip(
-                  flipX: rtl,
-                  child: Image.asset(
-                    dark
-                        ? 'assets/images/login_background_dark.webp'
-                        : 'assets/images/login_background_light.webp',
-                    fit: BoxFit.fill,
-                    errorBuilder: (context, error, stack) => DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: dark
-                              ? const [Color(0xFF00392F), Color(0xFF002E27)]
-                              : const [Color(0xFFE8FFF5), Color(0xFFF9FFFC)],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                child: NatureBackdrop(dark: dark),
               ),
             ),
             SafeArea(
@@ -162,81 +148,50 @@ class _SignInPageState extends State<SignInPage> {
     final top = MediaQuery.paddingOf(context).top;
     final screenWidth = MediaQuery.sizeOf(context).width;
     return SizedBox(
-      height: top + 181,
+      height: top + 202,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: AlignmentDirectional.topStart,
-                  end: AlignmentDirectional.bottomEnd,
-                  colors: dark
-                      ? const [
-                          Color(0xF6002C24),
-                          Color(0xEE005C42),
-                          Color(0xF3004032),
-                        ]
-                      : const [
-                          Color(0xED004637),
-                          Color(0xE7007856),
-                          Color(0xE9006C51),
-                        ],
-                ),
-              ),
+            child: NatureWaveBand(
+              dark: dark,
+              reverse: rtl,
             ),
           ),
           PositionedDirectional(
-            start: -9,
-            bottom: 15,
-            width: screenWidth > 550 ? 300 : 257,
-            height: 132,
-            child: ShaderMask(
-              shaderCallback: (rect) => LinearGradient(
-                begin: rtl ? Alignment.centerLeft : Alignment.centerRight,
-                end: rtl ? Alignment.centerRight : Alignment.centerLeft,
-                colors: const [
-                  Colors.transparent,
-                  Colors.white,
-                  Colors.white,
-                ],
-                stops: const [0, .27, 1],
-              ).createShader(rect),
-              blendMode: BlendMode.dstIn,
+            start: -18,
+            bottom: 2,
+            width: screenWidth > 550 ? 333 : 272,
+            height: 158,
+            child: IgnorePointer(
               child: Transform.flip(
                 flipX: rtl,
-                child: Image.asset(
-                  'assets/images/login_animals_hero.webp',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  errorBuilder: (_, _, _) => Image.asset(
-                    'assets/images/agent_field.webp',
-                    fit: BoxFit.cover,
-                  ),
+                child: SvgPicture.asset(
+                  'assets/decorations/mazraa_animals.svg',
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomLeft,
+                  excludeFromSemantics: true,
                 ),
               ),
             ),
           ),
-          Positioned(
-            bottom: -1,
-            left: 0,
-            right: 0,
-            height: 56,
-            child: Transform.flip(
-              flipX: rtl,
-              child: Image.asset(
-                dark
-                    ? 'assets/images/login_wave_dark.webp'
-                    : 'assets/images/login_wave_light.webp',
-                fit: BoxFit.fill,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          PositionedDirectional(
+            top: top + 36,
+            end: -18,
+            width: 112,
+            height: 112,
+            child: IgnorePointer(
+              child: NatureIllustration(
+                asset: 'assets/decorations/mazraa_flora.svg',
+                width: 112,
+                opacity: .84,
+                flip: rtl,
               ),
             ),
           ),
           PositionedDirectional(
-            top: top + 13,
-            start: 16,
+            top: top + 8,
+            start: 15,
             child: Row(
               textDirection: TextDirection.ltr,
               mainAxisSize: MainAxisSize.min,
@@ -244,9 +199,10 @@ class _SignInPageState extends State<SignInPage> {
                 ClipOval(
                   child: Image.asset(
                     'assets/branding/mazraa.png',
-                    height: 39,
-                    width: 39,
+                    height: 40,
+                    width: 40,
                     fit: BoxFit.cover,
+                    semanticLabel: 'Mazraa',
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -258,7 +214,7 @@ class _SignInPageState extends State<SignInPage> {
                       'Mazraa',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
+                        fontSize: 19.5,
                         fontWeight: FontWeight.w900,
                         height: 1,
                       ),
@@ -267,7 +223,7 @@ class _SignInPageState extends State<SignInPage> {
                       'Agent',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 12.5,
+                        fontSize: 12,
                         height: 1.2,
                       ),
                     ),
@@ -277,7 +233,7 @@ class _SignInPageState extends State<SignInPage> {
             ),
           ),
           PositionedDirectional(
-            top: top + 12,
+            top: top + 10,
             end: 14,
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -294,7 +250,9 @@ class _SignInPageState extends State<SignInPage> {
                 const SizedBox(width: 5),
                 _headerControl(
                   tooltip: context.tr('تغيير المظهر', 'Toggle appearance'),
-                  icon: dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                  icon: dark
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
                   onPressed: () {
                     context.app.preferences(theme: dark ? 'light' : 'dark');
                   },
@@ -303,47 +261,52 @@ class _SignInPageState extends State<SignInPage> {
             ),
           ),
           PositionedDirectional(
-            top: top + 70,
-            end: 16,
-            width: screenWidth > 550 ? 285 : 222,
+            top: top + 73,
+            end: 17,
+            width: screenWidth > 550 ? 267 : 191,
             child: Column(
-              crossAxisAlignment:
-                  rtl ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   context.tr('مرحباً بك', 'Welcome'),
-                  textAlign: rtl ? TextAlign.left : TextAlign.right,
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                     fontSize: 30,
-                    height: 1.14,
+                    height: 1.16,
                     shadows: [
-                      Shadow(color: Color(0x6600251E), blurRadius: 6),
+                      Shadow(color: Color(0x9900251E), blurRadius: 9),
                     ],
                   ),
                 ),
-                const SizedBox(height: 7),
+                const SizedBox(height: 6),
                 Text(
                   context.tr(
                     'سجّل الدخول للوصول إلى عمليات الطبيب والوكيل',
                     'Sign in to access doctor and agent operations',
                   ),
-                  textAlign: rtl ? TextAlign.left : TextAlign.right,
+                  textAlign: TextAlign.end,
                   maxLines: 3,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 11.6,
+                    fontSize: 11.4,
                     fontWeight: FontWeight.w600,
-                    height: 1.4,
+                    height: 1.5,
+                    shadows: [
+                      Shadow(color: Color(0x6600251E), blurRadius: 5),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 9),
+                const SizedBox(height: 10),
                 Container(
                   height: 4,
-                  width: 32,
+                  width: 34,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFD788),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD58A), Color(0xFFFFEABB)],
+                    ),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
