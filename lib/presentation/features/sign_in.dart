@@ -159,7 +159,7 @@ class _SignInPageState extends State<SignInPage> {
                                           decoration: _decoration(context.tr('البريد الإلكتروني', 'Email address')),
                                           validator: (value) {
                                             final text = value?.trim() ?? '';
-                                            return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+.hasMatch(text)
+                                            return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text)
                                                 ? null
                                                 : context.tr('أدخل بريدًا إلكترونيًا صالحًا', 'Enter a valid email address');
                                           },
