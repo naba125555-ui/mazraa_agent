@@ -1,7 +1,6 @@
-Build request: final full-bleed Mazraa Agent login with accurate tests.
-Source commit: 154ebaa694b94c9290321dd406b1197d0c3d4fae
+Build request: wave-only Mazraa Agent sign-in (pure Flutter painted curves).
 Date: 2026-11-21
-Target: Android ARM64 optimized release APK.
-Checks: 92 route structure, analyze, tests, four direct SignInPage previews (ar/en × light/dark).
-Assets: transparent SVG; backgrounds and wave bands painted with reusable Flutter widgets.
-Docs: untouched.
+Target: Android ARM64 optimized release APK (one ABI).
+Changes: cubic bezier header/footer, emerald and gold layered gradients, mirrored RTL/LTR; no photos, SVG or image decorations on login.
+Verification: structure, analyze, widget tests for ar/en x light/dark, visual previews.
+Documentation and authentication API remain unchanged.
