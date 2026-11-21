@@ -25,7 +25,6 @@ class PagedRecords extends StatefulWidget {
 }
 
 class _PagedRecordsState extends State<PagedRecords> {
-  final controller = ScrollController();
   final records = <Json>[];
   int cursor = 0;
   int generation = 0;
@@ -36,18 +35,18 @@ class _PagedRecordsState extends State<PagedRecords> {
   @override
   void initState() {
     super.initState();
-    controller.addListener(onScroll);
     load();
   }
 
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  void onScroll() {
-    if (controller.position.extentAfter < 420 && error == null) load();
+  // Observe list scrolls rather than attaching an independent controller.
+  // This lets NestedScrollView coordinate the pinned/floating SliverAppBar
+  // with pagination and keeps infinite-scroll behavior unchanged.
+  void onScroll(ScrollMetrics metrics) {
+    if (metrics.extentAfter < 420 && error == null && !loading && hasMore) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) load();
+      });
+    }
   }
 
   Future<void> reload() async {
@@ -122,8 +121,14 @@ class _PagedRecordsState extends State<PagedRecords> {
   @override
   Widget build(BuildContext context) => RefreshIndicator(
     onRefresh: reload,
-    child: ListView.builder(
-      controller: controller,
+    child: NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.depth == 0 && notification is ScrollUpdateNotification) {
+          onScroll(notification.metrics);
+        }
+        return false;
+      },
+      child: ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 154),
       itemCount: widget.header.length + records.length + 1,
@@ -132,6 +137,7 @@ class _PagedRecordsState extends State<PagedRecords> {
         final offset = index - widget.header.length;
         return offset < records.length ? widget.itemBuilder(records[offset]) : footer(context);
       },
+      ),
     ),
   );
 }
