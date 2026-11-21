@@ -216,6 +216,24 @@ void main(){
     app.dispose();
   });
 
+  testWidgets('320dp glass dock stays usable at 200 percent text scale',(tester)async{
+    tester.view.physicalSize=const Size(320,740);
+    tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final app=fixture('ar','dark');
+    await tester.pumpWidget(host(app,MediaQuery(
+      data:const MediaQueryData(textScaler:TextScaler.linear(2)),
+      child:const AppShell(),
+    )));
+    await tester.pumpAndSettle();
+    expect(find.byType(AgentGlassNavigationBar),findsOneWidget);
+    expect(find.byKey(const ValueKey('agent-primary-navigation')),findsOneWidget);
+    expect(tester.takeException(),isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
   testWidgets('Branded module banners and the sale cart fit a narrow phone',(tester)async{
     tester.view.physicalSize=const Size(360,800);
     tester.view.devicePixelRatio=1;
