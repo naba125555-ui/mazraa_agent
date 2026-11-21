@@ -36,6 +36,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   AgentWorkspace workspace = AgentWorkspace.home;
   final tabRoutes = List<String>.of(roots);
   final routeKeys = List<String>.of(roots.map((route) => route + ':root'));
+  final pendingKeys = List<String?>.filled(roots.length, null);
   late List<NavigatorObserver> observers;
   int? scopeRevision;
   Timer? timer;
@@ -156,7 +157,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     // Repeated presses on the same destination never add an identical route,
     // even when the first navigation push has not rendered its next frame.
-    if (routeKeys[target] == signature) {
+    if (routeKeys[target] == signature || pendingKeys[target] == signature) {
       if (index != target) selectTab(target);
       if (destinationWorkspace != null &&
           AgentNavigationRegistry.canEnter(app, destinationWorkspace) &&
@@ -175,14 +176,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
     }
 
-    // Reserve the destination before scheduling a navigator push; a second
-    // quick tap therefore sees the same signature and is ignored.
-    routeKeys[target] = signature;
+    // Reserve the destination independently of the nested Navigator's
+    // initial didPush notification. The initial root route must not cancel a
+    // pending deep-link when switching to a previously unvisited tab.
+    pendingKeys[target] = signature;
     void push() {
       if (!mounted || app.scopeRevision != scope ||
-          !app.canOpen(spec) || routeKeys[target] != signature) return;
+          !app.canOpen(spec) || pendingKeys[target] != signature) return;
       final navigator = keys[target].currentState;
       if (navigator == null) return;
+      pendingKeys[target] = null;
+      routeKeys[target] = signature;
       if (route == roots[target]) {
         navigator.popUntil((entry) => entry.isFirst);
       } else {
@@ -234,6 +238,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         observers[tab] = _TabRouteObserver((settings) => _onRouteChanged(tab, settings));
         tabRoutes[tab] = roots[tab];
         routeKeys[tab] = _signature(roots[tab], null);
+        pendingKeys[tab] = null;
         if (tab != index) visited.remove(tab);
       }
     }
