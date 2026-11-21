@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../domain/models.dart';
 import '../navigation.dart';
 import '../shared/scope.dart';
-import '../shared/section_banner.dart';
 import '../shared/widgets.dart';
 
 /// A permission-aware workspace. Only server-backed counters are displayed;
@@ -15,11 +14,8 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.app;
     final colors = Theme.of(context).colorScheme;
-    final profile = payload(obj(app.profile['profile']));
-    final name = str(app.user['name'] ?? obj(app.profile['user'])['name']).trim();
     final isDoctor = app.access.doctor;
     final hasBranch = app.grant != null;
-    final available = profile['isAvailable'] == true;
 
     final priority = <_HomeLink>[
       if (isDoctor)
@@ -112,90 +108,10 @@ class HomePage extends StatelessWidget {
         ),
     ];
 
-    return PageBody(fullBleedFirstChild: true, children: [
-      // The existing local artwork and Cairo typography keep Mazraa's identity.
-      SectionBanner(
-        art: SectionArt.workspace,
-        edgeToEdge: true,
-        icon: Icons.eco_outlined,
-        title: name.isEmpty
-            ? context.tr('مرحبًا بك في مزرعتي', 'Welcome to Mazraa')
-            : '${context.tr('مرحبًا،', 'Welcome,')} $name',
-        subtitle: context.tr(
-          'صحة الحيوان وتجارة الفرع، في مساحة عمل واحدة',
-          'Animal care and branch commerce in one workspace',
-        ),
-      ),
-
-      const SizedBox(height: 12),
-      Container(
-        padding: const EdgeInsetsDirectional.fromSTEB(14, 12, 12, 12),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: colors.outline.withValues(alpha: .7)),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            Icon(Icons.storefront_rounded, color: colors.primary, size: 23),
-            const SizedBox(width: 10),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(context.tr('نطاق العمل الحالي', 'Current work context'),
-                    style: Theme.of(context).textTheme.labelLarge),
-                Text(
-                  hasBranch
-                      ? '${context.tr('مخزن', 'Warehouse')} #${app.grant!.warehouse}'
-                      : context.tr('لا يوجد فرع مفوض', 'No delegated branch'),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            )),
-            TextButton(
-              onPressed: () => context.open('H06'),
-              child: Text(context.tr('تغيير', 'Change')),
-            ),
-          ]),
-          if (isDoctor) ...[
-            const SizedBox(height: 8),
-            Divider(height: 1, color: colors.outline.withValues(alpha: .55)),
-            const SizedBox(height: 8),
-            Row(children: [
-              Container(
-                height: 9, width: 9,
-                decoration: BoxDecoration(
-                  color: available ? const Color(0xFF279C55) : colors.secondary,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: Text(
-                available
-                    ? context.tr('متاح لاستقبال الاستشارات', 'Available for consultations')
-                    : context.tr('استقبال الاستشارات متوقف', 'Consultations paused'),
-                style: Theme.of(context).textTheme.bodySmall,
-              )),
-              TextButton.icon(
-                onPressed: () async {
-                  try {
-                    await app.repo.write('PATCH', '/api/agent/availability',
-                        {'available': !available});
-                    await app.refreshAccess();
-                  } catch (e) {
-                    if (context.mounted) {
-                      toast(context, failureText(context, e));
-                    }
-                  }
-                },
-                icon: const Icon(Icons.tune_rounded, size: 16),
-                label: Text(context.tr('تعديل', 'Update')),
-              ),
-            ]),
-          ],
-        ]),
-      ),
-
+    // The hero, warehouse context and availability now live in the pinned,
+    // scroll-collapsing SliverAppBar, not in a duplicate body banner.
+    return PageBody(children: [
+      const SizedBox(height: 4),
       if (metrics.isNotEmpty) ...[
         _HomeHeading(context.tr('نظرة سريعة', 'At a glance'),
             subtitle: context.tr('بيانات مباشرة من حسابك', 'Live account figures')),
