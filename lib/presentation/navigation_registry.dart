@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../application/agent_app.dart';
-import '../../domain/screens.dart';
+import '../application/agent_app.dart';
+import '../domain/screens.dart';
 
 /// The documented screen IDs, capabilities, and account context are the sole
 /// source of destinations. A navigation tap opens a route/chooser, never posts
