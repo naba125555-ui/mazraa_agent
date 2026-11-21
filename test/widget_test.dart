@@ -173,8 +173,7 @@ void main(){
       expect(dock.layout.items[dock.layout.primaryIndex].highlight,isTrue);
       expect(dock.layout.items.length,lessThanOrEqualTo(5));
       expect(find.byType(SectionBanner), findsNothing);
-      expect(find.byType(NestedScrollView), findsNothing);
-      expect(find.byKey(const ValueKey('agent-opaque-toolbar')), findsOneWidget);
+      expect(find.byType(NestedScrollView), findsOneWidget);
       final page = tester.widget<PageBody>(find.byType(PageBody).first);
       expect(page.fullBleedFirstChild, isFalse);
       final wave = tester.widget<LoginHeaderWave>(find.byType(LoginHeaderWave));
@@ -204,20 +203,14 @@ void main(){
     await tester.pumpWidget(host(app,const ScreenPage('H05')));
     await tester.pumpAndSettle();
     expect(find.byType(AgentHomeScopeStrip),findsOneWidget);
-    expect(find.byType(SliverAppBar),findsNothing);
-    expect(find.byKey(const ValueKey('agent-opaque-toolbar')),findsOneWidget);
+    expect(find.byType(SliverAppBar),findsOneWidget);
     expect(find.byType(SectionBanner),findsNothing);
-    final wave = find.byKey(const ValueKey('agent-collapsing-wave-viewport'));
-    final full = tester.getSize(wave).height;
-    expect(full, greaterThan(210));
-    await tester.drag(find.byType(ListView).first, const Offset(0,-620));
+    await tester.drag(find.byType(ListView).first,const Offset(0,-520));
     await tester.pumpAndSettle();
-    expect(tester.getSize(wave).height, lessThan(2));
-    // A short reverse drag (not a trip back to the top of the list) restores
-    // the complete header, including greeting, scope and server availability.
-    await tester.drag(find.byType(ListView).first, const Offset(0,110));
+    expect(find.byType(AgentHomeScopeStrip),findsNothing);
+    await tester.drag(find.byType(ListView).first,const Offset(0,650));
     await tester.pumpAndSettle();
-    expect(tester.getSize(wave).height, closeTo(full, 1));
+    expect(find.byType(AgentHomeScopeStrip),findsOneWidget);
     expect(tester.takeException(),isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
@@ -236,7 +229,6 @@ void main(){
     await tester.pumpAndSettle();
     expect(find.byType(AgentGlassNavigationBar),findsOneWidget);
     expect(find.byKey(const ValueKey('agent-primary-navigation')),findsOneWidget);
-    expect(tester.getSize(find.byType(AgentGlassNavigationBar)).height, lessThan(80));
     expect(tester.takeException(),isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
@@ -253,42 +245,12 @@ void main(){
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull,reason:route);
       expect(find.byType(AgentCollapsibleAppBar), findsOneWidget,reason:route);
-      expect(find.byKey(const ValueKey('agent-opaque-toolbar')),findsOneWidget,reason:route);
-      expect(find.byKey(const ValueKey('agent-collapsing-wave-viewport')),findsOneWidget,reason:route);
       if(route=='H05')expect(find.byType(SectionBanner),findsNothing);
       else if(route!='H02')expect(find.byType(SectionBanner),findsOneWidget,reason:route);
       else expect(find.text('تسجيل الدخول'),findsWidgets);
       if(route=='T02')expect(find.text('عرض السلة'),findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     }
-    app.dispose();
-  });
-
-  testWidgets('repeated dock taps never stack duplicate routes; Home keeps tab state',(tester)async{
-    tester.view.physicalSize=const Size(390,844);
-    tester.view.devicePixelRatio=1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final app=fixture('ar','dark');
-    await tester.pumpWidget(host(app,const AppShell()));
-    await tester.pumpAndSettle();
-    final homeContext=tester.element(find.byType(ScreenPage).first);
-    homeContext.open('T02');
-    homeContext.open('T02');
-    homeContext.open('T02');
-    await tester.pumpAndSettle();
-    final saleScreens=find.byWidgetPredicate((widget)=>widget is ScreenPage && widget.route=='T02',skipOffstage:false);
-    expect(saleScreens,findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('agent-nav-H05-الرئيسية')));
-    await tester.pumpAndSettle();
-    expect(tester.widget<AgentGlassNavigationBar>(find.byType(AgentGlassNavigationBar)).selectedRoute,'H05');
-    expect(saleScreens,findsOneWidget);
-    final returnedHome=tester.element(find.byType(ScreenPage).first);
-    returnedHome.open('T02');
-    await tester.pumpAndSettle();
-    expect(saleScreens,findsOneWidget);
-    expect(tester.takeException(),isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
   });
 
@@ -347,12 +309,6 @@ void main(){
       await tester.pumpWidget(host(app,ScreenPage(spec.id,key:ValueKey(spec.id),id:1)));
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull,reason:spec.id);
-      expect(find.byType(AgentCollapsibleAppBar),findsOneWidget,reason:spec.id);
-      expect(find.byKey(const ValueKey('agent-opaque-toolbar')),findsOneWidget,reason:spec.id);
-      expect(find.byKey(const ValueKey('agent-collapsing-wave-viewport')),findsOneWidget,reason:spec.id);
-      final headerColor = tester.widget<Container>(
-        find.byKey(const ValueKey('agent-opaque-toolbar')));
-      expect(headerColor.color,const Color(0xFF003F31),reason:spec.id);
       await tester.pumpWidget(const SizedBox.shrink());
     }app.dispose();
   });

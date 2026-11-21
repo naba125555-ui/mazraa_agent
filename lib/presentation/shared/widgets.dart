@@ -70,8 +70,8 @@ class PageBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView(
         padding: fullBleedFirstChild
-            ? const EdgeInsets.only(bottom: 88)
-            : const EdgeInsets.fromLTRB(18, 8, 18, 88),
+            ? const EdgeInsets.only(bottom: 154)
+            : const EdgeInsets.fromLTRB(18, 8, 18, 154),
         physics: const AlwaysScrollableScrollPhysics(),
         children: fullBleedFirstChild && children.isNotEmpty
             ? [
