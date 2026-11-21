@@ -11,3 +11,5 @@ Retry after correcting navigation registry imports and integrating pagination wi
 Retry: repair glass-navigation Dart parse error found by format step.
 
 Retry: eliminate unused import causing fatal flutter analyze warning.
+
+Final QA: isolated Sell/Purchase/Transfer delegation fallbacks, 320dp @ 200% type scaling, floating nested paged scroll.
