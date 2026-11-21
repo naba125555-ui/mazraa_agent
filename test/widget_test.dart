@@ -79,6 +79,7 @@ void main(){
               const AssetImage(LoginHeaderWave.defaultImageAsset),
               element,
             ),
+            precacheImage(const AssetImage(BrandLogo.assetPath), element),
             precacheImage(
               const AssetImage('assets/decorations/botanical_hanging_sprig.webp'),
               element,
@@ -91,6 +92,13 @@ void main(){
         // The page and gold/emerald waves are real Flutter gradient layers.
         expect(find.byType(LoginScenery), findsOneWidget);
         expect(find.byType(LoginHeaderWave), findsOneWidget);
+        expect(find.byType(BrandLogo), findsOneWidget);
+        expect(BrandLogo.assetPath,
+            'assets/branding/mazraa_store_dashboard_icon.webp');
+        expect(
+          find.text(language == 'ar' ? 'مزرعة' : 'Mazraa'),
+          findsOneWidget,
+        );
         final header =
             tester.widget<LoginHeaderWave>(find.byType(LoginHeaderWave));
         expect(header.photoOnLeft, language == 'ar');
@@ -141,6 +149,7 @@ void main(){
         final element = tester.element(find.byType(ScreenPage));
         await Future.wait([
           precacheImage(const AssetImage(SectionBanner.homeHero), element),
+          precacheImage(const AssetImage(BrandLogo.assetPath), element),
           precacheImage(
             const AssetImage('assets/decorations/botanical_hanging_sprig.webp'),
             element,
@@ -152,8 +161,17 @@ void main(){
       expect(find.byType(BotanicalBackground), findsOneWidget);
       expect(find.byType(LoginScenery), findsOneWidget);
       expect(find.byType(LoginHeaderWave), findsOneWidget);
+      expect(find.byType(BrandLogo), findsOneWidget);
+      expect(find.text(language=='ar'?'لوحة أعمالي':'My workspace'), findsNothing);
+      expect(find.text(language=='ar'?'مزرعة':'Mazraa'), findsOneWidget);
+      final page = tester.widget<PageBody>(find.byType(PageBody).first);
+      expect(page.fullBleedFirstChild, isTrue);
+      final bounds = tester.getRect(find.byType(SectionBanner).first);
+      expect(bounds.left, closeTo(0, .5));
+      expect(bounds.width, closeTo(430, .5));
       final banner = tester.widget<SectionBanner>(find.byType(SectionBanner));
       expect(banner.imageAsset, SectionBanner.homeHero);
+      expect(banner.edgeToEdge, isTrue);
       final wave = tester.widget<LoginHeaderWave>(find.byType(LoginHeaderWave));
       expect(wave.imageAsset, SectionBanner.homeHero);
       expect(wave.photoOnLeft, language=='ar');expect(find.textContaining(language=='ar'?'مرحبًا':'Welcome'),findsOneWidget);
