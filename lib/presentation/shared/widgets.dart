@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 import '../../domain/models.dart';
+import '../design/login_scenery.dart';
 import 'labels.dart';
 import 'scope.dart';
 import 'product_thumbnail.dart';
@@ -11,15 +11,30 @@ class BrandLogo extends StatelessWidget{
   @override Widget build(BuildContext context)=>ClipRRect(borderRadius:BorderRadius.circular(size*.23),
     child:Image.asset('assets/branding/mazraa.png',width:size,height:size,fit:BoxFit.cover));
 }
-class BotanicalBackground extends StatelessWidget{
-  const BotanicalBackground({super.key,required this.child});final Widget child;
-  @override Widget build(BuildContext context)=>Stack(children:[
-    PositionedDirectional(bottom:0,start:-35,child:IgnorePointer(child:Opacity(opacity:.32,child:
-      SvgPicture.asset('assets/decorations/leaf_pattern.svg',width:230,height:310,fit:BoxFit.cover,colorFilter:ColorFilter.mode(Theme.of(context).colorScheme.primary,BlendMode.srcIn))))),
-    PositionedDirectional(top:120,end:-95,child:IgnorePointer(child:Opacity(opacity:.20,child:
-      Transform.rotate(angle:3.14,child:SvgPicture.asset('assets/decorations/leaf_pattern.svg',width:280,height:340,fit:BoxFit.cover,colorFilter:ColorFilter.mode(Theme.of(context).colorScheme.primary,BlendMode.srcIn)))))),
-    Positioned.fill(child:child),
-  ]);
+/// Every authenticated screen (including all nested routes) shares the same
+/// responsive live-wave scenery as sign-in; the scrollable page remains above
+/// the non-interactive scenery and never loses hit-testing or scroll behavior.
+class BotanicalBackground extends StatelessWidget {
+  const BotanicalBackground({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: RepaintBoundary(
+              child: LoginScenery(dark: dark),
+            ),
+          ),
+        ),
+        Positioned.fill(child: child),
+      ],
+    );
+  }
 }
 class Panel extends StatelessWidget{
   const Panel({super.key,required this.child,this.onTap,this.padding=const EdgeInsets.all(16)});
