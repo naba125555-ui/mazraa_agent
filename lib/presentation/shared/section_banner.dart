@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../design/login_scenery.dart';
 
 enum SectionArt { workspace, clinical, commerce, field }
 
+/// A reusable live-wave hero: colors, curved emerald/gold ribbons and image
+/// masking are identical to sign-in. Only the replaceable image changes.
 class SectionBanner extends StatelessWidget {
   const SectionBanner({
     super.key,
@@ -11,65 +14,89 @@ class SectionBanner extends StatelessWidget {
     this.icon,
   });
 
+  static const homeHero =
+      'assets/images/home_header_yemeni_veterinary_store_hero.webp';
+
   final SectionArt art;
   final String title;
   final String? subtitle;
   final IconData? icon;
 
+  String get imageAsset => art == SectionArt.workspace
+      ? homeHero
+      : 'assets/images/agent_${art.name}.webp';
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final dark = theme.brightness == Brightness.dark;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(21),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/agent_${art.name}.webp',
-              fit: BoxFit.cover,
-              excludeFromSemantics: true,
-              alignment: Alignment.center,
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: AlignmentDirectional.centerStart,
-                  end: AlignmentDirectional.centerEnd,
-                  colors: const [
-                    Color(0xe911301f),
-                    Color(0xc3122f21),
-                    Color(0x53112b1e),
-                  ],
-                  stops: const [0, .57, 1],
+      borderRadius: BorderRadius.circular(22),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SizedBox(
+          height: 212,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: LoginHeaderWave(
+                  dark: dark,
+                  photoOnLeft: rtl,
+                  imageAsset: imageAsset,
                 ),
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(18, 16, 18, 16),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 90),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon case final glyph?) ...[
-                    Icon(glyph, size: 22, color: const Color(0xffc0eaca)),
-                    const SizedBox(height: 5),
-                  ],
-                  Text(title, style: theme.textTheme.titleLarge?.copyWith(color: Colors.white)),
-                  if (subtitle case final description?)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: Text(description, style: theme.textTheme.bodyMedium?.copyWith(color: const Color(0xffe6f2e8))),
+              PositionedDirectional(
+                top: 19,
+                start: 18,
+                width: (constraints.maxWidth * .56)
+                    .clamp(150.0, 294.0)
+                    .toDouble(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (icon case final glyph?) ...[
+                      Icon(glyph, size: 20, color: const Color(0xFFFFE9B6)),
+                      const SizedBox(height: 5),
+                    ],
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontSize: 18,
+                        height: 1.22,
+                        fontWeight: FontWeight.w800,
+                        shadows: const [
+                          Shadow(color: Color(0x8800261C), blurRadius: 7),
+                        ],
+                      ),
                     ),
-                ],
+                    if (subtitle case final description?) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        description,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFFF1FFF5),
+                          height: 1.3,
+                          fontSize: 11.4,
+                          fontWeight: FontWeight.w600,
+                          shadows: const [
+                            Shadow(color: Color(0x9900241B), blurRadius: 5),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
