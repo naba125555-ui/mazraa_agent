@@ -36,10 +36,16 @@ void main() {
       (false,Cap.cash,'N01'),
       (false,Cap.pickup,'P02'),
       (false,Cap.auction,'A01'),
+      (false,Cap.sell,'T01'),
+      (false,Cap.purchase,'T12'),
+      (false,Cap.transfer,'T01'),
       (false,Cap.sell|Cap.cash,'T02'),
     ];
     for(final (doctor,bits,want) in cases){
       final app=agentWith(doctor:doctor,bits:bits);
+      if(bits==Cap.sell || bits==Cap.transfer) {
+        expect(AgentNavigationRegistry.canEnter(app,AgentWorkspace.branch),isTrue);
+      }
       final layout=AgentNavigationRegistry.resolve(app,AgentWorkspace.home);
       expect(layout.items[layout.primaryIndex].route,want);
       expect(layout.items.any((item)=>item.route=='T02'),bits==34);
