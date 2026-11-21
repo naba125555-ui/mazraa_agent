@@ -9,3 +9,5 @@ Verification: Dart format, Flutter analyze, widget/nav registry tests, RTL/LTR l
 Retry after correcting navigation registry imports and integrating pagination with NestedScrollView.
 
 Retry: repair glass-navigation Dart parse error found by format step.
+
+Retry: eliminate unused import causing fatal flutter analyze warning.
