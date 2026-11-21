@@ -194,9 +194,42 @@ class ScreenPage extends StatelessWidget{
     else if(spec.area==Area.clinical){body=ClinicalPage(route,id:id,seed:seed);}
     else if(spec.area==Area.field){body=FieldPage(route,id:id,seed:seed);}
     else{body=BusinessPage(route,id:id,seed:seed);}
-    return Scaffold(appBar:AppBar(title:route=='H05'?const BrandLogo(size:44):Text(app.tr(spec.ar,spec.en)),
-      leading:route=='H05'?IconButton(tooltip:context.tr('حسابي','My account'),icon:const Icon(Icons.account_circle_outlined),onPressed:()=>context.open('H08')):null,
-      actions:[if(route!='H07')IconButton(tooltip:context.tr('الإشعارات','Notifications'),icon:const Icon(Icons.notifications_none),onPressed:()=>context.open('H07'))]),
-      body:BotanicalBackground(child:body));
+    final pageTitle = route == 'H05' || route == 'H01'
+        ? context.tr('مزرعة', 'Mazraa')
+        : app.tr(spec.ar, spec.en);
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BrandLogo(size: 36),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                pageTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        leading: route == 'H05'
+            ? IconButton(
+                tooltip: context.tr('حسابي', 'My account'),
+                icon: const Icon(Icons.account_circle_outlined),
+                onPressed: () => context.open('H08'),
+              )
+            : null,
+        actions: [
+          if (route != 'H07')
+            IconButton(
+              tooltip: context.tr('الإشعارات', 'Notifications'),
+              icon: const Icon(Icons.notifications_none),
+              onPressed: () => context.open('H07'),
+            ),
+        ],
+      ),
+      body: BotanicalBackground(child: body),
+    );
   }
 }
