@@ -173,7 +173,10 @@ void main(){
       expect(dock.layout.items[dock.layout.primaryIndex].highlight,isTrue);
       expect(dock.layout.items.length,lessThanOrEqualTo(5));
       expect(find.byType(SectionBanner), findsNothing);
-      expect(find.byType(NestedScrollView), findsOneWidget);
+      expect(find.byType(NestedScrollView), findsNothing);
+      expect(find.byKey(const ValueKey('agent-opaque-toolbar')), findsOneWidget);
+      expect(find.byKey(const ValueKey('agent-wave-viewport')), findsOneWidget);
+      expect(tester.getSize(find.byType(AgentGlassNavigationBar)).height, lessThan(120));
       final page = tester.widget<PageBody>(find.byType(PageBody).first);
       expect(page.fullBleedFirstChild, isFalse);
       final wave = tester.widget<LoginHeaderWave>(find.byType(LoginHeaderWave));
@@ -203,13 +206,20 @@ void main(){
     await tester.pumpWidget(host(app,const ScreenPage('H05')));
     await tester.pumpAndSettle();
     expect(find.byType(AgentHomeScopeStrip),findsOneWidget);
-    expect(find.byType(SliverAppBar),findsOneWidget);
+    expect(find.byType(SliverAppBar),findsNothing);
     expect(find.byType(SectionBanner),findsNothing);
+    final wave = find.byKey(const ValueKey('agent-wave-viewport'));
+    final fullHeight = tester.getSize(wave).height;
+    final pinned = tester.getSize(find.byKey(const ValueKey('agent-opaque-toolbar'))).height;
+    expect(fullHeight,greaterThan(260));
     await tester.drag(find.byType(ListView).first,const Offset(0,-520));
     await tester.pumpAndSettle();
-    expect(find.byType(AgentHomeScopeStrip),findsNothing);
-    await tester.drag(find.byType(ListView).first,const Offset(0,650));
+    expect(tester.getSize(wave).height,lessThan(1));
+    expect(tester.getSize(find.byKey(const ValueKey('agent-opaque-toolbar'))).height,pinned);
+    // A small downward drag reveals the entire wave without returning to top.
+    await tester.drag(find.byType(ListView).first,const Offset(0,82));
     await tester.pumpAndSettle();
+    expect(tester.getSize(wave).height,closeTo(fullHeight,1));
     expect(find.byType(AgentHomeScopeStrip),findsOneWidget);
     expect(tester.takeException(),isNull);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -229,6 +239,7 @@ void main(){
     await tester.pumpAndSettle();
     expect(find.byType(AgentGlassNavigationBar),findsOneWidget);
     expect(find.byKey(const ValueKey('agent-primary-navigation')),findsOneWidget);
+    expect(tester.getSize(find.byType(AgentGlassNavigationBar)).height,lessThan(120));
     expect(tester.takeException(),isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
@@ -245,12 +256,45 @@ void main(){
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull,reason:route);
       expect(find.byType(AgentCollapsibleAppBar), findsOneWidget,reason:route);
+      expect(find.byKey(const ValueKey('agent-opaque-toolbar')),findsOneWidget,reason:route);
+      expect(find.byKey(const ValueKey('agent-wave-viewport')),findsOneWidget,reason:route);
       if(route=='H05')expect(find.byType(SectionBanner),findsNothing);
       else if(route!='H02')expect(find.byType(SectionBanner),findsOneWidget,reason:route);
       else expect(find.text('تسجيل الدخول'),findsWidgets);
       if(route=='T02')expect(find.text('عرض السلة'),findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     }
+    app.dispose();
+  });
+
+  testWidgets('Home stays first, route taps are idempotent, tabs stay mounted',(tester)async{
+    tester.view.physicalSize=const Size(390,844);
+    tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final app=fixture('ar','dark');
+    await tester.pumpWidget(host(app,const AppShell()));
+    await tester.pumpAndSettle();
+    final original=tester.element(find.byType(ScreenPage).first);
+    original.open('T02');
+    original.open('T02');
+    original.open('T02');
+    await tester.pumpAndSettle();
+    final sale=find.byWidgetPredicate((w)=>w is ScreenPage && w.route=='T02',skipOffstage:false);
+    expect(sale,findsOneWidget);
+    final dock=tester.widget<AgentGlassNavigationBar>(find.byType(AgentGlassNavigationBar));
+    expect(dock.layout.items.first.route,'H05');
+    await tester.tap(find.byKey(const ValueKey('agent-nav-H05-الرئيسية')));
+    await tester.pumpAndSettle();
+    expect(sale,findsOneWidget); // Offstage sale tab is kept alive.
+    expect(tester.widget<AgentGlassNavigationBar>(
+        find.byType(AgentGlassNavigationBar)).selectedRoute,'H05');
+    final homeContext=tester.element(find.byType(ScreenPage).first);
+    homeContext.open('T02');
+    await tester.pumpAndSettle();
+    expect(sale,findsOneWidget);
+    expect(tester.takeException(),isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
   });
 
