@@ -3,3 +3,5 @@ Pinned opaque header; unified interactive photo-wave text/warehouse/doctor avail
 Keep contextual registry from docs/agent-rebuild/10-dynamic-bottom-navigation.md; permanent first Home item in all workspaces; 20% smaller 102dp glass dock; duplicate-tap protection and independent IndexedStack tab state.
 Tests: analyze, all 92 routes, RTL/LTR light/dark, 320dp 200% accessibility, scroll hiding and immediate reappearance, repeated route selection, rights-based options and pagination.
 No changes to docs or backend API. Export optimized Android ARM64.
+
+Follow-up run: guard nullable NavigatorObserver.didReplace route and retest page-state preservation, all wave headers and ARM64 release.
