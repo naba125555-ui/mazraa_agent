@@ -35,6 +35,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int index = 0;
   AgentWorkspace workspace = AgentWorkspace.home;
   final tabRoutes = List<String>.of(roots);
+  final routeKeys = List<String>.of(roots.map((route) => route + ':root'));
   late List<NavigatorObserver> observers;
   int? scopeRevision;
   Timer? timer;
@@ -45,7 +46,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     observers = List.generate(roots.length,
-        (tab) => _TabRouteObserver((route) => _onRouteChanged(tab, route)));
+        (tab) => _TabRouteObserver((settings) => _onRouteChanged(tab, settings)));
     startPolling();
   }
 
@@ -83,19 +84,25 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
-  void _onRouteChanged(int tab, String? route) {
-    final active = route == null || route == '/' ? roots[tab] : route;
+  static String _signature(String route, int? id) =>
+      route + ':' + (id?.toString() ?? 'root');
+
+  void _onRouteChanged(int tab, RouteSettings? settings) {
+    final active = settings?.name ?? roots[tab];
+    final id = settings?.arguments is int ? settings!.arguments as int : null;
+    routeKeys[tab] = _signature(active, id);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || tabRoutes[tab] == active) return;
-      tabRoutes[tab] = active;
-      if (tab == index) {
-        final entry = AgentNavigationRegistry.workspaceForEntry(active);
-        setState(() {
-          if (entry != null && AgentNavigationRegistry.canEnter(context.app, entry)) {
+      setState(() {
+        tabRoutes[tab] = active;
+        if (tab == index) {
+          final entry = AgentNavigationRegistry.workspaceForEntry(active);
+          if (entry != null &&
+              AgentNavigationRegistry.canEnter(context.app, entry)) {
             workspace = entry;
           }
-        });
-      }
+        }
+      });
     });
   }
 
@@ -121,33 +128,69 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ));
       return;
     }
+
+    // Home is permanently available from every dock and never disposes the
+    // other IndexedStack navigators (including their filters and back stacks).
+    if (route == 'H05') {
+      if (index != 0 || workspace != AgentWorkspace.home) {
+        setState(() {
+          index = 0;
+          visited.add(0);
+          workspace = AgentWorkspace.home;
+        });
+      }
+      keys[0].currentState?.popUntil((entry) => entry.isFirst);
+      return;
+    }
+
     final target = switch (spec.area) {
       Area.clinical => app.canOpen(screen('C01')) ? 1 : 3,
       Area.field => 2,
-      Area.general => route == 'H05' ? 0 : 4,
+      Area.general => 4,
       _ => 3,
     };
+    final signature = _signature(route, id);
+    final destinationWorkspace =
+        AgentNavigationRegistry.workspaceForEntry(route);
     final scope = app.scopeRevision;
-    final chosenWorkspace = AgentNavigationRegistry.workspaceForEntry(route);
-    void push() {
-      if (!mounted || app.scopeRevision != scope || !app.canOpen(spec)) return;
-      final navigator = keys[target].currentState;
-      if (navigator == null) return;
-      if (route == roots[target]) {
-        navigator.popUntil((entry) => entry.isFirst);
-        return;
+
+    // Repeated presses on the same destination never add an identical route,
+    // even when the first navigation push has not rendered its next frame.
+    if (routeKeys[target] == signature) {
+      if (index != target) selectTab(target);
+      if (destinationWorkspace != null &&
+          AgentNavigationRegistry.canEnter(app, destinationWorkspace) &&
+          workspace != destinationWorkspace) {
+        setState(() => workspace = destinationWorkspace);
       }
-      navigator.push(MaterialPageRoute<void>(
-        settings: RouteSettings(name: route),
-        builder: (_) => ScreenPage(route, id: id, seed: seed ?? {}),
-      ));
+      return;
     }
 
     final needsMount = !visited.contains(target);
     if (index != target || needsMount) selectTab(target);
-    if (chosenWorkspace != null &&
-        AgentNavigationRegistry.canEnter(app, chosenWorkspace)) {
-      setState(() => workspace = chosenWorkspace);
+    if (destinationWorkspace != null &&
+        AgentNavigationRegistry.canEnter(app, destinationWorkspace)) {
+      if (workspace != destinationWorkspace) {
+        setState(() => workspace = destinationWorkspace);
+      }
+    }
+
+    // Reserve the destination before scheduling a navigator push; a second
+    // quick tap therefore sees the same signature and is ignored.
+    routeKeys[target] = signature;
+    void push() {
+      if (!mounted || app.scopeRevision != scope ||
+          !app.canOpen(spec) || routeKeys[target] != signature) return;
+      final navigator = keys[target].currentState;
+      if (navigator == null) return;
+      if (route == roots[target]) {
+        navigator.popUntil((entry) => entry.isFirst);
+      } else {
+        navigator.push(MaterialPageRoute<void>(
+          settings: RouteSettings(name: route, arguments: id),
+          builder: (_) => ScreenPage(route, id: id, seed: seed ?? {}),
+        ));
+      }
     }
     if (needsMount) {
       WidgetsBinding.instance.addPostFrameCallback((_) => push());
@@ -188,8 +231,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       scopeRevision = app.scopeRevision;
       for (final tab in [1, 2, 3]) {
         keys[tab] = GlobalKey<NavigatorState>();
-        observers[tab] = _TabRouteObserver((route) => _onRouteChanged(tab, route));
+        observers[tab] = _TabRouteObserver((settings) => _onRouteChanged(tab, settings));
         tabRoutes[tab] = roots[tab];
+        routeKeys[tab] = _signature(roots[tab], null);
         if (tab != index) visited.remove(tab);
       }
     }
@@ -206,7 +250,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         if (await keys[index].currentState?.maybePop() == true) return;
-        if (mounted && index != 0) setState(() => index = 0);
+        if (mounted && index != 0) selectTab(0);
       },
       child: Scaffold(
         extendBody: true,
@@ -264,14 +308,14 @@ class ScreenPage extends StatelessWidget{
 
 class _TabRouteObserver extends NavigatorObserver {
   _TabRouteObserver(this.onRoute);
-  final ValueChanged<String?> onRoute;
+  final ValueChanged<RouteSettings?> onRoute;
   @override void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    onRoute(route.settings.name);
+    onRoute(route.settings);
   }
   @override void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    onRoute(previousRoute?.settings.name);
+    onRoute(previousRoute?.settings);
   }
   @override void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    onRoute(newRoute?.settings.name);
+    onRoute(newRoute?.settings);
   }
 }
