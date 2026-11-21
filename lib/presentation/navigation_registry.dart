@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../application/agent_app.dart';
 import '../domain/screens.dart';
+import '../domain/models.dart';
 
 /// The documented screen IDs, capabilities, and account context are the sole
 /// source of destinations. A navigation tap opens a route/chooser, never posts
@@ -58,8 +59,10 @@ abstract final class AgentNavigationRegistry {
   }
 
   static bool hasBranchAccess(AgentApp app) =>
-      const ['T02', 'I01', 'N01', 'P02', 'A01', 'T12', 'I09']
-          .any((route) => allowed(app, route));
+      app.grant != null &&
+      [Cap.inventory, Cap.sell, Cap.purchase, Cap.transfer, Cap.count,
+       Cap.cash, Cap.pickup, Cap.auction]
+          .any((capability) => app.allows(capability));
 
   static bool canEnter(AgentApp app, AgentWorkspace workspace) =>
       switch (workspace) {
@@ -130,6 +133,8 @@ abstract final class AgentNavigationRegistry {
           AgentNavItem('N01', 'المالية', 'Finance', Icons.account_balance_wallet_outlined),
           AgentNavItem('P02', 'الاستلام', 'Pickup', Icons.local_shipping_outlined),
           AgentNavItem('A01', 'المزادات', 'Auctions', Icons.gavel_outlined),
+          AgentNavItem('T12', 'المشتريات', 'Purchases', Icons.add_shopping_cart_outlined),
+          AgentNavItem('T01', 'الفرع', 'Branch', Icons.storefront_outlined),
           AgentNavItem('C01', 'استشاراتي', 'Cases', Icons.medical_services_outlined),
           AgentNavItem('F01', 'مهامي', 'Tasks', Icons.assignment_outlined),
           AgentNavItem('H08', 'حسابي', 'Account', Icons.person_outline_rounded),
@@ -164,6 +169,7 @@ abstract final class AgentNavigationRegistry {
           AgentNavItem('P02', 'الاستلام', 'Pickup', Icons.local_shipping_outlined),
           AgentNavItem('A01', 'المزادات', 'Auctions', Icons.gavel_outlined),
           AgentNavItem('T12', 'المشتريات', 'Purchase', Icons.add_shopping_cart_outlined),
+          AgentNavItem('T01', 'الفرع', 'Branch', Icons.storefront_outlined),
         ]);
       case AgentWorkspace.account:
         side.addAll(const [
@@ -229,7 +235,10 @@ abstract final class AgentNavigationRegistry {
         candidates.add(const AgentNavItem('A02', 'مزاد جديد', 'New auction', Icons.add_circle_outline));
     }
 
-    final primary = candidates.where((item) => allowed(app, item.route)).firstOrNull ??
+    final primary = candidates
+        .where((item) => allowed(app, item.route) &&
+            (item.route != 'T01' || hasBranchAccess(app)))
+        .firstOrNull ??
         const AgentNavItem('H05', 'الرئيسية', 'Home', Icons.home_rounded);
     final choices = side
         .where((item) => allowed(app, item.route) &&
