@@ -35,6 +35,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int index = 0;
   AgentWorkspace workspace = AgentWorkspace.home;
   final tabRoutes = List<String>.of(roots);
+  final routeKeys = List<String>.of(roots.map((route) => '$route:root'));
+  final pendingKeys = List<String?>.filled(roots.length, null);
+  final stackKeys = List.generate(roots.length, (_) => <String>[]);
   late List<NavigatorObserver> observers;
   int? scopeRevision;
   Timer? timer;
@@ -45,7 +48,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     observers = List.generate(roots.length,
-        (tab) => _TabRouteObserver((route) => _onRouteChanged(tab, route)));
+        (tab) => _TabRouteObserver((route, stack) => _onRouteChanged(tab, route, stack)));
     startPolling();
   }
 
@@ -83,19 +86,34 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
-  void _onRouteChanged(int tab, String? route) {
-    final active = route == null || route == '/' ? roots[tab] : route;
+  static String _routeKey(String route, int? id) =>
+      '$route:${id ?? 'root'}';
+
+  static String _settingsKey(RouteSettings settings) =>
+      _routeKey(settings.name ?? 'H05',
+          settings.arguments is int ? settings.arguments as int : null);
+
+  void _onRouteChanged(int tab, RouteSettings? current,
+      List<RouteSettings> history) {
+    final active = current?.name ?? roots[tab];
+    routeKeys[tab] = current == null
+        ? _routeKey(roots[tab], null)
+        : _settingsKey(current);
+    stackKeys[tab]
+      ..clear()
+      ..addAll(history.map(_settingsKey));
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || tabRoutes[tab] == active) return;
-      tabRoutes[tab] = active;
-      if (tab == index) {
-        final entry = AgentNavigationRegistry.workspaceForEntry(active);
-        setState(() {
-          if (entry != null && AgentNavigationRegistry.canEnter(context.app, entry)) {
-            workspace = entry;
-          }
-        });
-      }
+      if (!mounted) return;
+      final entry = AgentNavigationRegistry.workspaceForEntry(active);
+      final nextWorkspace = tab == index && entry != null &&
+              AgentNavigationRegistry.canEnter(context.app, entry)
+          ? entry : workspace;
+      if (tabRoutes[tab] == active && workspace == nextWorkspace) return;
+      setState(() {
+        tabRoutes[tab] = active;
+        if (tab == index) workspace = nextWorkspace;
+      });
     });
   }
 
@@ -121,38 +139,79 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ));
       return;
     }
+
+    // Home is always reachable from any screen. The other navigators remain
+    // in IndexedStack, preserving their scroll positions, inputs and filters.
+    if (route == 'H05') {
+      if (index != 0 || workspace != AgentWorkspace.home) {
+        setState(() {
+          index = 0;
+          visited.add(0);
+          workspace = AgentWorkspace.home;
+        });
+      }
+      keys[0].currentState?.popUntil((route) => route.isFirst);
+      return;
+    }
+
     final target = switch (spec.area) {
       Area.clinical => app.canOpen(screen('C01')) ? 1 : 3,
       Area.field => 2,
-      Area.general => route == 'H05' ? 0 : 4,
+      Area.general => 4,
       _ => 3,
     };
+    final signature = _routeKey(route, id);
+    final targetWorkspace = AgentNavigationRegistry.workspaceForEntry(route);
     final scope = app.scopeRevision;
-    final chosenWorkspace = AgentNavigationRegistry.workspaceForEntry(route);
-    void push() {
-      if (!mounted || app.scopeRevision != scope || !app.canOpen(spec)) return;
-      final navigator = keys[target].currentState;
-      if (navigator == null) return;
-      if (route == roots[target]) {
-        navigator.popUntil((entry) => entry.isFirst);
-        return;
+
+    void activate() {
+      if (index != target || !visited.contains(target)) {
+        selectTab(target);
       }
-      navigator.push(MaterialPageRoute<void>(
-        settings: RouteSettings(name: route),
-        builder: (_) => ScreenPage(route, id: id, seed: seed ?? {}),
-      ));
+      if (targetWorkspace != null &&
+          AgentNavigationRegistry.canEnter(app, targetWorkspace) &&
+          workspace != targetWorkspace) {
+        setState(() => workspace = targetWorkspace);
+      }
     }
 
-    final needsMount = !visited.contains(target);
-    if (index != target || needsMount) selectTab(target);
-    if (chosenWorkspace != null &&
-        AgentNavigationRegistry.canEnter(app, chosenWorkspace)) {
-      setState(() => workspace = chosenWorkspace);
+    // Also reserve pending routes before their Navigator is first mounted.
+    if (pendingKeys[target] == signature ||
+        routeKeys[target] == signature) {
+      activate();
+      return;
     }
+
+    final alreadyInStack = stackKeys[target].contains(signature);
+    final needsMount = !visited.contains(target);
+    activate();
+    pendingKeys[target] = signature;
+
+    void navigate() {
+      if (!mounted || scope != app.scopeRevision ||
+          !app.canOpen(spec) || pendingKeys[target] != signature) {
+        return;
+      }
+      final navigator = keys[target].currentState;
+      if (navigator == null) return;
+      pendingKeys[target] = null;
+
+      if (route == roots[target]) {
+        navigator.popUntil((entry) => entry.isFirst);
+      } else if (alreadyInStack) {
+        navigator.popUntil((entry) => _settingsKey(entry.settings) == signature);
+      } else {
+        navigator.push(MaterialPageRoute<void>(
+          settings: RouteSettings(name: route, arguments: id),
+          builder: (_) => ScreenPage(route, id: id, seed: seed ?? {}),
+        ));
+      }
+    }
+
     if (needsMount) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => push());
+      WidgetsBinding.instance.addPostFrameCallback((_) => navigate());
     } else {
-      push();
+      navigate();
     }
   }
 
@@ -188,8 +247,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       scopeRevision = app.scopeRevision;
       for (final tab in [1, 2, 3]) {
         keys[tab] = GlobalKey<NavigatorState>();
-        observers[tab] = _TabRouteObserver((route) => _onRouteChanged(tab, route));
+        observers[tab] = _TabRouteObserver(
+            (route, stack) => _onRouteChanged(tab, route, stack));
         tabRoutes[tab] = roots[tab];
+        routeKeys[tab] = _routeKey(roots[tab], null);
+        pendingKeys[tab] = null;
+        stackKeys[tab].clear();
         if (tab != index) visited.remove(tab);
       }
     }
@@ -206,7 +269,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         if (await keys[index].currentState?.maybePop() == true) return;
-        if (mounted && index != 0) setState(() => index = 0);
+        if (mounted && index != 0) selectTab(0);
       },
       child: Scaffold(
         extendBody: true,
@@ -252,16 +315,9 @@ class ScreenPage extends StatelessWidget{
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: BotanicalBackground(
-        child: NestedScrollView(
-          key: PageStorageKey('screen-scroll-' + route),
-          floatHeaderSlivers: true,
-          headerSliverBuilder: (context, innerScrolled) => [
-            AgentCollapsibleAppBar(
-              route: route,
-              title: pageTitle,
-              innerScrolled: innerScrolled,
-            ),
-          ],
+        child: AgentCollapsibleAppBar(
+          route: route,
+          title: pageTitle,
           body: body,
         ),
       ),
@@ -269,16 +325,50 @@ class ScreenPage extends StatelessWidget{
   }
 }
 
+typedef _RouteStackChanged = void Function(
+    RouteSettings? current, List<RouteSettings> stack);
+
 class _TabRouteObserver extends NavigatorObserver {
-  _TabRouteObserver(this.onRoute);
-  final ValueChanged<String?> onRoute;
-  @override void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    onRoute(route.settings.name);
+  _TabRouteObserver(this.onChanged);
+
+  final _RouteStackChanged onChanged;
+  final stack = <Route<dynamic>>[];
+
+  void _notify() => onChanged(
+      stack.isEmpty ? null : stack.last.settings,
+      stack.map((route) => route.settings).toList());
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    stack.add(route);
+    _notify();
   }
-  @override void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    onRoute(previousRoute?.settings.name);
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    stack.remove(route);
+    _notify();
   }
-  @override void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    onRoute(newRoute?.settings.name);
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    stack.remove(route);
+    _notify();
+  }
+
+  @override
+  void didReplace({
+    Route<dynamic>? newRoute,
+    Route<dynamic>? oldRoute,
+  }) {
+    final i = stack.indexOf(oldRoute);
+    if (i >= 0) {
+      if (newRoute == null) {
+        stack.removeAt(i);
+      } else {
+        stack[i] = newRoute;
+      }
+    }
+    _notify();
   }
 }
