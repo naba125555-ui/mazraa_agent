@@ -1,17 +1,5 @@
-Build request: Complete contextual navigation and pinned collapsible hero.
-Date: 2026-11-21
-Reference: docs/agent-rebuild/10-dynamic-bottom-navigation.md (read only).
-Navigation: 11 workspaces with role-aware central actions, secure selectors, RTL/LTR floating glass dock, preserving each nested navigator and delegation scope.
-Header: shared pinned app bar, full-width replaceable Yemen store hero, animated on scroll with floating/snap, server-backed warehouse context and doctor availability in hero.
-No POST from tabs. Choosers for record-dependent destinations. No API or doc modifications.
-Verification: Dart format, Flutter analyze, widget/nav registry tests, RTL/LTR light/dark and scroll collapse screenshots, optimized ARM64 APK.
-
-Retry after correcting navigation registry imports and integrating pagination with NestedScrollView.
-
-Retry: repair glass-navigation Dart parse error found by format step.
-
-Retry: eliminate unused import causing fatal flutter analyze warning.
-
-Final QA: isolated Sell/Purchase/Transfer delegation fallbacks, 320dp @ 200% type scaling, floating nested paged scroll.
-
-Final visual QA: lift warehouse/availability strip away from colored wave; use updated shell and role tests.
+Build request 2026-11-21: targeted AppBar/navigation repairs on restored branch.
+Pinned opaque header; unified interactive photo-wave text/warehouse/doctor availability on every route, animated hide/reveal on directional scroll independent of list top.
+Keep contextual registry from docs/agent-rebuild/10-dynamic-bottom-navigation.md; permanent first Home item in all workspaces; 20% smaller 102dp glass dock; duplicate-tap protection and independent IndexedStack tab state.
+Tests: analyze, all 92 routes, RTL/LTR light/dark, 320dp 200% accessibility, scroll hiding and immediate reappearance, repeated route selection, rights-based options and pagination.
+No changes to docs or backend API. Export optimized Android ARM64.
