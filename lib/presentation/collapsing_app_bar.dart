@@ -72,6 +72,11 @@ class AgentCollapsibleAppBar extends StatelessWidget {
               ),
             ])),
           )),
+          if(home&&amount>0.12) PositionedDirectional(
+            start:12,end:12,bottom:56,
+            child:Opacity(opacity:amount,
+              child:const AgentHomeScopeStrip()),
+          ),
         ]);
       }),
       titleSpacing:0,
@@ -105,9 +110,6 @@ class AgentCollapsibleAppBar extends StatelessWidget {
           icon:const Icon(Icons.notifications_none_rounded,size:26),
           onPressed:()=>context.open('H07')),
       ],
-      bottom:home?PreferredSize(preferredSize:const Size.fromHeight(0),
-        child:SizedBox(height:0,child:OverflowBox(
-          alignment:Alignment.bottomCenter,minHeight:0,maxHeight:0,child:const SizedBox.shrink()))):null,
     );
   }
 
