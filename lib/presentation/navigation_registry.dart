@@ -239,20 +239,28 @@ abstract final class AgentNavigationRegistry {
         .where((item) => allowed(app, item.route) &&
             (item.route != 'T01' || hasBranchAccess(app)))
         .firstOrNull ??
-        const AgentNavItem('H05', 'الرئيسية', 'Home', Icons.home_rounded);
-    final choices = side
-        .where((item) => allowed(app, item.route) &&
-            (item.chooser == null || allowed(app, item.chooser!)))
-        .where((item) =>
-            item.route != primary.route || item.ar != primary.ar)
-        .toList();
+        const AgentNavItem('H08', 'حسابي', 'Account',
+            Icons.person_outline_rounded);
 
-    // Keep the floating action centered, even when there are only 2–4
-    // authorized destinations; avoid phantom disabled tabs.
-    final leftCount = choices.length >= 2 ? (choices.length / 2).ceil() : choices.length;
-    final before = choices.take(leftCount.clamp(0, 2)).toList();
-    final after = choices.skip(before.length).take(2).toList();
-    final items = [
+    // HOME is the first destination in *every* workspace, even in clinical
+    // details, financial forms and specialized commerce sections. A small
+    // center button remains visually fixed, but all contextual items still
+    // respect the current grant and required record chooser.
+    const goHome = AgentNavItem(
+        'H05', 'الرئيسية', 'Home', Icons.home_rounded);
+    final choices = <AgentNavItem>[goHome];
+    for (final item in side) {
+      if (!allowed(app, item.route) ||
+          (item.chooser != null && !allowed(app, item.chooser!)) ||
+          item.route == primary.route ||
+          choices.any((other) => other.route == item.route)) {
+        continue;
+      }
+      choices.add(item);
+    }
+    final before = choices.take(2).toList();
+    final after = choices.skip(2).take(2).toList();
+    final items = <AgentNavItem>[
       ...before,
       primary.asPrimary(),
       ...after,
