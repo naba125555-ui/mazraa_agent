@@ -361,6 +361,11 @@ class _TabRouteObserver extends NavigatorObserver {
     Route<dynamic>? newRoute,
     Route<dynamic>? oldRoute,
   }) {
+    if (oldRoute == null) {
+      if (newRoute != null) stack.add(newRoute);
+      _notify();
+      return;
+    }
     final i = stack.indexOf(oldRoute);
     if (i >= 0) {
       if (newRoute == null) {
