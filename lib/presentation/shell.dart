@@ -252,16 +252,9 @@ class ScreenPage extends StatelessWidget{
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: BotanicalBackground(
-        child: NestedScrollView(
-          key: PageStorageKey('screen-scroll-' + route),
-          floatHeaderSlivers: true,
-          headerSliverBuilder: (context, innerScrolled) => [
-            AgentCollapsibleAppBar(
-              route: route,
-              title: pageTitle,
-              innerScrolled: innerScrolled,
-            ),
-          ],
+        child: AgentCollapsibleAppBar(
+          route: route,
+          title: pageTitle,
           body: body,
         ),
       ),
