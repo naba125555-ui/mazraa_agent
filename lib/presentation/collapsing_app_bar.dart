@@ -1,5 +1,4 @@
 
-import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
@@ -59,7 +58,7 @@ class _AgentCollapsibleAppBarState extends State<AgentCollapsibleAppBar>
       if (note.direction == ScrollDirection.reverse) _showHero(false);
       if (note.direction == ScrollDirection.forward) _showHero(true);
     }
-    // Support overscroll at either end and accessiblity scroll dispatches.
+    // Support overscroll at either end and accessibility scroll dispatches.
     if (note is OverscrollNotification && note.dragDetails != null) {
       if (note.overscroll < -2) _showHero(true);
       if (note.overscroll > 2) _showHero(false);
