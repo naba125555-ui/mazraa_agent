@@ -215,19 +215,22 @@ class _DockItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 1),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    item.label(arabic),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 9.2,
-                      fontWeight: selected
-                          ? FontWeight.w900 : FontWeight.w700,
-                      color: dark
-                        ? Colors.white
-                        : const Color(0xFF18402E),
+                SizedBox(
+                  height: 16,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      item.label(arabic),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 9.2,
+                        fontWeight: selected
+                            ? FontWeight.w900 : FontWeight.w700,
+                        color: dark
+                          ? Colors.white
+                          : const Color(0xFF18402E),
+                      ),
                     ),
                   ),
                 ),
