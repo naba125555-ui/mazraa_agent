@@ -12,6 +12,7 @@ class SectionBanner extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.icon,
+    this.edgeToEdge = false,
   });
 
   static const homeHero =
@@ -21,6 +22,7 @@ class SectionBanner extends StatelessWidget {
   final String title;
   final String? subtitle;
   final IconData? icon;
+  final bool edgeToEdge;
 
   String get imageAsset => art == SectionArt.workspace
       ? homeHero
@@ -32,10 +34,10 @@ class SectionBanner extends StatelessWidget {
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final dark = theme.brightness == Brightness.dark;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: edgeToEdge ? BorderRadius.zero : BorderRadius.circular(22),
       child: LayoutBuilder(
         builder: (context, constraints) => SizedBox(
-          height: 212,
+          height: edgeToEdge ? 245 : 212,
           child: Stack(
             fit: StackFit.expand,
             children: [
