@@ -13,7 +13,6 @@ import 'package:mazraa_agent/presentation/design/brand_theme.dart';
 import 'package:mazraa_agent/presentation/design/login_scenery.dart';
 import 'package:mazraa_agent/presentation/collapsing_app_bar.dart';
 import 'package:mazraa_agent/presentation/glass_navigation_bar.dart';
-import 'package:mazraa_agent/presentation/navigation_registry.dart';
 import 'package:mazraa_agent/presentation/features/sign_in.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
