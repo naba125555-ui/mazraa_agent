@@ -18,6 +18,8 @@ void main() {
     for(final workspace in AgentWorkspace.values){
       final layout=AgentNavigationRegistry.resolve(app,workspace);
       expect(layout.items,isNotEmpty);
+      expect(layout.items.first.route,'H05',reason:workspace.name);
+      expect(layout.items.where((item)=>item.route=='H05'),hasLength(1));
       expect(layout.items.length,lessThanOrEqualTo(5));
       expect(layout.items[layout.primaryIndex].highlight,isTrue);
       for(final item in layout.items){
