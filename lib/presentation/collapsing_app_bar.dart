@@ -75,7 +75,7 @@ class AgentCollapsibleAppBar extends StatelessWidget {
             ])),
           )),
           if(home&&amount>0.35) PositionedDirectional(
-            start:12,end:12,bottom:56,
+            start:12,end:12,bottom:92,
             child:IgnorePointer(ignoring:amount<0.9,child:Opacity(opacity:amount,
               child:const AgentHomeScopeStrip())),
           ),
