@@ -347,6 +347,12 @@ void main(){
       await tester.pumpWidget(host(app,ScreenPage(spec.id,key:ValueKey(spec.id),id:1)));
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull,reason:spec.id);
+      expect(find.byType(AgentCollapsibleAppBar),findsOneWidget,reason:spec.id);
+      expect(find.byKey(const ValueKey('agent-opaque-toolbar')),findsOneWidget,reason:spec.id);
+      expect(find.byKey(const ValueKey('agent-collapsing-wave-viewport')),findsOneWidget,reason:spec.id);
+      final headerColor = tester.widget<Container>(
+        find.byKey(const ValueKey('agent-opaque-toolbar')));
+      expect(headerColor.color,const Color(0xFF003F31),reason:spec.id);
       await tester.pumpWidget(const SizedBox.shrink());
     }app.dispose();
   });
