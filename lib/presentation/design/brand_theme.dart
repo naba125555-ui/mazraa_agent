@@ -16,7 +16,7 @@ abstract final class Brand {
     );
     final border=OutlineInputBorder(borderRadius:BorderRadius.circular(14),borderSide:BorderSide(color:c.outline));
     return ThemeData(useMaterial3:true,colorScheme:c,fontFamily:'Cairo',fontFamilyFallback:const ['Noto Sans Arabic','Arial'],
-      scaffoldBackgroundColor:dark?night:ivory,
+      scaffoldBackgroundColor:dark?const Color(0xFF063F34):const Color(0xFFE6F9F0),
       textTheme:TextTheme(headlineLarge:TextStyle(fontSize:28,fontWeight:FontWeight.w800,color:c.onSurface),
         headlineSmall:TextStyle(fontSize:23,fontWeight:FontWeight.w800,color:c.onSurface),
         titleLarge:TextStyle(fontSize:20,fontWeight:FontWeight.w700,color:c.onSurface),
@@ -24,7 +24,7 @@ abstract final class Brand {
         bodyLarge:TextStyle(fontSize:15,height:1.65,color:c.onSurface),
         bodyMedium:TextStyle(fontSize:13,height:1.65,color:c.onSurface),
         labelLarge:TextStyle(fontSize:14,fontWeight:FontWeight.w700,color:c.onSurface)),
-      appBarTheme:AppBarTheme(centerTitle:true,backgroundColor:dark?night:ivory,surfaceTintColor:Colors.transparent,elevation:0,
+      appBarTheme:AppBarTheme(centerTitle:true,backgroundColor:dark?const Color(0xFF063F34):const Color(0xFFE6F9F0),surfaceTintColor:Colors.transparent,elevation:0,
         titleTextStyle:TextStyle(fontFamily:'Cairo',fontSize:18,fontWeight:FontWeight.w700,color:c.onSurface)),
       cardTheme:CardThemeData(elevation:0,color:c.surface,margin:EdgeInsets.zero,
         shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(18),side:BorderSide(color:c.outline.withValues(alpha:.7)))),
