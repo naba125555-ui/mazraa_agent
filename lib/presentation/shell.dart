@@ -127,14 +127,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (app.bootstrap.isEmpty) {
       final failure = app.accessError;
       if (failure == null) {
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        return const Scaffold(body: BotanicalBackground(child: Center(child: CircularProgressIndicator())));
       }
-      return Scaffold(body: SafeArea(child: PageBody(children: [
+      return Scaffold(body: BotanicalBackground(child: SafeArea(child: PageBody(children: [
         Notice(failureText(context, failure), error: true),
         const SizedBox(height: 16),
         BusyButton(label: context.tr('إعادة الاتصال', 'Reconnect'), run: app.refreshAccess),
         TextButton(onPressed: app.logout, child: Text(context.tr('تسجيل الخروج', 'Sign out'))),
-      ])));
+      ]))));
     }
 
     if (scopeRevision != app.scopeRevision) {
