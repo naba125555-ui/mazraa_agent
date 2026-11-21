@@ -6,10 +6,25 @@ import 'labels.dart';
 import 'scope.dart';
 import 'product_thumbnail.dart';
 
-class BrandLogo extends StatelessWidget{
-  const BrandLogo({super.key,this.size=48});final double size;
-  @override Widget build(BuildContext context)=>ClipRRect(borderRadius:BorderRadius.circular(size*.23),
-    child:Image.asset('assets/branding/mazraa.png',width:size,height:size,fit:BoxFit.cover));
+/// The user-supplied Mazraa store artwork, shared by every app bar and
+/// the sign-in/splash brand marks. Store it as an optimized, local WebP asset.
+class BrandLogo extends StatelessWidget {
+  const BrandLogo({super.key, this.size = 48});
+  static const assetPath = 'assets/branding/mazraa_store_dashboard_icon.webp';
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(size * .23),
+        child: Image.asset(
+          assetPath,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+          semanticLabel: 'Mazraa',
+        ),
+      );
 }
 /// Every authenticated screen (including all nested routes) shares the same
 /// responsive live-wave scenery as sign-in; the scrollable page remains above
@@ -41,10 +56,34 @@ class Panel extends StatelessWidget{
   final Widget child;final VoidCallback? onTap;final EdgeInsetsGeometry padding;
   @override Widget build(BuildContext context)=>Card(clipBehavior:Clip.antiAlias,child:InkWell(onTap:onTap,child:Padding(padding:padding,child:child)));
 }
-class PageBody extends StatelessWidget{
-  const PageBody({super.key,required this.children});final List<Widget> children;
-  @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.fromLTRB(18,8,18,32),
-    physics:const AlwaysScrollableScrollPhysics(),children:children);
+/// Standard padded content, with an opt-in edge-to-edge first item for
+/// the home hero. Subsequent controls retain their readable 18px margins.
+class PageBody extends StatelessWidget {
+  const PageBody({
+    super.key,
+    required this.children,
+    this.fullBleedFirstChild = false,
+  });
+  final List<Widget> children;
+  final bool fullBleedFirstChild;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: fullBleedFirstChild
+            ? const EdgeInsets.only(bottom: 32)
+            : const EdgeInsets.fromLTRB(18, 8, 18, 32),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: fullBleedFirstChild && children.isNotEmpty
+            ? [
+                children.first,
+                for (final item in children.skip(1))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: item,
+                  ),
+              ]
+            : children,
+      );
 }
 class Heading extends StatelessWidget{
   const Heading(this.title,{super.key,this.icon,this.action});final String title;final IconData? icon;final Widget? action;
