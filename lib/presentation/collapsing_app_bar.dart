@@ -20,7 +20,9 @@ class AgentCollapsibleAppBar extends StatelessWidget {
     final rtl=Directionality.of(context)==TextDirection.rtl;
     final top=MediaQuery.paddingOf(context).top;
     final narrow=MediaQuery.sizeOf(context).width<365;
-    final expanded=home?(narrow?375.0:342.0):70.0;
+    final textScale=MediaQuery.textScalerOf(context).scale(16)/16;
+    final accessibilityHeight=((textScale-1).clamp(0.0,1.0)).toDouble()*160;
+    final expanded=home?(narrow?375.0:342.0)+accessibilityHeight:70.0;
     return SliverAppBar(
       pinned:true,
       floating:true,
