@@ -125,7 +125,7 @@ class _PagedRecordsState extends State<PagedRecords> {
     child: ListView.builder(
       controller: controller,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 154),
       itemCount: widget.header.length + records.length + 1,
       itemBuilder: (context, index) {
         if (index < widget.header.length) return widget.header[index];
