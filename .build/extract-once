@@ -1,10 +1,9 @@
-Build request: Uniform Mazraa Agent scenery across every app screen.
+Build request: Mazraa Agent full-bleed home banner and unified icon refinement.
 Date: 2026-11-21
-Target: Android ARM64 optimized release APK plus widget-test screenshots.
-App-wide: LoginScenery via BotanicalBackground on all ScreenPage routes and bootstrap states.
-Banners: shared LoginHeaderWave with emerald/gold clipped paths; Home uses assets/images/home_header_yemeni_veterinary_store_hero.webp.
-Decorations: mirrored transparent assets/decorations/botanical_hanging_sprig.webp instead of the previous side SVGs.
-Themes: dark/light with RTL/LTR responsive mirroring.
-Android icon: validate day/night 5 mipmap densities, day/night adaptive foreground and background resources.
-Checks: Python structure validation; Flutter analyze; widget and native icon tests; screen previews.
-Authentication/server APIs and docs untouched.
+Targets: Android ARM64 optimized release APK and previews for Arabic/English, light/dark.
+Home: remove secondary account/title/notification row below AppBar, retain AppBar controls.
+Hero: SectionBanner edgeToEdge with zero rounded corners and full screen width, retaining secure wave widget layers.
+Branding: user-supplied Mazraa dashboard store image optimized as assets/branding/mazraa_store_dashboard_icon.webp, shared in every app bar, login title and splash.
+Light-mode footer: deepen mint-green wave tones moderately and darken support/recovery tiles.
+Checks: Flutter analyze and widget tests for 92 routes, image asset, no overflow, hero full width and duplicate row absent.
+Contracts/API and documentation remain untouched.
