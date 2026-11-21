@@ -128,8 +128,8 @@ class LoginScenery extends StatelessWidget {
                                     Color(0x400C8467),
                                   ]
                                 : const [
-                                    Color(0x2291E5BE),
-                                    Color(0x5BB5EFDA),
+                                    Color(0x3D6FCFA0),
+                                    Color(0x729DDDBF),
                                   ],
                           ),
                         ),
@@ -148,8 +148,8 @@ class LoginScenery extends StatelessWidget {
                                     Color(0x5507654E),
                                   ]
                                 : const [
-                                    Color(0x4AD4FFF0),
-                                    Color(0x6C9DDFCA),
+                                    Color(0x618FDEC0),
+                                    Color(0x8B7ACBAA),
                                   ],
                           ),
                         ),
@@ -168,8 +168,8 @@ class LoginScenery extends StatelessWidget {
                                     Color(0x70045A47),
                                   ]
                                 : const [
-                                    Color(0x39D8FFEF),
-                                    Color(0x96B2ECD7),
+                                    Color(0x528DD5B4),
+                                    Color(0xA48FD6B6),
                                   ],
                           ),
                         ),
