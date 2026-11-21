@@ -7,3 +7,5 @@ No POST from tabs. Choosers for record-dependent destinations. No API or doc mod
 Verification: Dart format, Flutter analyze, widget/nav registry tests, RTL/LTR light/dark and scroll collapse screenshots, optimized ARM64 APK.
 
 Retry after correcting navigation registry imports and integrating pagination with NestedScrollView.
+
+Retry: repair glass-navigation Dart parse error found by format step.
