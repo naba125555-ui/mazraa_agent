@@ -120,7 +120,7 @@ abstract final class AgentNavigationRegistry {
       case AgentWorkspace.home:
         side.addAll(const [
           AgentNavItem('H05', 'الرئيسية', 'Home', Icons.home_rounded),
-          AgentNavItem('C01', 'العيادة', 'Clinic', Icons.stethoscope_outlined),
+          AgentNavItem('C01', 'العيادة', 'Clinic', Icons.medical_services_outlined),
           AgentNavItem('F01', 'الميدان', 'Field', Icons.location_on_outlined),
           AgentNavItem('H08', 'حسابي', 'Account', Icons.person_outline_rounded),
         ]);
@@ -130,7 +130,7 @@ abstract final class AgentNavigationRegistry {
           AgentNavItem('N01', 'المالية', 'Finance', Icons.account_balance_wallet_outlined),
           AgentNavItem('P02', 'الاستلام', 'Pickup', Icons.local_shipping_outlined),
           AgentNavItem('A01', 'المزادات', 'Auctions', Icons.gavel_outlined),
-          AgentNavItem('C01', 'استشاراتي', 'Cases', Icons.stethoscope_outlined),
+          AgentNavItem('C01', 'استشاراتي', 'Cases', Icons.medical_services_outlined),
           AgentNavItem('F01', 'مهامي', 'Tasks', Icons.assignment_outlined),
           AgentNavItem('H08', 'حسابي', 'Account', Icons.person_outline_rounded),
         ]);
@@ -141,7 +141,7 @@ abstract final class AgentNavigationRegistry {
           AgentNavItem('C12', 'الوصفات', 'Prescriptions', Icons.medication_outlined),
           AgentNavItem('C09', 'المواعيد', 'Visits', Icons.event_outlined, chooser: 'C01'),
         ]);
-        candidates.add(const AgentNavItem('C01', 'استشاراتي', 'My cases', Icons.stethoscope_outlined));
+        candidates.add(const AgentNavItem('C01', 'استشاراتي', 'My cases', Icons.medical_services_outlined));
       case AgentWorkspace.field:
         side.addAll(const [
           AgentNavItem('F01', 'مهامي', 'My tasks', Icons.assignment_outlined),
@@ -204,7 +204,7 @@ abstract final class AgentNavigationRegistry {
         side.addAll(const [
           AgentNavItem('P02', 'الطابور', 'Queue', Icons.list_alt_outlined),
           AgentNavItem('P03', 'الحيازة', 'Custody', Icons.inventory_outlined, chooser: 'P02'),
-          AgentNavItem('P05', 'الرفوف', 'Shelves', Icons.shelves, chooser: 'P02'),
+          AgentNavItem('P05', 'الرفوف', 'Shelves', Icons.view_module_outlined, chooser: 'P02'),
           AgentNavItem('P07', 'الاستثناءات', 'Exceptions', Icons.report_outlined, chooser: 'P02'),
         ]);
         candidates.addAll(const [
