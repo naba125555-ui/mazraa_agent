@@ -15,6 +15,7 @@ class LoginScenery extends StatelessWidget {
       builder: (context, constraints) {
         final height = constraints.maxHeight;
         final footerHeight = (height * .22).clamp(145.0, 260.0).toDouble();
+        final sprigWidth = (constraints.maxWidth * .35).clamp(105.0, 164.0).toDouble();
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -60,6 +61,46 @@ class LoginScenery extends StatelessWidget {
                             Color(0x66FFFFFF),
                             Colors.transparent,
                           ],
+                  ),
+                ),
+              ),
+            ),
+            // The same transparent WebP sprig is mirrored on both sides,
+            // behind every interactive control and behind the footer waves.
+            PositionedDirectional(
+              top: height * .32,
+              start: -sprigWidth * .36,
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: dark ? .15 : .22,
+                  child: Transform.flip(
+                    flipX: !rtl,
+                    child: Image.asset(
+                      'assets/decorations/botanical_hanging_sprig.webp',
+                      width: sprigWidth,
+                      fit: BoxFit.contain,
+                      excludeFromSemantics: true,
+                      filterQuality: FilterQuality.medium,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            PositionedDirectional(
+              top: height * .58,
+              end: -sprigWidth * .35,
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: dark ? .13 : .19,
+                  child: Transform.flip(
+                    flipX: rtl,
+                    child: Image.asset(
+                      'assets/decorations/botanical_hanging_sprig.webp',
+                      width: sprigWidth * .92,
+                      fit: BoxFit.contain,
+                      excludeFromSemantics: true,
+                      filterQuality: FilterQuality.medium,
+                    ),
                   ),
                 ),
               ),
