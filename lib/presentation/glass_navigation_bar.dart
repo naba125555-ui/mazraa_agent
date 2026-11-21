@@ -49,7 +49,7 @@ class AgentGlassNavigationBar extends StatelessWidget {
               boxShadow:const [BoxShadow(color:Color(0x88001B13),blurRadius:20,offset:Offset(0,8))],
             ),child:Icon(center.icon,size:38,color:Colors.white)),
           )),
-        )))),
+        ))),
         Positioned(bottom:8,child:SizedBox(width:85,child:Text(center.label(arabic),
           textAlign:TextAlign.center,maxLines:1,overflow:TextOverflow.ellipsis,
           style:TextStyle(fontWeight:FontWeight.w900,fontSize:12,color:dark?Colors.white:const Color(0xFF103D30))))),
