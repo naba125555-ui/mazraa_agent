@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../domain/models.dart';
-import '../domain/screens.dart';
 import 'design/login_scenery.dart';
 import 'navigation.dart';
 import 'navigation_registry.dart';
@@ -24,8 +23,9 @@ class AgentCollapsibleAppBar extends StatelessWidget {
     final expanded=home?(narrow?375.0:342.0):70.0;
     return SliverAppBar(
       pinned:true,
-      floating:false,
+      floating:true,
       stretch:true,
+      snap:true,
       forceElevated:innerScrolled,
       scrolledUnderElevation:0,
       elevation:0,
@@ -72,10 +72,10 @@ class AgentCollapsibleAppBar extends StatelessWidget {
               ),
             ])),
           )),
-          if(home&&amount>0.12) PositionedDirectional(
+          if(home&&amount>0.35) PositionedDirectional(
             start:12,end:12,bottom:56,
-            child:Opacity(opacity:amount,
-              child:const AgentHomeScopeStrip()),
+            child:IgnorePointer(ignoring:amount<0.9,child:Opacity(opacity:amount,
+              child:const AgentHomeScopeStrip())),
           ),
         ]);
       }),
