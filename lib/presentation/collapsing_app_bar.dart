@@ -96,6 +96,7 @@ class _AgentCollapsibleAppBarState extends State<AgentCollapsibleAppBar>
           builder: (context, child) {
             final visible = _height.value;
             return SizedBox(
+              key: const ValueKey('agent-collapsing-wave-viewport'),
               height: heroHeight * visible,
               child: ClipRect(
                 child: OverflowBox(
