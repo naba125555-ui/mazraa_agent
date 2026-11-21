@@ -157,20 +157,33 @@ class _AgentCollapsibleAppBarState extends State<AgentCollapsibleAppBar>
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   const BrandLogo(size: 37),
                   const SizedBox(width: 8),
-                  Flexible(child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(context.tr('مزرعتي', 'Mazraa'),
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white,
-                            fontSize: 21, fontWeight: FontWeight.w900)),
-                      if (!root) Text(widget.title,
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFFCDE6D8),
-                            fontSize: 10, height: 1.05)),
-                    ],
-                  )),
+                  Flexible(
+                    child: SizedBox(
+                      height: root ? 29 : 41,
+                      child: FittedBox(
+                        alignment: AlignmentDirectional.centerStart,
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(context.tr('مزرعتي', 'Mazraa'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white, fontSize: 21,
+                                fontWeight: FontWeight.w900)),
+                            if (!root) Text(widget.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFCDE6D8),
+                                fontSize: 10, height: 1.05)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   const Icon(Icons.keyboard_arrow_down_rounded,
                       size: 17, color: Color(0xFFB8DBC7)),
                 ]),
