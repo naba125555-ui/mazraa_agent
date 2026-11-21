@@ -254,7 +254,7 @@ class ScreenPage extends StatelessWidget{
       body: BotanicalBackground(
         child: NestedScrollView(
           key: PageStorageKey('screen-scroll-' + route),
-          floatHeaderSlivers: false,
+          floatHeaderSlivers: true,
           headerSliverBuilder: (context, innerScrolled) => [
             AgentCollapsibleAppBar(
               route: route,
