@@ -164,38 +164,22 @@ class _SignInPageState extends State<SignInPage> {
               textDirection: TextDirection.ltr,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0x3300CF8A),
-                    border: Border.all(
-                      color: const Color(0xAAFFE8A8),
-                      width: 1.2,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.eco_outlined,
-                    size: 25,
-                    color: Color(0xFFFFE7A9),
-                  ),
-                ),
+                const BrandLogo(size: 40),
                 const SizedBox(width: 8),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Mazraa',
-                      style: TextStyle(
+                      context.tr('مزرعة', 'Mazraa'),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 19.5,
                         fontWeight: FontWeight.w900,
                         height: 1,
                       ),
                     ),
-                    Text(
+                    const Text(
                       'Agent',
                       style: TextStyle(
                         color: Colors.white,
@@ -714,7 +698,7 @@ class _SignInPageState extends State<SignInPage> {
     VoidCallback onPressed,
   ) =>
       Material(
-        color: dark ? const Color(0xFF12644E) : const Color(0xFFDDF9EB),
+        color: dark ? const Color(0xFF12644E) : const Color(0xFFC0EAD5),
         borderRadius: BorderRadius.circular(15),
         child: InkWell(
           borderRadius: BorderRadius.circular(15),
