@@ -112,49 +112,11 @@ class HomePage extends StatelessWidget {
         ),
     ];
 
-    return PageBody(children: [
-      Padding(
-        padding: const EdgeInsetsDirectional.only(top: 6, bottom: 12),
-        child: Row(children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(50),
-            onTap: () => context.open('H08'),
-            child: Container(
-              width: 46, height: 46,
-              decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                shape: BoxShape.circle,
-                border: Border.all(color: colors.primary.withValues(alpha: .16)),
-              ),
-              child: Icon(Icons.person_outline_rounded, color: colors.primary),
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(context.tr('لوحة أعمالي', 'My workspace'),
-                  style: Theme.of(context).textTheme.titleMedium),
-              Text(
-                isDoctor
-                    ? context.tr('الطبيب البيطري والوكيل', 'Veterinarian and agent')
-                    : context.tr('إدارة الفرع التجاري', 'Branch management'),
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 1, overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          )),
-          IconButton(
-            tooltip: context.tr('الإشعارات', 'Notifications'),
-            onPressed: () => context.open('H07'),
-            icon: Icon(Icons.notifications_none_rounded, color: colors.primary),
-          ),
-        ]),
-      ),
-
+    return PageBody(fullBleedFirstChild: true, children: [
       // The existing local artwork and Cairo typography keep Mazraa's identity.
       SectionBanner(
         art: SectionArt.workspace,
+        edgeToEdge: true,
         icon: Icons.eco_outlined,
         title: name.isEmpty
             ? context.tr('مرحبًا بك في مزرعتي', 'Welcome to Mazraa')
