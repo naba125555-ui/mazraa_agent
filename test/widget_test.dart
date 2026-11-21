@@ -147,7 +147,7 @@ void main(){
       tester.view.physicalSize=const Size(430,932);tester.view.devicePixelRatio=1;
       addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
       final app=fixture(language,mode),key=GlobalKey();
-      await tester.pumpWidget(host(app,RepaintBoundary(key:key,child:const ScreenPage('H05'))));await tester.pumpAndSettle();
+      await tester.pumpWidget(host(app,RepaintBoundary(key:key,child:const AppShell())));await tester.pumpAndSettle();
       await tester.runAsync(() async {
         final element = tester.element(find.byType(ScreenPage));
         await Future.wait([
@@ -169,6 +169,10 @@ void main(){
       expect(find.text(language=='ar'?'مزرعتي':'Mazraa'), findsWidgets);
       expect(find.byType(AgentCollapsibleAppBar), findsOneWidget);
       expect(find.byType(AgentHomeScopeStrip), findsOneWidget);
+      expect(find.byType(AgentGlassNavigationBar), findsOneWidget);
+      final dock=tester.widget<AgentGlassNavigationBar>(find.byType(AgentGlassNavigationBar));
+      expect(dock.layout.items[dock.layout.primaryIndex].highlight,isTrue);
+      expect(dock.layout.items.length,lessThanOrEqualTo(5));
       expect(find.byType(SectionBanner), findsNothing);
       expect(find.byType(NestedScrollView), findsOneWidget);
       final page = tester.widget<PageBody>(find.byType(PageBody).first);
@@ -191,6 +195,28 @@ void main(){
       await tester.pumpWidget(const SizedBox.shrink());app.dispose();
     });
   }
+  testWidgets('Home wave is inside the pinned app bar and follows scroll', (tester) async {
+    tester.view.physicalSize=const Size(390,844);
+    tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final app=fixture('ar','dark');
+    await tester.pumpWidget(host(app,const ScreenPage('H05')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AgentHomeScopeStrip),findsOneWidget);
+    expect(find.byType(SliverAppBar),findsOneWidget);
+    expect(find.byType(SectionBanner),findsNothing);
+    await tester.drag(find.byType(ListView).first,const Offset(0,-520));
+    await tester.pumpAndSettle();
+    expect(find.byType(AgentHomeScopeStrip),findsNothing);
+    await tester.drag(find.byType(ListView).first,const Offset(0,650));
+    await tester.pumpAndSettle();
+    expect(find.byType(AgentHomeScopeStrip),findsOneWidget);
+    expect(tester.takeException(),isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
   testWidgets('Branded module banners and the sale cart fit a narrow phone',(tester)async{
     tester.view.physicalSize=const Size(360,800);
     tester.view.devicePixelRatio=1;
