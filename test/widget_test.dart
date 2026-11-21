@@ -16,6 +16,7 @@ import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
 import 'package:mazraa_agent/presentation/shared/scope.dart';
 import 'package:mazraa_agent/presentation/shared/section_banner.dart';
+import 'package:mazraa_agent/presentation/shared/widgets.dart';
 import 'package:mazraa_agent/presentation/shell.dart';
 import 'fake_repository.dart';
 
@@ -72,10 +73,17 @@ void main(){
         // Wait for the asset decoder before taking the *first* light-mode
         // screenshot; an Image widget can mount before its WebP frame arrives.
         await tester.runAsync(() async {
-          await precacheImage(
-            const AssetImage(LoginHeaderWave.defaultImageAsset),
-            tester.element(find.byType(SignInPage)),
-          );
+          final element = tester.element(find.byType(SignInPage));
+          await Future.wait([
+            precacheImage(
+              const AssetImage(LoginHeaderWave.defaultImageAsset),
+              element,
+            ),
+            precacheImage(
+              const AssetImage('assets/decorations/botanical_hanging_sprig.webp'),
+              element,
+            ),
+          ]);
         });
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
@@ -88,13 +96,16 @@ void main(){
         expect(header.photoOnLeft, language == 'ar');
         expect(header.imageAsset, LoginHeaderWave.defaultImageAsset);
         expect(find.byType(ClipPath), findsAtLeastNWidgets(5));
-        // Only the replaceable hero photograph is a bitmap; never the page.
+        // Exactly one replaceable hero image and two transparent side sprigs;
+        // the waves and page gradients are still made by real widgets.
         final images = tester.widgetList<Image>(find.byType(Image)).toList();
-        expect(images, hasLength(1));
-        expect(images.single.image, isA<AssetImage>());
+        final assets = images.map((widget) =>
+            (widget.image as AssetImage).assetName).toList();
+        expect(assets, contains(LoginHeaderWave.defaultImageAsset));
         expect(
-          (images.single.image as AssetImage).assetName,
-          'assets/images/login_header_yemeni_store_secure_access_hero.webp',
+          assets.where((name) =>
+              name == 'assets/decorations/botanical_hanging_sprig.webp'),
+          hasLength(2),
         );
         expect(
           find.text(language == 'ar' ? 'مرحباً بك' : 'Welcome'),
@@ -126,7 +137,26 @@ void main(){
       addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
       final app=fixture(language,mode),key=GlobalKey();
       await tester.pumpWidget(host(app,RepaintBoundary(key:key,child:const ScreenPage('H05'))));await tester.pumpAndSettle();
-      expect(tester.takeException(),isNull);expect(find.textContaining(language=='ar'?'مرحبًا':'Welcome'),findsOneWidget);
+      await tester.runAsync(() async {
+        final element = tester.element(find.byType(ScreenPage));
+        await Future.wait([
+          precacheImage(const AssetImage(SectionBanner.homeHero), element),
+          precacheImage(
+            const AssetImage('assets/decorations/botanical_hanging_sprig.webp'),
+            element,
+          ),
+        ]);
+      });
+      await tester.pumpAndSettle();
+      expect(tester.takeException(),isNull);
+      expect(find.byType(BotanicalBackground), findsOneWidget);
+      expect(find.byType(LoginScenery), findsOneWidget);
+      expect(find.byType(LoginHeaderWave), findsOneWidget);
+      final banner = tester.widget<SectionBanner>(find.byType(SectionBanner));
+      expect(banner.imageAsset, SectionBanner.homeHero);
+      final wave = tester.widget<LoginHeaderWave>(find.byType(LoginHeaderWave));
+      expect(wave.imageAsset, SectionBanner.homeHero);
+      expect(wave.photoOnLeft, language=='ar');expect(find.textContaining(language=='ar'?'مرحبًا':'Welcome'),findsOneWidget);
       final boundary=key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       // Rasterization and PNG encoding use engine futures. Run them outside
       // FakeAsync to avoid hanging the entire widget-test suite.
