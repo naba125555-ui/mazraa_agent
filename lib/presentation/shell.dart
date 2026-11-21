@@ -9,6 +9,9 @@ import 'features/general.dart';
 import 'features/home.dart';
 import 'features/scan.dart';
 import 'navigation.dart';
+import 'navigation_registry.dart';
+import 'glass_navigation_bar.dart';
+import 'collapsing_app_bar.dart';
 import 'shared/scope.dart';
 import 'shared/widgets.dart';
 
@@ -30,6 +33,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final keys = List.generate(roots.length, (_) => GlobalKey<NavigatorState>());
   final visited = <int>{0};
   int index = 0;
+  AgentWorkspace workspace = AgentWorkspace.home;
+  final tabRoutes = List<String>.of(roots);
+  late List<NavigatorObserver> observers;
   int? scopeRevision;
   Timer? timer;
   bool refreshing = false;
@@ -38,6 +44,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    observers = List.generate(roots.length,
+        (tab) => _TabRouteObserver((route) => _onRouteChanged(tab, route)));
     startPolling();
   }
 
@@ -75,6 +83,33 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
+  void _onRouteChanged(int tab, String? route) {
+    final active = route == null || route == '/' ? roots[tab] : route;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || tabRoutes[tab] == active) return;
+      tabRoutes[tab] = active;
+      if (tab == index) {
+        final entry = AgentNavigationRegistry.workspaceForEntry(active);
+        setState(() {
+          if (entry != null && AgentNavigationRegistry.canEnter(context.app, entry)) {
+            workspace = entry;
+          }
+        });
+      }
+    });
+  }
+
+  void _selectNavigation(AgentNavItem item) {
+    final destination = item.openRoute;
+    if (destination != item.route) {
+      toast(context, context.tr(
+        'اختر سجلًا من القائمة لإكمال الإجراء.',
+        'Select an authorized record from the list to continue.',
+      ));
+    }
+    open(destination);
+  }
+
   void open(String route, {int? id, Json? seed}) {
     if (!implementedScreens.contains(route)) return;
     final app = context.app;
@@ -93,6 +128,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _ => 3,
     };
     final scope = app.scopeRevision;
+    final chosenWorkspace = AgentNavigationRegistry.workspaceForEntry(route);
     void push() {
       if (!mounted || app.scopeRevision != scope || !app.canOpen(spec)) return;
       final navigator = keys[target].currentState;
@@ -109,6 +145,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     final needsMount = !visited.contains(target);
     if (index != target || needsMount) selectTab(target);
+    if (chosenWorkspace != null &&
+        AgentNavigationRegistry.canEnter(app, chosenWorkspace)) {
+      setState(() => workspace = chosenWorkspace);
+    }
     if (needsMount) {
       WidgetsBinding.instance.addPostFrameCallback((_) => push());
     } else {
@@ -119,6 +159,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void selectTab(int tab) => setState(() {
     index = tab;
     visited.add(tab);
+    workspace = switch (tab) {
+      0 => AgentWorkspace.home,
+      1 => AgentWorkspace.clinic,
+      2 => AgentWorkspace.field,
+      3 => AgentWorkspace.branch,
+      _ => AgentWorkspace.account,
+    };
   });
 
   @override
@@ -141,19 +188,18 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       scopeRevision = app.scopeRevision;
       for (final tab in [1, 2, 3]) {
         keys[tab] = GlobalKey<NavigatorState>();
+        observers[tab] = _TabRouteObserver((route) => _onRouteChanged(tab, route));
+        tabRoutes[tab] = roots[tab];
         if (tab != index) visited.remove(tab);
       }
     }
     final available = [for (var i = 0; i < roots.length; i++)
       if (app.canOpen(screen(roots[i]))) i];
-    if (!available.contains(index)) index = 0;
-    final destinations = [
-      NavigationDestination(icon: const Icon(Icons.home_outlined), selectedIcon: const Icon(Icons.home), label: context.tr('الرئيسية', 'Home')),
-      NavigationDestination(icon: const Icon(Icons.chat_bubble_outline), selectedIcon: const Icon(Icons.chat_bubble), label: context.tr('الاستشارات', 'Cases')),
-      NavigationDestination(icon: const Icon(Icons.assignment_outlined), selectedIcon: const Icon(Icons.assignment), label: context.tr('المهام', 'Tasks')),
-      NavigationDestination(icon: const Icon(Icons.storefront_outlined), selectedIcon: const Icon(Icons.storefront), label: context.tr('تجارتي', 'Business')),
-      NavigationDestination(icon: const Icon(Icons.person_outline), selectedIcon: const Icon(Icons.person), label: context.tr('حسابي', 'Account')),
-    ];
+    if (!available.contains(index)) {
+      index = 0;
+      workspace = AgentWorkspace.home;
+    }
+    final layout = AgentNavigationRegistry.resolve(app, workspace);
 
     return NavScope(open: open, child: PopScope(
       canPop: false,
@@ -163,20 +209,26 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         if (mounted && index != 0) setState(() => index = 0);
       },
       child: Scaffold(
+        extendBody: true,
         body: IndexedStack(index: index, children: [
           for (var i = 0; i < roots.length; i++)
             if (available.contains(i) && visited.contains(i))
               Navigator(
                 key: keys[i],
-                onGenerateRoute: (_) => MaterialPageRoute<void>(builder: (_) => ScreenPage(roots[i])),
+                observers: [observers[i]],
+                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                  settings: RouteSettings(name: roots[i]),
+                  builder: (_) => ScreenPage(roots[i]),
+                ),
               )
             else
               const SizedBox.shrink(),
         ]),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: available.indexOf(index),
-          onDestinationSelected: (destination) => selectTab(available[destination]),
-          destinations: [for (final tab in available) destinations[tab]],
+        bottomNavigationBar: AgentGlassNavigationBar(
+          layout: layout,
+          arabic: app.ar,
+          selectedRoute: tabRoutes[index],
+          onSelect: _selectNavigation,
         ),
       ),
     ));
@@ -195,41 +247,38 @@ class ScreenPage extends StatelessWidget{
     else if(spec.area==Area.field){body=FieldPage(route,id:id,seed:seed);}
     else{body=BusinessPage(route,id:id,seed:seed);}
     final pageTitle = route == 'H05' || route == 'H01'
-        ? context.tr('مزرعة', 'Mazraa')
+        ? context.tr('مزرعتي', 'Mazraa')
         : app.tr(spec.ar, spec.en);
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const BrandLogo(size: 36),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                pageTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+      backgroundColor: Colors.transparent,
+      body: BotanicalBackground(
+        child: NestedScrollView(
+          key: PageStorageKey('screen-scroll-' + route),
+          floatHeaderSlivers: false,
+          headerSliverBuilder: (context, innerScrolled) => [
+            AgentCollapsibleAppBar(
+              route: route,
+              title: pageTitle,
+              innerScrolled: innerScrolled,
             ),
           ],
+          body: body,
         ),
-        leading: route == 'H05'
-            ? IconButton(
-                tooltip: context.tr('حسابي', 'My account'),
-                icon: const Icon(Icons.account_circle_outlined),
-                onPressed: () => context.open('H08'),
-              )
-            : null,
-        actions: [
-          if (route != 'H07')
-            IconButton(
-              tooltip: context.tr('الإشعارات', 'Notifications'),
-              icon: const Icon(Icons.notifications_none),
-              onPressed: () => context.open('H07'),
-            ),
-        ],
       ),
-      body: BotanicalBackground(child: body),
     );
+  }
+}
+
+class _TabRouteObserver extends NavigatorObserver {
+  _TabRouteObserver(this.onRoute);
+  final ValueChanged<String?> onRoute;
+  @override void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    onRoute(route.settings.name);
+  }
+  @override void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    onRoute(previousRoute?.settings.name);
+  }
+  @override void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    onRoute(newRoute?.settings.name);
   }
 }
