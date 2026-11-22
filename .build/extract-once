@@ -11,3 +11,5 @@ Follow-up run: guard nullable NavigatorObserver.didReplace route and retest page
 Retry 2026-11-22: remove unused import, re-run flutter analyze, all Widget/unit tests and Android ARM64 packaging for home insights carousel.
 
 Retry after responsive chart legend and stat card overflow fixes + locale-safe day labels. Verify analytics data route accuracy and export Android APK.
+
+Final QA: all eleven slide visual screenshots, tap-to-detail and long-press day value, mirrored RTL line canvas, permission-safe data decoding, analyzer and ARM64 APK.
