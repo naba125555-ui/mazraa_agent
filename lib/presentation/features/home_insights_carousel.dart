@@ -501,7 +501,8 @@ class _SegmentedDistribution extends StatelessWidget {
           borderRadius:BorderRadius.circular(18)))
       else ClipRRect(
         borderRadius:BorderRadius.circular(17),
-        child:SizedBox(width:double.infinity,height:23,child:Row(children:[
+        child:SizedBox(width:double.infinity,height:23,child:Row(
+          crossAxisAlignment:CrossAxisAlignment.stretch,children:[
           for(var i=0;i<parts.length;i++)
             if((parts[i].value??0)>0) Expanded(
               flex:math.max(1,((parts[i].value??0)/total*1000).round()),
