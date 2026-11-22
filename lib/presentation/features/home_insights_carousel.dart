@@ -506,7 +506,9 @@ class _SegmentedDistribution extends StatelessWidget {
           for(var i=0;i<parts.length;i++)
             if((parts[i].value??0)>0) Expanded(
               flex:math.max(1,((parts[i].value??0)/total*1000).round()),
-              child:ColoredBox(color:_chartColors[i%_chartColors.length]),
+              child:ColoredBox(
+                key:ValueKey('insight-segment-'+i.toString()),
+                color:_chartColors[i%_chartColors.length]),
             ),
         ])),
       ),
