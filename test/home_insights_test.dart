@@ -159,6 +159,9 @@ void main() {
           find.byKey(const ValueKey('home-insights-card')));
       expect(repo.requested,isEmpty); // Summary slide uses bootstrap state.
       expect(find.text(lang=='ar'?'نظرة عامة':'Overview'),findsOneWidget);
+      final segment=find.byKey(const ValueKey('insight-segment-0'));
+      expect(segment,findsOneWidget);
+      expect(tester.getSize(segment).height,greaterThan(20));
       await tester.tap(find.byKey(const ValueKey('insight-dot-1')));
       await tester.pumpAndSettle();
       expect(find.text(lang=='ar'?'العيادة البيطرية':'Veterinary clinic'),
