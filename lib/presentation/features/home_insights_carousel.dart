@@ -282,6 +282,7 @@ class _InsightContent extends StatelessWidget {
   @override Widget build(BuildContext context) {
     final palette=Theme.of(context).colorScheme;
     final overview=kind==InsightKind.overview;
+    final scaled=MediaQuery.textScalerOf(context).scale(16)/16;
     return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
       if(!overview) ...[
         SizedBox(height:55,child:Row(children:[
@@ -299,7 +300,7 @@ class _InsightContent extends StatelessWidget {
         const SizedBox(height:5),
       ],
       SizedBox(
-        height:overview ? 93 : 64,
+        height:overview ? (scaled>1.4?151:93) : (scaled>1.4?104:64),
         child:_QuickStats(
           data.values,
           columns:overview?2:3,
