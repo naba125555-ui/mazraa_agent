@@ -9,3 +9,5 @@ Follow-up run: guard nullable NavigatorObserver.didReplace route and retest page
 2026-11-22: verify and build eleven-slide lazy Home insights carousel, real permission-scoped metrics, error/loading states, native charts, Arabic/English, light/dark, screen samples, 320dp at 200%.
 
 Retry 2026-11-22: remove unused import, re-run flutter analyze, all Widget/unit tests and Android ARM64 packaging for home insights carousel.
+
+Retry after responsive chart legend and stat card overflow fixes + locale-safe day labels. Verify analytics data route accuracy and export Android APK.
