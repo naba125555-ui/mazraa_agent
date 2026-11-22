@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mazraa_agent/application/agent_app.dart';
@@ -61,6 +62,22 @@ Widget host(AgentApp app,{double textScale=1,GlobalKey? boundaryKey})=>
   ));
 
 void main() {
+  setUpAll(() async {
+    final cairo=FontLoader('Cairo')
+      ..addFont(rootBundle.load('assets/fonts/Cairo.ttf'));
+    await cairo.load();
+    final root=Platform.environment['FLUTTER_ROOT'];
+    if(root!=null) {
+      final path=File('$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
+      if(path.existsSync()) {
+        final bytes=await path.readAsBytes();
+        final icons=FontLoader('MaterialIcons')
+          ..addFont(Future.value(ByteData.sublistView(bytes)));
+        await icons.load();
+      }
+    }
+  });
+
   test('all eleven slides are permission-aware and role-ordered',() async {
     final repo=CountingRepository();
     final app=sample(repo);
