@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import '../../domain/models.dart';
 import '../navigation.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
