@@ -15,3 +15,5 @@ Retry after responsive chart legend and stat card overflow fixes + locale-safe d
 Final QA: all eleven slide visual screenshots, tap-to-detail and long-press day value, mirrored RTL line canvas, permission-safe data decoding, analyzer and ARM64 APK.
 
 Visual QA fix: import RenderRepaintBoundary in 11-screenshot test; verify numeric enum guards and Purchase-only analytics permissions before extracting final APK.
+
+Visual QA correction: ensure the segmented overview distribution bar stretches full card width; test all eleven screenshots, supported branch-only grants, and build final ARM64.
