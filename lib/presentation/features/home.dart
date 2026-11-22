@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models.dart';
 import '../navigation.dart';
+import 'home_insights_carousel.dart';
 import '../shared/scope.dart';
 import '../shared/widgets.dart';
 
-/// A permission-aware workspace. Only server-backed counters are displayed;
-/// unavailable commerce totals are deliberately not replaced with demo data.
+/// The live, permission-scoped carousel is the first container on Home.
+/// No synthetic totals or full reports from incomplete paginated sources.
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -77,52 +78,11 @@ class HomePage extends StatelessWidget {
             Icons.qr_code_scanner_outlined, 'T03'),
     ];
 
-    final metrics = <_HomeMetricData>[
-      if (isDoctor)
-        _HomeMetricData(
-          context.tr('استشارات جديدة', 'New consultations'),
-          numId(app.summary['caseOffers']),
-          Icons.mark_unread_chat_alt_outlined, 'C01',
-          colors.secondary,
-        ),
-      if (isDoctor)
-        _HomeMetricData(
-          context.tr('حالات قيد المتابعة', 'Active cases'),
-          numId(app.summary['activeCases']),
-          Icons.monitor_heart_outlined, 'C01',
-          colors.primary,
-        ),
-      if (app.allows(Cap.cash))
-        _HomeMetricData(
-          context.tr('ورديات مفتوحة', 'Open cash shifts'),
-          numId(app.summary['openShifts']),
-          Icons.account_balance_wallet_outlined, 'N03',
-          colors.primary,
-        ),
-      if (app.allows(Cap.inventory))
-        _HomeMetricData(
-          context.tr('مقترحات معلقة', 'Pending proposals'),
-          numId(app.summary['pendingProposals']),
-          Icons.pending_actions_outlined, 'G01',
-          colors.secondary,
-        ),
-    ];
-
     // The hero, warehouse context and availability now live in the pinned,
     // scroll-collapsing SliverAppBar, not in a duplicate body banner.
     return PageBody(children: [
       const SizedBox(height: 4),
-      if (metrics.isNotEmpty) ...[
-        _HomeHeading(context.tr('نظرة سريعة', 'At a glance'),
-            subtitle: context.tr('بيانات مباشرة من حسابك', 'Live account figures')),
-        LayoutBuilder(builder: (context, box) {
-          final width = (box.maxWidth - 10) / 2;
-          return Wrap(spacing: 10, runSpacing: 10, children: [
-            for (final metric in metrics)
-              SizedBox(width: width, child: _HomeMetricCard(metric)),
-          ]);
-        }),
-      ],
+      const HomeInsightsCarousel(),
 
       if (priority.isNotEmpty) ...[
         _HomeHeading(context.tr('عمليات سريعة', 'Quick operations'),
@@ -211,14 +171,6 @@ class _HomeLink {
   final IconData icon;
 }
 
-class _HomeMetricData {
-  const _HomeMetricData(this.label, this.value, this.icon, this.route, this.accent);
-  final String label, route;
-  final int value;
-  final IconData icon;
-  final Color accent;
-}
-
 class _HomeHeading extends StatelessWidget {
   const _HomeHeading(this.title, {this.subtitle, this.action});
   final String title;
@@ -251,55 +203,6 @@ class _HomeHeading extends StatelessWidget {
         )),
         if (action != null) action!,
       ]),
-    );
-  }
-}
-
-class _HomeMetricCard extends StatelessWidget {
-  const _HomeMetricCard(this.metric);
-  final _HomeMetricData metric;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    return Material(
-      color: colors.surface,
-      borderRadius: BorderRadius.circular(18),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.open(metric.route),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 122),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            border: Border.all(color: colors.outline.withValues(alpha: .65)),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Container(
-                height: 35, width: 35,
-                decoration: BoxDecoration(
-                  color: metric.accent.withValues(alpha: .10),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(metric.icon, color: metric.accent, size: 21),
-              ),
-              Icon(Icons.arrow_outward_rounded, color: colors.onSurfaceVariant, size: 17),
-            ]),
-            const SizedBox(height: 7),
-            Text(display(context, metric.value),
-                style: text.headlineSmall?.copyWith(
-                  color: colors.primary,
-                  fontWeight: FontWeight.w900,
-                )),
-            Text(metric.label, style: text.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ), maxLines: 2, overflow: TextOverflow.ellipsis),
-          ]),
-        ),
-      ),
     );
   }
 }
