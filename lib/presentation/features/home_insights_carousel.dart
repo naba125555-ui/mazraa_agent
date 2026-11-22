@@ -370,22 +370,26 @@ class _QuickStats extends StatelessWidget {
                 border:Border.all(color:cs.outline.withValues(alpha:.2)),
               ),
               child:Row(children:[
-                Expanded(child:Column(
-                  crossAxisAlignment:CrossAxisAlignment.start,
-                  mainAxisAlignment:MainAxisAlignment.center,
-                  children:[
-                    Text(_format(context,stat.value),
-                      maxLines:1,style:TextStyle(
-                        color:cs.primary,fontSize:15,
-                        fontWeight:FontWeight.w900,
-                      )),
-                    Text(stat.label(context.app.ar),
-                      maxLines:1,overflow:TextOverflow.ellipsis,
-                      style:TextStyle(
-                        color:cs.onSurfaceVariant,fontSize:9.1,
-                        height:1.08,fontWeight:FontWeight.w700,
-                      )),
-                  ],
+                Expanded(child:FittedBox(
+                  fit:BoxFit.scaleDown,
+                  alignment:AlignmentDirectional.centerStart,
+                  child:Column(
+                    mainAxisSize:MainAxisSize.min,
+                    crossAxisAlignment:CrossAxisAlignment.start,
+                    children:[
+                      Text(_format(context,stat.value),
+                        maxLines:1,style:TextStyle(
+                          color:cs.primary,fontSize:15,
+                          fontWeight:FontWeight.w900,
+                        )),
+                      Text(stat.label(context.app.ar),
+                        maxLines:1,overflow:TextOverflow.ellipsis,
+                        style:TextStyle(
+                          color:cs.onSurfaceVariant,fontSize:9.1,
+                          height:1.08,fontWeight:FontWeight.w700,
+                        )),
+                    ],
+                  ),
                 )),
               ]),
             ),
@@ -506,15 +510,21 @@ class _Legend extends StatelessWidget {
   const _Legend(this.label,this.color,this.number);
   final String label,number;
   final Color color;
-  @override Widget build(BuildContext context)=>Row(
-    mainAxisSize:MainAxisSize.min,children:[
-      Container(width:7,height:7,decoration:BoxDecoration(
-        color:color,shape:BoxShape.circle)),
-      const SizedBox(width:4),
-      Text(label+' '+number,maxLines:1,
-        style:Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontSize:9.2,fontWeight:FontWeight.w700)),
-    ]);
+  @override Widget build(BuildContext context)=>ConstrainedBox(
+    constraints:const BoxConstraints(maxWidth:174),
+    child:SizedBox(height:18,child:FittedBox(
+      fit:BoxFit.scaleDown,
+      alignment:AlignmentDirectional.centerStart,
+      child:Row(mainAxisSize:MainAxisSize.min,children:[
+        Container(width:7,height:7,decoration:BoxDecoration(
+          color:color,shape:BoxShape.circle)),
+        const SizedBox(width:4),
+        Text(label+' '+number,maxLines:1,
+          style:Theme.of(context).textTheme.bodySmall?.copyWith(
+            fontSize:9.2,fontWeight:FontWeight.w700)),
+      ]),
+    )),
+  );
 }
 
 class _DonutGraph extends StatelessWidget {
