@@ -5,3 +5,5 @@ Tests: analyze, all 92 routes, RTL/LTR light/dark, 320dp 200% accessibility, scr
 No changes to docs or backend API. Export optimized Android ARM64.
 
 Follow-up run: guard nullable NavigatorObserver.didReplace route and retest page-state preservation, all wave headers and ARM64 release.
+
+2026-11-22: verify and build eleven-slide lazy Home insights carousel, real permission-scoped metrics, error/loading states, native charts, Arabic/English, light/dark, screen samples, 320dp at 200%.
