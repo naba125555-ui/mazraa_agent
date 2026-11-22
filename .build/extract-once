@@ -7,3 +7,5 @@ No changes to docs or backend API. Export optimized Android ARM64.
 Follow-up run: guard nullable NavigatorObserver.didReplace route and retest page-state preservation, all wave headers and ARM64 release.
 
 2026-11-22: verify and build eleven-slide lazy Home insights carousel, real permission-scoped metrics, error/loading states, native charts, Arabic/English, light/dark, screen samples, 320dp at 200%.
+
+Retry 2026-11-22: remove unused import, re-run flutter analyze, all Widget/unit tests and Android ARM64 packaging for home insights carousel.
