@@ -17,3 +17,5 @@ Final QA: all eleven slide visual screenshots, tap-to-detail and long-press day 
 Visual QA fix: import RenderRepaintBoundary in 11-screenshot test; verify numeric enum guards and Purchase-only analytics permissions before extracting final APK.
 
 Visual QA correction: ensure the segmented overview distribution bar stretches full card width; test all eleven screenshots, supported branch-only grants, and build final ARM64.
+
+Final glyph-accurate screenshot verification: load Cairo and MaterialIcons before all 11 native chart rasters, Arabic/English Home previews and Android ARM64 package.
