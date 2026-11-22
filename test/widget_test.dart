@@ -14,6 +14,7 @@ import 'package:mazraa_agent/presentation/design/login_scenery.dart';
 import 'package:mazraa_agent/presentation/collapsing_app_bar.dart';
 import 'package:mazraa_agent/presentation/glass_navigation_bar.dart';
 import 'package:mazraa_agent/presentation/features/sign_in.dart';
+import 'package:mazraa_agent/presentation/features/home_insights_carousel.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
 import 'package:mazraa_agent/presentation/shared/scope.dart';
@@ -169,6 +170,11 @@ void main(){
       expect(find.byType(AgentCollapsibleAppBar), findsOneWidget);
       expect(find.byType(AgentHomeScopeStrip), findsOneWidget);
       expect(find.byType(AgentGlassNavigationBar), findsOneWidget);
+      expect(find.byType(HomeInsightsCarousel), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-insights-card')),findsOneWidget);
+      final insightsHeight=tester.getSize(find.byKey(
+        const ValueKey('home-insights-card'))).height;
+      expect(insightsHeight,greaterThanOrEqualTo(376));
       final dock=tester.widget<AgentGlassNavigationBar>(find.byType(AgentGlassNavigationBar));
       expect(dock.layout.items[dock.layout.primaryIndex].highlight,isTrue);
       expect(dock.layout.items.length,lessThanOrEqualTo(5));
