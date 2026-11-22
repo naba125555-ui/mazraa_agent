@@ -13,3 +13,5 @@ Retry 2026-11-22: remove unused import, re-run flutter analyze, all Widget/unit 
 Retry after responsive chart legend and stat card overflow fixes + locale-safe day labels. Verify analytics data route accuracy and export Android APK.
 
 Final QA: all eleven slide visual screenshots, tap-to-detail and long-press day value, mirrored RTL line canvas, permission-safe data decoding, analyzer and ARM64 APK.
+
+Visual QA fix: import RenderRepaintBoundary in 11-screenshot test; verify numeric enum guards and Purchase-only analytics permissions before extracting final APK.
