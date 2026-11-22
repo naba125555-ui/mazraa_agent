@@ -75,6 +75,12 @@ void main() {
     expect(HomeInsightsData.available(branch),
       [InsightKind.overview,InsightKind.finance]);
     branch.dispose();
+    final purchaser=sample(CountingRepository(),doctor:false,caps:Cap.purchase);
+    expect(HomeInsightsData.available(purchaser),
+      [InsightKind.overview,InsightKind.purchasing]);
+    final purchases=await HomeInsightsData.load(purchaser,InsightKind.purchasing);
+    expect(purchases.headline,isNotNull);
+    purchaser.dispose();
     final doctor=sample(CountingRepository(),doctor:true,caps:0);
     expect(HomeInsightsData.available(doctor),
       [InsightKind.overview,InsightKind.clinic,
