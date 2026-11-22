@@ -207,6 +207,11 @@ abstract final class HomeInsightsData {
     return status;
   }
 
+  // Domain-specific enums (visit, auction, pickup, document) are NOT
+  // AgentRecordStatus. Preserve their raw wire representation instead of
+  // guessing that an integer value maps to the AgentRecord enum.
+  static String _rawStatus(Object? status) => str(status).trim();
+
   static int _matching(List<Json> source, Set<String> statuses) =>
       source.where((row)=>statuses.contains(_status(row['status']))).length;
 
@@ -262,7 +267,9 @@ abstract final class HomeInsightsData {
       _status(d['type']).toLowerCase()=='salesinvoice' &&
       d['isPosted']==true && _date(d['postedAt'])!=null).toList();
     final currencies=posted.map((d)=>str(d['currency'])).where((s)=>s.isNotEmpty).toSet();
-    final sameCurrency=currencies.length<=1 &&
+    final unknownDocumentType=documents.any((d)=>
+      d['isPosted']==true && d['type'] is num);
+    final sameCurrency=!unknownDocumentType && currencies.length<=1 &&
         posted.every((d)=>d['currency']!=null && _number(d['totalAmount'])!=null);
     final amounts=<double>[for(final _ in week)0];
     var invoices=0;
@@ -292,12 +299,12 @@ abstract final class HomeInsightsData {
       series:sameCurrency?amounts:[],
       days:_labels(week,app.language),partial:!complete,
       noteAr:!sameCurrency
-          ? 'لا يمكن جمع فواتير بعملات مختلفة أو مبالغ غير مؤكدة.'
+          ? 'نوع المستند أو العملة أو المبلغ لا يتيح رسمًا موثوقًا.'
           : complete
             ? 'مستندات المستودع المصرح بها خلال الفترة.'
             : 'الصفحة الأولى فقط؛ ليس إجمالي مبيعات الأسبوع.',
       noteEn:!sameCurrency
-          ? 'Amounts or a single currency could not be verified.'
+          ? 'Document types, amounts or a single currency could not be verified.'
           : complete
             ? 'Authorized warehouse documents in the selected period.'
             : 'First page only; not a complete weekly sales total.',
@@ -310,10 +317,12 @@ abstract final class HomeInsightsData {
     final counts=<double>[for(final _ in week)0];
     var completed=0;
     var visits=0;
+    var unknownVisitStatus=false;
     for(final task in tasks) {
       for(final visit in maps(task['visits'])) {
         visits++;
-        if(_status(visit['status'])!='Completed')continue;
+        if(visit['status'] is num) unknownVisitStatus=true;
+        if(_rawStatus(visit['status'])!='Completed')continue;
         final date=_date(visit['completedAt']);
         if(date==null)continue;
         final day=week.indexWhere((w)=>_sameDay(w,date));
@@ -322,19 +331,22 @@ abstract final class HomeInsightsData {
     }
     final complete=tasks.length<50;
     return InsightSnapshot(
-      headline:completed.toDouble(),headlineAr:'زيارات مكتملة في الفترة',
+      headline:unknownVisitStatus?null:completed.toDouble(),headlineAr:'زيارات مكتملة في الفترة',
       headlineEn:'Completed visits in period',
       periodAr:'آخر 7 أيام',periodEn:'Last 7 days',
       values:[
         InsightValue('مهام محمّلة','Loaded tasks',tasks.length.toDouble()),
         InsightValue('زيارات مرتبطة','Linked visits',visits.toDouble()),
-        InsightValue('مكتملة في الفترة','Completed in period',completed.toDouble()),
+        InsightValue('مكتملة في الفترة','Completed in period',
+          unknownVisitStatus?null:completed.toDouble()),
       ],
-      series:counts,days:_labels(week,app.language),
+      series:unknownVisitStatus?[]:counts,days:_labels(week,app.language),
       partial:!complete,
-      noteAr:complete?'زيارات مكتملة فعلًا، وليست حالات مهام مكتملة.'
+      noteAr:unknownVisitStatus?'ترميز حالة الزيارة لا يتيح إجماليًا مؤكدًا.' :
+          complete?'زيارات مكتملة فعلًا، وليست حالات مهام مكتملة.'
           :'حسب أول 50 مهمة فقط؛ ليس العدد الإجمالي للزيارات.',
-      noteEn:complete?'Completed visits, not completed parent tasks.'
+      noteEn:unknownVisitStatus?'Visit status encoding is not verified.' :
+          complete?'Completed visits, not completed parent tasks.'
           :'From the first 50 tasks only; not all visits.',
     );
   }
@@ -444,7 +456,7 @@ abstract final class HomeInsightsData {
     final requests=await app.page('/api/agent/pickup/requests',query:app.scoped());
     final statuses=<String,int>{};
     for(final r in requests) {
-      final status=_status(r['status']);
+      final status=_rawStatus(r['status']);
       if(status.isNotEmpty) statuses[status]=(statuses[status]??0)+1;
     }
     final parts=[for(final entry in statuses.entries.take(4))
@@ -474,28 +486,33 @@ abstract final class HomeInsightsData {
         query:app.scoped({'afterId':0})));
     final auctions=maps(data['auctions']);
     final reviews=maps(data['reviews']);
+    final unknownAuctionStatuses=auctions.any((a)=>a['status'] is num);
     final active=auctions.where((a)=>
-        ['Active','Published','Scheduled'].contains(_status(a['status']))).length;
+        ['Active','Published','Scheduled'].contains(_rawStatus(a['status']))).length;
     final drafts=_matching(reviews,{'Draft'});
     final pending=_matching(reviews,{'Pending'});
     final ended=auctions.where((a)=>
-        ['Completed','Ended','Closed'].contains(_status(a['status']))).length;
+        ['Completed','Ended','Closed'].contains(_rawStatus(a['status']))).length;
     final complete=reviews.length<50;
     return InsightSnapshot(
-      headline:active.toDouble(),
+      headline:unknownAuctionStatuses?null:active.toDouble(),
       headlineAr:'مزادات منشورة أو نشطة',
       headlineEn:'Published / active auctions',
       values:[
         InsightValue('مسودات مراجعة','Draft reviews',drafts.toDouble()),
         InsightValue('بانتظار المراجعة','Pending reviews',pending.toDouble()),
-        InsightValue('منشورة أو نشطة','Published / active',active.toDouble()),
-        InsightValue('منتهية','Ended auctions',ended.toDouble()),
+        InsightValue('منشورة أو نشطة','Published / active',
+          unknownAuctionStatuses?null:active.toDouble()),
+        InsightValue('منتهية','Ended auctions',
+          unknownAuctionStatuses?null:ended.toDouble()),
       ],
       parts:[
         InsightValue('مسودة','Draft',drafts.toDouble()),
         InsightValue('مراجعة','Review',pending.toDouble()),
-        InsightValue('منشورة','Published',active.toDouble()),
-        InsightValue('منتهية','Ended',ended.toDouble()),
+        InsightValue('منشورة','Published',
+          unknownAuctionStatuses?null:active.toDouble()),
+        InsightValue('منتهية','Ended',
+          unknownAuctionStatuses?null:ended.toDouble()),
       ],
       partial:!complete,
       noteAr:'المسودات من سجلات المراجعة؛ النشر والانتهاء من المزادات نفسها.'
