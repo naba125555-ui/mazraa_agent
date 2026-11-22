@@ -20,7 +20,7 @@ extension InsightKindInfo on InsightKind {
     InsightKind.finance => 'N02',
     InsightKind.pickup => 'P02',
     InsightKind.auctions => 'A01',
-    InsightKind.purchasing => 'T11',
+    InsightKind.purchasing => 'T12',
     InsightKind.proposals => 'G01',
     InsightKind.sync => 'H09',
   };
@@ -232,17 +232,17 @@ abstract final class HomeInsightsData {
       if(app.allows(Cap.cash) && _key(s,'openShifts')!=null)
         InsightValue('ورديات مفتوحة','Open shifts',_key(s,'openShifts')),
     ];
-    final known=values.fold<double>(0,(sum,m)=>sum+(m.value??0));
     return InsightSnapshot(
-      headline:values.isEmpty?null:known,
+      // Different categories can overlap. No synthetic grand total.
+      headline:null,
       headlineAr:'مؤشرات العمل المتاحة',headlineEn:'Available work indicators',
       values:values,parts:values,
       noteAr:values.isEmpty
         ? 'لا تتوفر مؤشرات مفوّضة من ملخص السيرفر.'
-        : 'عدد عناصر عمل من أنواع مختلفة، وليس مجموعًا ماليًا.',
+        : 'مؤشرات مستقلة لحسابك؛ لا تُجمع كإجمالي واحد.',
       noteEn:values.isEmpty
         ? 'No authorized counters are available from the server summary.'
-        : 'Counts of different work items; no monetary amounts are combined.',
+        : 'Separate account-wide counts, not one combined total.',
     );
   }
 
