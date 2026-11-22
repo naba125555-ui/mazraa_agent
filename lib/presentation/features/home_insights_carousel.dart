@@ -310,9 +310,13 @@ class _InsightContent extends StatelessWidget {
         child:Material(
           color:palette.primary.withValues(alpha:.035),
           borderRadius:BorderRadius.circular(16),
-          child:Padding(
-            padding:const EdgeInsets.fromLTRB(9,8,9,5),
-            child:_InsightGraph(kind:kind,data:data),
+          child:InkWell(
+            borderRadius:BorderRadius.circular(16),
+            onTap:()=>context.open(kind.route),
+            child:Padding(
+              padding:const EdgeInsets.fromLTRB(9,8,9,5),
+              child:_InsightGraph(kind:kind,data:data),
+            ),
           ),
         ),
       ),
@@ -627,7 +631,9 @@ class _WeekBarsState extends State<_WeekBars> {
         for(var i=0;i<widget.values.length;i++)
           Expanded(child:GestureDetector(
             key:ValueKey('insight-day-'+i.toString()),
-            onTap:()=>setState(()=>selected=i),
+            // A short tap follows the graph's documented detail route.
+            // Long press selects the day value without navigating.
+            onLongPress:()=>setState(()=>selected=i),
             behavior:HitTestBehavior.opaque,
             child:Padding(
               padding:const EdgeInsets.symmetric(horizontal:3),
