@@ -414,7 +414,6 @@ class _InsightGraph extends StatelessWidget {
 
   @override Widget build(BuildContext context) {
     final positive=data.parts.where((v)=>(v.value??0)>0).toList();
-    final nonzero=data.series.any((value)=>value>0);
     switch(kind){
       case InsightKind.overview:
       case InsightKind.pickup:
@@ -850,7 +849,7 @@ class _WaffleGraph extends StatelessWidget {
     final colors=<Color>[];
     for(var i=0;i<parts.length;i++) {
       final next=i==parts.length-1?100:
-          (end+((parts[i].value??0)/total*100).round()).clamp(end,100);
+          (end+((parts[i].value??0)/total*100).round()).clamp(end,100).toInt();
       for(var j=end;j<next;j++) colors.add(_chartColors[i%_chartColors.length]);
       end=next;
     }
