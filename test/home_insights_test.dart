@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,17 +44,19 @@ AgentApp sample(CountingRepository repo,
   return app;
 }
 
-Widget host(AgentApp app,{double textScale=1})=>
+Widget host(AgentApp app,{double textScale=1,GlobalKey? boundaryKey})=>
   AppScope(app:app,child:MaterialApp(
     locale:Locale(app.language),
     localizationsDelegates:GlobalMaterialLocalizations.delegates,
     supportedLocales:const [Locale('ar'),Locale('en')],
-    theme:Brand.theme(Brightness.light),
+    theme:Brand.theme(app.theme=='dark'?Brightness.dark:Brightness.light),
     home:NavScope(open:(route,{id,seed}){},
       child:MediaQuery(
         data:MediaQueryData(textScaler:TextScaler.linear(textScale)),
-        child:const Scaffold(body:Padding(
-          padding:EdgeInsets.all(18),child:HomeInsightsCarousel())),
+        child:Scaffold(body:Padding(
+          padding:const EdgeInsets.all(18),
+          child:RepaintBoundary(key:boundaryKey,
+            child:const HomeInsightsCarousel()))),
       )),
   ));
 
@@ -146,6 +151,43 @@ void main() {
       app.dispose();
     });
   }
+  testWidgets('all eleven graph designs are visualized without overflow',
+      (tester) async {
+    tester.view.physicalSize=const Size(430,932);
+    tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repo=CountingRepository();
+    final app=sample(repo);
+    final boundary=GlobalKey();
+    await tester.pumpWidget(host(app,boundaryKey:boundary));
+    await tester.pumpAndSettle();
+    final expectedHeight=tester.getSize(
+        find.byKey(const ValueKey('home-insights-card'))).height;
+    for(var index=0;index<11;index++) {
+      if(index>0) {
+        await tester.tap(find.byKey(ValueKey('insight-dot-'+index.toString())));
+        await tester.pumpAndSettle();
+      }
+      expect(tester.takeException(),isNull,reason:'insight '+index.toString());
+      expect(tester.getSize(find.byKey(const ValueKey('home-insights-card'))).height,
+        expectedHeight);
+      final image=await tester.runAsync(() async {
+        final object=boundary.currentContext!.findRenderObject()!
+          as RenderRepaintBoundary;
+        final raster=await object.toImage(pixelRatio:1);
+        try{return await raster.toByteData(format:ui.ImageByteFormat.png);}
+        finally{raster.dispose();}
+      });
+      expect(image,isNotNull);
+      final file=File('build/previews/insight-ar-light-'+index.toString()+'.png');
+      file.parent.createSync(recursive:true);
+      file.writeAsBytesSync(image!.buffer.asUint8List());
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
   testWidgets('small layout withstands 200 percent accessibility text',
       (tester) async {
     tester.view.physicalSize=const Size(320,740);
