@@ -19,3 +19,5 @@ Visual QA fix: import RenderRepaintBoundary in 11-screenshot test; verify numeri
 Visual QA correction: ensure the segmented overview distribution bar stretches full card width; test all eleven screenshots, supported branch-only grants, and build final ARM64.
 
 Final glyph-accurate screenshot verification: load Cairo and MaterialIcons before all 11 native chart rasters, Arabic/English Home previews and Android ARM64 package.
+
+Final QA assertion: overview and pickup segmented bars must paint visible 23dp segments (stretched children), not only legends; 11 screens pictured with Cairo and MaterialIcons. Release APK.
