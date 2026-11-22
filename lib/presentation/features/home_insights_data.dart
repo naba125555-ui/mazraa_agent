@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../application/agent_app.dart';
 import '../../domain/models.dart';
 import '../../domain/screens.dart';
@@ -79,7 +78,7 @@ extension InsightKindInfo on InsightKind {
     'فتح طابور التسليم', 'إدارة مزاداتي',
     'متابعة المشتريات', 'متابعة مقترحاتي', 'إدارة المزامنة',
   ] : const [
-    'My workspace', 'Open consultations',
+    'Open work areas', 'Open consultations',
     'Open invoices', 'View field tasks',
     'Review stock alerts', 'View cash movements',
     'Open pickup queue', 'Manage auctions',
@@ -190,8 +189,14 @@ abstract final class HomeInsightsData {
     final today=DateTime(now.year,now.month,now.day);
     return [for(var i=6;i>=0;i--)today.subtract(Duration(days:i))];
   }
-  static List<String> _labels(List<DateTime> week, String language) =>
-      [for(final day in week) DateFormat('E',language).format(day)];
+  // Weekday names are stable without loading intl locale databases at
+  // startup; this also works in offline/fixture widgets.
+  static List<String> _labels(List<DateTime> week, String language) {
+    const ar=['الاث','الث','الأر','الخ','الج','الس','الأح'];
+    const en=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    final names=language=='ar'?ar:en;
+    return [for(final day in week) names[day.weekday-1]];
+  }
 
   static bool _sameDay(DateTime x,DateTime y) =>
       x.year==y.year && x.month==y.month && x.day==y.day;
