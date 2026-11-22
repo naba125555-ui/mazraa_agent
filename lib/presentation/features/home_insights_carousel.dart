@@ -491,14 +491,17 @@ class _SegmentedDistribution extends StatelessWidget {
   @override Widget build(BuildContext context) {
     final total=parts.fold<double>(0,(sum,p)=>sum+(p.value??0).clamp(0,double.infinity));
     final cs=Theme.of(context).colorScheme;
-    return Column(mainAxisAlignment:MainAxisAlignment.center,children:[
+    return Column(
+      mainAxisAlignment:MainAxisAlignment.center,
+      crossAxisAlignment:CrossAxisAlignment.stretch,
+      children:[
       if(total==0)
         Container(height:23,decoration:BoxDecoration(
           color:cs.outline.withValues(alpha:.17),
           borderRadius:BorderRadius.circular(18)))
       else ClipRRect(
         borderRadius:BorderRadius.circular(17),
-        child:SizedBox(height:23,child:Row(children:[
+        child:SizedBox(width:double.infinity,height:23,child:Row(children:[
           for(var i=0;i<parts.length;i++)
             if((parts[i].value??0)>0) Expanded(
               flex:math.max(1,((parts[i].value??0)/total*1000).round()),
