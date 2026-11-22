@@ -312,7 +312,7 @@ class _InsightContent extends StatelessWidget {
           borderRadius:BorderRadius.circular(16),
           child:InkWell(
             borderRadius:BorderRadius.circular(16),
-            onTap:()=>context.open(kind.route),
+            onTap:()=>context.open(_detailsRoute(context,kind)),
             child:Padding(
               padding:const EdgeInsets.fromLTRB(9,8,9,5),
               child:_InsightGraph(kind:kind,data:data),
@@ -328,7 +328,7 @@ class _InsightContent extends StatelessWidget {
             fontSize:9.6,height:1.25,
             color:palette.onSurfaceVariant))),
         TextButton(
-          onPressed:()=>context.open(kind.route),
+          onPressed:()=>context.open(_detailsRoute(context,kind)),
           style:TextButton.styleFrom(
             padding:const EdgeInsets.symmetric(horizontal:5),
             minimumSize:const Size(46,42),
@@ -401,6 +401,15 @@ class _QuickStats extends StatelessWidget {
       ]);
     });
   }
+}
+
+/// The overview is already on Home; link it to an authorized work area.
+String _detailsRoute(BuildContext context,InsightKind kind) {
+  if(kind!=InsightKind.overview)return kind.route;
+  final app=context.app;
+  if(app.access.doctor)return 'C01';
+  if(app.grant!=null)return 'T01';
+  return 'H04';
 }
 
 String _format(BuildContext context,double? value,{String? currency}) {
@@ -696,6 +705,7 @@ class _AreaGraph extends StatelessWidget {
     Expanded(child:CustomPaint(
       size:Size.infinite,
       painter:_AreaPainter(values:values,
+        rtl:Directionality.of(context)==TextDirection.rtl,
         color:Theme.of(context).colorScheme.primary),
     )),
     const SizedBox(height:5),
@@ -710,9 +720,10 @@ class _AreaGraph extends StatelessWidget {
 }
 
 class _AreaPainter extends CustomPainter {
-  _AreaPainter({required this.values,required this.color});
+  _AreaPainter({required this.values,required this.color,required this.rtl});
   final List<double> values;
   final Color color;
+  final bool rtl;
   @override void paint(Canvas canvas,Size size) {
     if(values.isEmpty)return;
     final maxV=math.max(1,values.fold<double>(0,math.max));
@@ -720,7 +731,8 @@ class _AreaPainter extends CustomPainter {
     final baseline=h-9,top=11.0;
     final points=<Offset>[
       for(var i=0;i<values.length;i++)
-        Offset(values.length==1?w/2:i*w/(values.length-1),
+        Offset(values.length==1?w/2:
+          (rtl?w-i*w/(values.length-1):i*w/(values.length-1)),
           baseline-(values[i]/maxV)*(baseline-top)),
     ];
     final path=Path()..moveTo(points.first.dx,points.first.dy);
@@ -746,7 +758,7 @@ class _AreaPainter extends CustomPainter {
     }
   }
   @override bool shouldRepaint(covariant _AreaPainter old)=>
-      old.values.toString()!=values.toString()||old.color!=color;
+      old.values.toString()!=values.toString()||old.color!=color||old.rtl!=rtl;
 }
 
 class _HorizontalStatuses extends StatelessWidget {
