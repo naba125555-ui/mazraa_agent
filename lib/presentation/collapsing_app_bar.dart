@@ -1,17 +1,16 @@
+import 'package:flutter/gestures.dart' show PointerScrollEvent;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
+
 import '../domain/models.dart';
-import '../domain/screens.dart';
 import 'design/login_scenery.dart';
 import 'navigation.dart';
 import 'navigation_registry.dart';
 import 'shared/scope.dart';
+import 'shared/section_banner.dart';
 import 'shared/widgets.dart';
 
-/// A reusable app header for every authenticated route. The toolbar remains
-/// opaque and pinned; only the wave hero is animated. A downward gesture
-/// reveals it from ANY scroll offset, including an unscrollable short page.
+/// The toolbar stays fixed. Only Home adds the collapsible photo header.
 class AgentCollapsibleAppBar extends StatefulWidget {
   const AgentCollapsibleAppBar({
     super.key,
@@ -25,21 +24,25 @@ class AgentCollapsibleAppBar extends StatefulWidget {
   final Widget body;
 
   @override
-  State<AgentCollapsibleAppBar> createState() =>
-      _AgentCollapsibleAppBarState();
+  State<AgentCollapsibleAppBar> createState() => _AgentCollapsibleAppBarState();
 }
 
 class _AgentCollapsibleAppBarState extends State<AgentCollapsibleAppBar>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _reveal = AnimationController(
+  static const _gestureThreshold = 18.0;
+  static const _toolbarColor = Color(0xFF004233);
+
+  late final _reveal = AnimationController(
     vsync: this,
     value: 1,
-    duration: const Duration(milliseconds: 300),
-    reverseDuration: const Duration(milliseconds: 240),
+    duration: const Duration(milliseconds: 260),
+    reverseDuration: const Duration(milliseconds: 210),
   );
-  bool visible = true;
-  double pointerTravel = 0;
-  int pointerDirection = 0;
+  late final _height = _reveal.drive(CurveTween(curve: Curves.easeInOutCubic));
+  bool _visible = true;
+  Axis? _gestureAxis;
+  Offset _movement = Offset.zero;
+  int? _pointer;
 
   @override
   void dispose() {
@@ -48,100 +51,114 @@ class _AgentCollapsibleAppBarState extends State<AgentCollapsibleAppBar>
   }
 
   void _setVisible(bool next) {
-    if (next == visible) return;
-    visible = next;
-    if (next) {
-      _reveal.animateTo(1, curve: Curves.easeOutCubic);
+    if (next == _visible) return;
+    _visible = next;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _reveal.value = next ? 1 : 0;
+    } else if (next) {
+      _reveal.forward();
     } else {
-      _reveal.animateTo(0, curve: Curves.easeInOutCubic);
+      _reveal.reverse();
     }
   }
 
-  bool _onScroll(ScrollNotification notification) {
-    if (notification.metrics.axis != Axis.vertical) return false;
-    if (notification is UserScrollNotification) {
-      if (notification.direction == ScrollDirection.reverse) {
-        _setVisible(false);
-      } else if (notification.direction == ScrollDirection.forward) {
-        _setVisible(true);
+  void _resetGesture() {
+    _movement = Offset.zero;
+    _gestureAxis = null;
+    _pointer = null;
+  }
+
+  void _followDrag(Offset delta) {
+    if (_gestureAxis == Axis.horizontal) return;
+    if (_gestureAxis == null) {
+      _movement += delta;
+      final dx = _movement.dx.abs();
+      final dy = _movement.dy.abs();
+      if (dx < _gestureThreshold && dy < _gestureThreshold) return;
+      if (dx >= dy * 1.25) {
+        _gestureAxis = Axis.horizontal;
+        return;
       }
-    } else if (notification is OverscrollNotification &&
-        notification.dragDetails != null) {
-      if (notification.overscroll < -2) _setVisible(true);
-      if (notification.overscroll > 2) _setVisible(false);
+      if (dy < dx * 1.25 || dy < _gestureThreshold) return;
+      _gestureAxis = Axis.vertical;
+    } else {
+      final dy = _movement.dy.sign == delta.dy.sign
+          ? _movement.dy + delta.dy
+          : delta.dy;
+      _movement = Offset(0, dy);
     }
-    return false;
-  }
-
-  // Lists with few items may not emit UserScrollNotification. Listen for
-  // deliberate vertical pointer motion as well, without swallowing gestures.
-  void _onPointer(PointerMoveEvent event) {
-    if (event.delta.dy.abs() < event.delta.dx.abs() * 1.5) return;
-    final direction = event.delta.dy > 0 ? 1 : -1;
-    if (pointerDirection != direction) {
-      pointerDirection = direction;
-      pointerTravel = 0;
-    }
-    pointerTravel += event.delta.dy.abs();
-    if (pointerTravel >= 14) {
-      _setVisible(direction > 0);
-      pointerTravel = 0;
-    }
+    if (_movement.dy.abs() < _gestureThreshold) return;
+    _setVisible(_movement.dy > 0);
+    _movement = Offset.zero;
   }
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final scaledText = MediaQuery.textScalerOf(context).scale(16) / 16;
-    final extra = ((scaledText - 1).clamp(0, 1) * 155).toDouble();
-    final heroHeight = (width < 365 ? 300.0 : 274.0) + extra;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Column(children: [
+    final home = widget.route == 'H05';
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         _pinnedToolbar(context),
-        AnimatedBuilder(
-          animation: _reveal,
-          child: SizedBox(
-            height: heroHeight,
-            child: _AgentWaveHero(route: widget.route, title: widget.title),
-          ),
-          builder: (context, child) {
-            final factor = _reveal.value;
-            return SizedBox(
-              key: const ValueKey('agent-wave-viewport'),
-              height: heroHeight * factor,
-              child: ClipRect(
-                child: OverflowBox(
-                  alignment: Alignment.topCenter,
-                  minHeight: heroHeight,
-                  maxHeight: heroHeight,
-                  child: Transform.translate(
-                    offset: Offset(0, -heroHeight * (1 - factor)),
-                    child: IgnorePointer(
-                      ignoring: factor < .97,
-                      child: child,
+        if (home)
+          SizeTransition(
+            key: const ValueKey('agent-wave-viewport'),
+            alignment: Alignment.bottomCenter,
+            sizeFactor: _height,
+            child: RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _reveal,
+                builder: (context, child) {
+                  final interactive = _reveal.isCompleted;
+                  return ExcludeSemantics(
+                    excluding: !interactive,
+                    child: ExcludeFocus(
+                      excluding: !interactive,
+                      child: IgnorePointer(
+                        ignoring: !interactive,
+                        child: child,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
+                child: const _AgentWaveHero(toolbarColor: _toolbarColor),
               ),
-            );
-          },
-        ),
-        Expanded(
-          child: Listener(
-            behavior: HitTestBehavior.translucent,
-            onPointerMove: _onPointer,
-            onPointerUp: (_) {
-              pointerDirection = 0;
-              pointerTravel = 0;
-            },
-            child: NotificationListener<ScrollNotification>(
-              onNotification: _onScroll,
-              child: widget.body,
             ),
           ),
-        ),
-      ]),
+        Expanded(child: widget.body),
+      ],
+    );
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: home ? _listenForScroll(content) : content,
+    );
+  }
+
+  Widget _listenForScroll(Widget child) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        _resetGesture();
+        _pointer = event.pointer;
+      },
+      onPointerMove: (event) {
+        if (event.pointer == _pointer) _followDrag(event.delta);
+      },
+      onPointerUp: (event) {
+        if (event.pointer == _pointer) _resetGesture();
+      },
+      onPointerCancel: (event) {
+        if (event.pointer == _pointer) _resetGesture();
+      },
+      onPointerPanZoomStart: (_) => _resetGesture(),
+      onPointerPanZoomUpdate: (event) => _followDrag(event.panDelta),
+      onPointerPanZoomEnd: (_) => _resetGesture(),
+      onPointerSignal: (event) {
+        if (event is PointerScrollEvent &&
+            event.scrollDelta.dy.abs() > event.scrollDelta.dx.abs()) {
+          _setVisible(event.scrollDelta.dy < 0);
+        }
+      },
+      child: child,
     );
   }
 
@@ -150,10 +167,10 @@ class _AgentCollapsibleAppBarState extends State<AgentCollapsibleAppBar>
     final canPop = Navigator.of(context).canPop();
     return Container(
       key: const ValueKey('agent-opaque-toolbar'),
-      color: const Color(0xFF004233),
+      color: _toolbarColor,
       child: SafeArea(
         bottom: false,
-        child: SizedBox(height: 70, child: Row(children: [
+        child: SizedBox(height: widget.route == 'H05' ? 58 : 70, child: Row(children: [
           IconButton(
             tooltip: canPop ? context.tr('رجوع', 'Back') :
                 context.tr('حسابي', 'Account'),
@@ -270,164 +287,204 @@ class _AgentCollapsibleAppBarState extends State<AgentCollapsibleAppBar>
   }
 }
 
-/// The greeting, subtitle, scope selector and availability are one interactive
-/// body, in order, entirely inside the curved photo header.
+/// The photo, copy and live controls move together below the toolbar.
 class _AgentWaveHero extends StatelessWidget {
-  const _AgentWaveHero({required this.route, required this.title});
-  final String route;
-  final String title;
+  const _AgentWaveHero({required this.toolbarColor});
+
+  final Color toolbarColor;
 
   @override
   Widget build(BuildContext context) {
     final app = context.app;
-    final isHome = route == 'H05' || route == 'H01';
-    final imageAsset = switch (screen(route).area) {
-      Area.clinical => 'assets/images/agent_clinical.webp',
-      Area.field => 'assets/images/agent_field.webp',
-      Area.general => 'assets/images/home_header_yemeni_veterinary_store_hero.webp',
-      _ => 'assets/images/agent_commerce.webp',
-    };
-    final name = str(app.user['name'] ??
-        obj(app.profile['user'])['name']).trim();
+    final name = str(app.user['name'] ?? obj(app.profile['user'])['name'])
+        .trim();
     final greeting = name.isEmpty
         ? context.tr('مرحبًا بك في مزرعتي', 'Welcome to Mazraa')
         : context.tr('مرحبًا، ', 'Welcome, ') + name;
-    return Stack(fit: StackFit.expand, children: [
-      LoginHeaderWave(
-        dark: Theme.of(context).brightness == Brightness.dark,
-        photoOnLeft: Directionality.of(context) == TextDirection.rtl,
-        imageAsset: imageAsset,
-      ),
-      PositionedDirectional(
-        start: 16, end: 16, top: 16, bottom: 48,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(isHome ? greeting : title,
-              maxLines: 2, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 21,
-                fontWeight: FontWeight.w900,
-                height: 1.19,
-                shadows: [
-                  Shadow(color: Color(0xAE00180E), blurRadius: 7),
-                ],
-              )),
-            const SizedBox(height: 5),
-            Text(isHome
-                ? context.tr('صحة الحيوان وتجارة الفرع في مساحة عمل واحدة',
-                    'Animal care and branch commerce in one workspace')
-                : context.tr('مساحة العمل والخدمات المتاحة',
-                    'Your authorized services and workspace'),
-              maxLines: 2, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 11.7,
-                height: 1.3,
-                color: Color(0xFFF1FFF5),
-                shadows: [
-                  Shadow(color: Color(0x99001912), blurRadius: 5),
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: LoginHeaderWave(
+            dark: Theme.of(context).brightness == Brightness.dark,
+            photoOnLeft: Directionality.of(context) == TextDirection.rtl,
+            imageAsset: SectionBanner.homeHero,
+            toolbarColor: toolbarColor,
+          ),
+        ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 200, maxWidth: 580),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 29, 16, 53),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FractionallySizedBox(
+                    widthFactor: .78,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            greeting,
+                            key: const ValueKey('home-wave-greeting'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              height: 1.18,
+                              shadows: [
+                                Shadow(color: Color(0xBB00180E), blurRadius: 8),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Text(
+                          context.tr(
+                            'صحة الحيوان وتجارة الفرع في مساحة عمل واحدة',
+                            'Animal care and branch commerce in one workspace',
+                          ),
+                          key: const ValueKey('home-wave-description'),
+                          style: const TextStyle(
+                            color: Color(0xFFF1FFF5),
+                            fontSize: 12,
+                            height: 1.32,
+                            fontWeight: FontWeight.w600,
+                            shadows: [
+                              Shadow(color: Color(0xBB00180E), blurRadius: 7),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const AgentHomeScopeStrip(),
                 ],
               ),
             ),
-            const SizedBox(height: 9),
-            const AgentHomeScopeStrip(),
-          ],
+          ),
         ),
-      ),
-    ]);
+      ],
+    );
   }
 }
 
 /// Operates only on the actual delegated warehouse and live doctor availability.
 class AgentHomeScopeStrip extends StatefulWidget {
   const AgentHomeScopeStrip({super.key});
-  @override State<AgentHomeScopeStrip> createState() =>
-      _AgentHomeScopeStripState();
+  @override
+  State<AgentHomeScopeStrip> createState() => _AgentHomeScopeStripState();
 }
 
 class _AgentHomeScopeStripState extends State<AgentHomeScopeStrip> {
   bool busy = false;
 
-  @override Widget build(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
     final app = context.app;
     final available =
         payload(obj(app.profile['profile']))['isAvailable'] == true;
+    const labelStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 11.5,
+      fontWeight: FontWeight.w800,
+    );
     return Wrap(
-      alignment: WrapAlignment.start,
       crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 7,
-      runSpacing: 4,
+      spacing: 8,
       children: [
-        Text(context.tr('النطاق الحالي', 'Current scope'),
-          style: const TextStyle(color: Colors.white,
-            fontSize: 11.2, fontWeight: FontWeight.w800)),
-        Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 10, vertical: 7),
+        Text(context.tr('النطاق الحالي', 'Current scope'), style: labelStyle),
+        DecoratedBox(
           decoration: BoxDecoration(
-            color: const Color(0x90006B4D),
-            borderRadius: BorderRadius.circular(23),
+            color: const Color(0xD029543F),
+            borderRadius: BorderRadius.circular(24),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.storefront_outlined,
-              color: Colors.white, size: 17),
-            const SizedBox(width: 5),
-            Text(app.grant == null
-                ? context.tr('بدون فرع', 'No branch')
-                : context.tr('مخزن ', 'Warehouse ') +
-                    app.grant!.warehouse.toString(),
-              style: const TextStyle(color: Colors.white,
-                fontSize: 10.6, fontWeight: FontWeight.w700)),
-          ]),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.storefront_outlined,
+                  color: Colors.white,
+                  size: 16,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  app.grant == null
+                      ? context.tr('بدون فرع', 'No branch')
+                      : context.tr('مخزن ', 'Warehouse ') +
+                            app.grant!.warehouse.toString(),
+                  style: labelStyle,
+                ),
+              ],
+            ),
+          ),
         ),
         OutlinedButton(
           onPressed: () => context.open('H06'),
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFFFFE9AC),
-            side: const BorderSide(
-                color: Color(0xFFFFE0A0), width: 1.2),
-            minimumSize: const Size(54, 36),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            backgroundColor: const Color(0x4000231A),
+            side: const BorderSide(color: Color(0xFFFFE0A0)),
+            minimumSize: const Size(54, 32),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             shape: const StadiumBorder(),
           ),
-          child: Text(context.tr('تبديل', 'Change'),
-            style: const TextStyle(fontSize: 11,
-                fontWeight: FontWeight.w800)),
-        ),
-        if (app.access.doctor) ...[
-          Text(available
-              ? context.tr('متاح', 'Available')
-              : context.tr('غير متاح', 'Unavailable'),
-            style: const TextStyle(color: Colors.white,
-              fontSize: 11, fontWeight: FontWeight.w800)),
-          SizedBox(
-            height: 38, width: 47,
-            child: FittedBox(child: Switch.adaptive(
-              value: available,
-              onChanged: busy ? null : (value) async {
-                setState(() => busy = true);
-                try {
-                  await app.repo.write(
-                    'PATCH', '/api/agent/availability',
-                    {'available': value},
-                  );
-                  await app.refreshAccess();
-                } catch (error) {
-                  if (context.mounted) {
-                    toast(context, failureText(context, error));
-                  }
-                } finally {
-                  if (mounted) setState(() => busy = false);
-                }
-              },
-              activeTrackColor: const Color(0xFF18B978),
-              activeThumbColor: Colors.white,
-            )),
+          child: Text(
+            context.tr('تبديل', 'Change'),
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
           ),
-        ],
+        ),
+        if (app.access.doctor)
+          MergeSemantics(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  available
+                      ? context.tr('متاح', 'Available')
+                      : context.tr('غير متاح', 'Unavailable'),
+                  style: labelStyle,
+                ),
+                const SizedBox(width: 3),
+                Switch.adaptive(
+                  value: available,
+                  onChanged: busy
+                      ? null
+                      : (value) async {
+                          setState(() => busy = true);
+                          try {
+                            await app.repo.write(
+                              'PATCH',
+                              '/api/agent/availability',
+                              {'available': value},
+                            );
+                            await app.refreshAccess();
+                          } catch (error) {
+                            if (context.mounted) {
+                              toast(context, failureText(context, error));
+                            }
+                          } finally {
+                            if (mounted) setState(() => busy = false);
+                          }
+                        },
+                  activeTrackColor: const Color(0xFF18B978),
+                  inactiveTrackColor: const Color(0xFF687D72),
+                  activeThumbColor: Colors.white,
+                  inactiveThumbColor: Colors.white,
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
