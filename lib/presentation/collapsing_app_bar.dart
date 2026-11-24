@@ -287,92 +287,107 @@ class _AgentCollapsibleAppBarState extends State<AgentCollapsibleAppBar>
   }
 }
 
-/// The photo, copy and live controls move together below the toolbar.
+/// Only Home has a photo-and-wave header. Its photo starts at the *actual*
+/// bottom of the fixed toolbar and its copy/actions are docked just above
+/// the upper ribbon (rather than floating at the top of the photograph).
 class _AgentWaveHero extends StatelessWidget {
   const _AgentWaveHero({required this.toolbarColor});
 
   final Color toolbarColor;
+  static const double _normalHeight = 240;
+  static const double _waveTopInset = 32;
 
   @override
   Widget build(BuildContext context) {
     final app = context.app;
-    final name = str(app.user['name'] ?? obj(app.profile['user'])['name'])
-        .trim();
+    final name = str(app.user['name'] ?? obj(app.profile['user'])['name']).trim();
     final greeting = name.isEmpty
         ? context.tr('مرحبًا بك في مزرعتي', 'Welcome to Mazraa')
         : context.tr('مرحبًا، ', 'Welcome, ') + name;
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: LoginHeaderWave(
-            dark: Theme.of(context).brightness == Brightness.dark,
-            photoOnLeft: Directionality.of(context) == TextDirection.rtl,
-            imageAsset: SectionBanner.homeHero,
-            toolbarColor: toolbarColor,
+    // Keep the screenshot proportions at regular text size, but allow the
+    // content to grow upwards on small phones with large accessibility text.
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final extraHeight = ((scale - 1).clamp(0.0, 1.5) * 88).toDouble();
+
+    return SizedBox(
+      key: const ValueKey('home-wave-hero'),
+      height: _normalHeight + extraHeight,
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: LoginHeaderWave(
+              dark: Theme.of(context).brightness == Brightness.dark,
+              photoOnLeft: Directionality.of(context) == TextDirection.rtl,
+              imageAsset: SectionBanner.homeHero,
+              toolbarColor: toolbarColor,
+            ),
           ),
-        ),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 200, maxWidth: 580),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(16, 29, 16, 53),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FractionallySizedBox(
-                    widthFactor: .78,
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Semantics(
-                          header: true,
-                          child: Text(
-                            greeting,
-                            key: const ValueKey('home-wave-greeting'),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              height: 1.18,
-                              shadows: [
-                                Shadow(color: Color(0xBB00180E), blurRadius: 8),
-                              ],
-                            ),
-                          ),
-                        ),
-                        Text(
-                          context.tr(
-                            'صحة الحيوان وتجارة الفرع في مساحة عمل واحدة',
-                            'Animal care and branch commerce in one workspace',
-                          ),
-                          key: const ValueKey('home-wave-description'),
+          PositionedDirectional(
+            start: 16,
+            end: 16,
+            bottom: _waveTopInset + extraHeight * .04,
+            child: Column(
+              key: const ValueKey('home-wave-bottom-content'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FractionallySizedBox(
+                  widthFactor: .88,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          greeting,
+                          key: const ValueKey('home-wave-greeting'),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Color(0xFFF1FFF5),
-                            fontSize: 12,
-                            height: 1.32,
-                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            height: 1.18,
                             shadows: [
-                              Shadow(color: Color(0xBB00180E), blurRadius: 7),
+                              Shadow(color: Color(0xBB00180E), blurRadius: 8),
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      Text(
+                        context.tr(
+                          'صحة الحيوان وتجارة الفرع في مساحة عمل واحدة',
+                          'Animal care and branch commerce in one workspace',
+                        ),
+                        key: const ValueKey('home-wave-description'),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFF1FFF5),
+                          fontSize: 12,
+                          height: 1.32,
+                          fontWeight: FontWeight.w600,
+                          shadows: [
+                            Shadow(color: Color(0xBB00180E), blurRadius: 7),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const AgentHomeScopeStrip(),
-                ],
-              ),
+                ),
+                // The actual warehouse/scope/availability widgets are inside
+                // the same bottom-anchored column: there is no vertical gap.
+                const AgentHomeScopeStrip(),
+              ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
