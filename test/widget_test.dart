@@ -194,9 +194,17 @@ void main(){
       final viewport = find.byKey(const ValueKey('agent-wave-viewport'));
       final greeting = find.byKey(const ValueKey('home-wave-greeting'));
       final description = find.byKey(const ValueKey('home-wave-description'));
+      // The actual photo begins at the toolbar, not 30-55dp below it.
+      final photo = find.byKey(const ValueKey('agent-home-photo-edge'));
+      expect(photo, findsOneWidget);
       expect(tester.getRect(viewport).top, tester.getRect(toolbar).bottom);
+      expect(tester.getRect(photo).top, tester.getRect(toolbar).bottom);
+      // Greeting, description and scope are attached above the last wave.
+      final scope = find.byType(AgentHomeScopeStrip);
       expect(tester.getRect(description).top-tester.getRect(greeting).bottom, closeTo(0, .1));
-      expect(tester.getRect(find.byType(AgentHomeScopeStrip)).top-tester.getRect(description).bottom, closeTo(0, .1));
+      expect(tester.getRect(scope).top-tester.getRect(description).bottom, closeTo(0, .1));
+      expect(tester.getRect(viewport).bottom-tester.getRect(scope).bottom,closeTo(32, .1));
+      expect(tester.getRect(greeting).top,greaterThan(tester.getRect(viewport).top+65));
       final boundary=key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       // Rasterization and PNG encoding use engine futures. Run them outside
       // FakeAsync to avoid hanging the entire widget-test suite.
@@ -302,6 +310,9 @@ void main(){
       expect(find.byType(AgentCollapsibleAppBar), findsOneWidget,reason:route);
       expect(find.byKey(const ValueKey('agent-opaque-toolbar')),findsOneWidget,reason:route);
       expect(find.byKey(const ValueKey('agent-wave-viewport')),route=='H05'?findsOneWidget:findsNothing,reason:route);
+      expect(find.byKey(const ValueKey('agent-home-photo-edge')),route=='H05'?findsOneWidget:findsNothing,reason:route);
+      // Every other route keeps only its pinned toolbar; photo wave never
+      // becomes part of those pages' AppBar.
       if(route=='H05')expect(find.byType(SectionBanner),findsNothing);
       else if(route!='H02')expect(find.byType(SectionBanner),findsOneWidget,reason:route);
       else expect(find.text('تسجيل الدخول'),findsWidgets);
