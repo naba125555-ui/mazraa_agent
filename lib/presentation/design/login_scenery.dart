@@ -196,6 +196,7 @@ class LoginHeaderWave extends StatelessWidget {
     required this.dark,
     required this.photoOnLeft,
     this.imageAsset = defaultImageAsset,
+    this.toolbarColor,
   });
 
   static const defaultImageAsset =
@@ -204,6 +205,7 @@ class LoginHeaderWave extends StatelessWidget {
   final bool dark;
   final bool photoOnLeft;
   final String imageAsset;
+  final Color? toolbarColor;
 
   @override
   Widget build(BuildContext context) {
@@ -214,7 +216,10 @@ class LoginHeaderWave extends StatelessWidget {
         children: [
           // Broad emerald lower edge below the cream-gold highlight.
           ClipPath(
-            clipper: const _HeaderWaveClipper(drop: 19),
+            clipper: _HeaderWaveClipper(
+              drop: 19,
+              atBottom: toolbarColor != null,
+            ),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -234,7 +239,10 @@ class LoginHeaderWave extends StatelessWidget {
             ),
           ),
           ClipPath(
-            clipper: const _HeaderWaveClipper(drop: 9),
+            clipper: _HeaderWaveClipper(
+              drop: 9,
+              atBottom: toolbarColor != null,
+            ),
             child: const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -250,7 +258,10 @@ class LoginHeaderWave extends StatelessWidget {
             ),
           ),
           ClipPath(
-            clipper: const _HeaderWaveClipper(drop: 0),
+            clipper: _HeaderWaveClipper(
+              drop: 0,
+              atBottom: toolbarColor != null,
+            ),
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -274,7 +285,7 @@ class LoginHeaderWave extends StatelessWidget {
                   ),
                 ),
                 Positioned.fill(
-                  top: 55,
+                  top: toolbarColor == null ? 55 : 0,
                   child: Image.asset(
                     imageAsset,
                     alignment: Alignment.topLeft,
@@ -284,30 +295,31 @@ class LoginHeaderWave extends StatelessWidget {
                 ),
                 // The picture emerges from the green upper canopy, matching
                 // the reference image's green-to-photograph vertical fade.
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: const [0, .15, .49, .83],
-                        colors: dark
-                            ? const [
-                                Color(0xFF003D30),
-                                Color(0xF9004837),
-                                Color(0x23004938),
-                                Colors.transparent,
-                              ]
-                            : const [
-                                Color(0xFF00513E),
-                                Color(0xF9006149),
-                                Color(0x26007151),
-                                Colors.transparent,
-                              ],
+                if (toolbarColor == null)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          stops: const [0, .15, .49, .83],
+                          colors: dark
+                              ? const [
+                                  Color(0xFF003D30),
+                                  Color(0xF9004837),
+                                  Color(0x23004938),
+                                  Colors.transparent,
+                                ]
+                              : const [
+                                  Color(0xFF00513E),
+                                  Color(0xF9006149),
+                                  Color(0x26007151),
+                                  Colors.transparent,
+                                ],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 // Left 28% is alpha=0, preserving every detail of the hero.
                 // The opposite side becomes opaque forest green for labels.
                 Positioned.fill(
@@ -336,6 +348,23 @@ class LoginHeaderWave extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (toolbarColor case final color?)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          stops: const [0, .14, .48],
+                          colors: [
+                            color,
+                            color.withValues(alpha: .28),
+                            color.withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -346,30 +375,45 @@ class LoginHeaderWave extends StatelessWidget {
 }
 
 class _HeaderWaveClipper extends CustomClipper<Path> {
-  const _HeaderWaveClipper({required this.drop});
+  const _HeaderWaveClipper({required this.drop, required this.atBottom});
 
   /// The visible colored ribbon is the distance between adjacent contours.
   final double drop;
+  final bool atBottom;
 
   @override
   Path getClip(Size size) {
     final w = size.width;
-    final h = size.height;
-    final d = drop.clamp(0.0, h * .12).toDouble();
+    final h = atBottom ? 72.0 : size.height;
+    final top = atBottom ? size.height - 82 : 0.0;
+    final d = drop.clamp(0.0, size.height * .12).toDouble();
     return Path()
-      ..moveTo(0, h * .80 + d)
-      ..cubicTo(w * .14, h * .94 + d, w * .32, h * .70 + d,
-          w * .49, h * .69 + d)
-      ..cubicTo(w * .66, h * .67 + d, w * .75, h * .86 + d,
-          w * .88, h * .75 + d)
-      ..quadraticBezierTo(w * .97, h * .80 + d, w, h * .75 + d)
+      ..moveTo(0, top + h * .80 + d)
+      ..cubicTo(
+        w * .14,
+        top + h * .94 + d,
+        w * .32,
+        top + h * .70 + d,
+        w * .49,
+        top + h * .69 + d,
+      )
+      ..cubicTo(
+        w * .66,
+        top + h * .67 + d,
+        w * .75,
+        top + h * .86 + d,
+        w * .88,
+        top + h * .75 + d,
+      )
+      ..quadraticBezierTo(w * .97, top + h * .80 + d, w, top + h * .75 + d)
       ..lineTo(w, 0)
       ..lineTo(0, 0)
       ..close();
   }
 
   @override
-  bool shouldReclip(covariant _HeaderWaveClipper old) => old.drop != drop;
+  bool shouldReclip(covariant _HeaderWaveClipper old) =>
+      old.drop != drop || old.atBottom != atBottom;
 }
 
 class _FooterSwellClipper extends CustomClipper<Path> {

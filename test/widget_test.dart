@@ -147,6 +147,7 @@ void main(){
       tester.view.physicalSize=const Size(430,932);tester.view.devicePixelRatio=1;
       addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
       final app=fixture(language,mode),key=GlobalKey();
+      app.user['name']=language=='ar'?'د. سامر · عرض مزرعتي':'Dr. Samer · Mazraa showcase';
       await tester.pumpWidget(host(app,RepaintBoundary(key:key,child:const AppShell())));await tester.pumpAndSettle();
       await tester.runAsync(() async {
         final element = tester.element(find.byType(ScreenPage));
@@ -187,7 +188,15 @@ void main(){
       expect(page.fullBleedFirstChild, isFalse);
       final wave = tester.widget<LoginHeaderWave>(find.byType(LoginHeaderWave));
       expect(wave.imageAsset, SectionBanner.homeHero);
-      expect(wave.photoOnLeft, language=='ar');expect(find.textContaining(language=='ar'?'مرحبًا':'Welcome'),findsOneWidget);
+      expect(wave.photoOnLeft, language=='ar');
+      expect(wave.toolbarColor, isNotNull);
+      final toolbar = find.byKey(const ValueKey('agent-opaque-toolbar'));
+      final viewport = find.byKey(const ValueKey('agent-wave-viewport'));
+      final greeting = find.byKey(const ValueKey('home-wave-greeting'));
+      final description = find.byKey(const ValueKey('home-wave-description'));
+      expect(tester.getRect(viewport).top, tester.getRect(toolbar).bottom);
+      expect(tester.getRect(description).top-tester.getRect(greeting).bottom, closeTo(0, .1));
+      expect(tester.getRect(find.byType(AgentHomeScopeStrip)).top-tester.getRect(description).bottom, closeTo(0, .1));
       final boundary=key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       // Rasterization and PNG encoding use engine futures. Run them outside
       // FakeAsync to avoid hanging the entire widget-test suite.
@@ -216,18 +225,47 @@ void main(){
     expect(find.byType(SectionBanner),findsNothing);
     final wave = find.byKey(const ValueKey('agent-wave-viewport'));
     final fullHeight = tester.getSize(wave).height;
-    final pinned = tester.getSize(find.byKey(const ValueKey('agent-opaque-toolbar'))).height;
-    expect(fullHeight,greaterThan(260));
-    await tester.drag(find.byType(ListView).first,const Offset(0,-520));
+    final toolbar = find.byKey(const ValueKey('agent-opaque-toolbar'));
+    final pinned = tester.getRect(toolbar);
+    final list = find.byType(ListView).first;
+    expect(fullHeight, inInclusiveRange(190, 245));
+
+    // The statistics use a horizontal gesture and must not move the header.
+    final slider = find.byType(PageView);
+    await tester.drag(slider, const Offset(155, -8));
     await tester.pumpAndSettle();
-    expect(tester.getSize(wave).height,lessThan(1));
-    expect(tester.getSize(find.byKey(const ValueKey('agent-opaque-toolbar'))).height,pinned);
-    // A small downward drag reveals the entire wave without returning to top.
-    await tester.drag(find.byType(ListView).first,const Offset(0,82));
+    expect(tester.getSize(wave).height, closeTo(fullHeight, 1));
+
+    await tester.drag(list, const Offset(0, -460));
     await tester.pumpAndSettle();
-    expect(tester.getSize(wave).height,closeTo(fullHeight,1));
-    expect(find.byType(AgentHomeScopeStrip),findsOneWidget);
-    expect(tester.takeException(),isNull);
+    expect(tester.getSize(wave).height, lessThan(1));
+    expect(tester.getRect(toolbar), pinned);
+
+    // A reverse drag restores the header while the list is still scrolled.
+    final position = tester.state<ScrollableState>(
+      find.descendant(of: list, matching: find.byType(Scrollable)).first,
+    ).position;
+    expect(position.pixels, greaterThan(82));
+    await tester.drag(list, const Offset(0, 82));
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(0));
+    expect(tester.getSize(wave).height, closeTo(fullHeight, 1));
+    expect(tester.getRect(toolbar), pinned);
+
+    // Reversing direction mid-animation continues from the current height.
+    final gesture = await tester.startGesture(tester.getCenter(list));
+    await gesture.moveBy(const Offset(0, -35));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+    final collapsingHeight = tester.getSize(wave).height;
+    expect(collapsingHeight, inExclusiveRange(0, fullHeight));
+    await gesture.moveBy(const Offset(0, 35));
+    await tester.pump();
+    expect(tester.getSize(wave).height, closeTo(collapsingHeight, 1));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.getSize(wave).height, closeTo(fullHeight, 1));
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
   });
@@ -263,7 +301,7 @@ void main(){
       expect(tester.takeException(),isNull,reason:route);
       expect(find.byType(AgentCollapsibleAppBar), findsOneWidget,reason:route);
       expect(find.byKey(const ValueKey('agent-opaque-toolbar')),findsOneWidget,reason:route);
-      expect(find.byKey(const ValueKey('agent-wave-viewport')),findsOneWidget,reason:route);
+      expect(find.byKey(const ValueKey('agent-wave-viewport')),route=='H05'?findsOneWidget:findsNothing,reason:route);
       if(route=='H05')expect(find.byType(SectionBanner),findsNothing);
       else if(route!='H02')expect(find.byType(SectionBanner),findsOneWidget,reason:route);
       else expect(find.text('تسجيل الدخول'),findsWidgets);
@@ -280,6 +318,11 @@ void main(){
     addTearDown(tester.view.resetDevicePixelRatio);
     final app=fixture('ar','dark');
     await tester.pumpWidget(host(app,const AppShell()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'تبديل'));
+    await tester.pumpAndSettle();
+    expect(find.byWidgetPredicate((w)=>w is ScreenPage && w.route=='H06'),findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('agent-nav-H05-الرئيسية')));
     await tester.pumpAndSettle();
     final original=tester.element(find.byType(ScreenPage).first);
     original.open('T02');
@@ -359,6 +402,10 @@ void main(){
       await tester.pumpWidget(host(app,ScreenPage(spec.id,key:ValueKey(spec.id),id:1)));
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull,reason:spec.id);
+      expect(find.byKey(const ValueKey('agent-wave-viewport')),
+        spec.id=='H05'?findsOneWidget:findsNothing,reason:spec.id);
+      expect(find.byType(AgentHomeScopeStrip),
+        spec.id=='H05'?findsOneWidget:findsNothing,reason:spec.id);
       await tester.pumpWidget(const SizedBox.shrink());
     }app.dispose();
   });
