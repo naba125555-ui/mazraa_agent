@@ -322,37 +322,47 @@ class _AgentWaveHero extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      greeting,
-                      key: const ValueKey('home-wave-greeting'),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        height: 1.18,
-                        shadows: [
-                          Shadow(color: Color(0xBB00180E), blurRadius: 8),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Text(
-                    context.tr(
-                      'صحة الحيوان وتجارة الفرع في مساحة عمل واحدة',
-                      'Animal care and branch commerce in one workspace',
-                    ),
-                    key: const ValueKey('home-wave-description'),
-                    style: const TextStyle(
-                      color: Color(0xFFF1FFF5),
-                      fontSize: 12,
-                      height: 1.32,
-                      fontWeight: FontWeight.w600,
-                      shadows: [
-                        Shadow(color: Color(0xBB00180E), blurRadius: 7),
+                  FractionallySizedBox(
+                    widthFactor: .78,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            greeting,
+                            key: const ValueKey('home-wave-greeting'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              height: 1.18,
+                              shadows: [
+                                Shadow(color: Color(0xBB00180E), blurRadius: 8),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Text(
+                          context.tr(
+                            'صحة الحيوان وتجارة الفرع في مساحة عمل واحدة',
+                            'Animal care and branch commerce in one workspace',
+                          ),
+                          key: const ValueKey('home-wave-description'),
+                          style: const TextStyle(
+                            color: Color(0xFFF1FFF5),
+                            fontSize: 12,
+                            height: 1.32,
+                            fontWeight: FontWeight.w600,
+                            shadows: [
+                              Shadow(color: Color(0xBB00180E), blurRadius: 7),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
