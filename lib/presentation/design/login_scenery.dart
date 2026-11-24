@@ -285,9 +285,14 @@ class LoginHeaderWave extends StatelessWidget {
                   ),
                 ),
                 Positioned.fill(
+                  // Home photo touches the fixed toolbar; the sign-in hero
+                  // continues using its own independent 55dp visual inset.
                   top: toolbarColor == null ? 55 : 0,
                   child: Image.asset(
                     imageAsset,
+                    key: toolbarColor == null
+                        ? null
+                        : const ValueKey('agent-home-photo-edge'),
                     alignment: Alignment.topLeft,
                     fit: BoxFit.cover,
                     excludeFromSemantics: true,
@@ -348,23 +353,9 @@ class LoginHeaderWave extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (toolbarColor case final color?)
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: const [0, .14, .48],
-                          colors: [
-                            color,
-                            color.withValues(alpha: .28),
-                            color.withValues(alpha: 0),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                // Home: do not mask the first part of the photograph with an
+                // opaque green fade; the toolbar and photo are flush.
+
               ],
             ),
           ),
