@@ -168,36 +168,38 @@ class AgentApp extends ChangeNotifier {
       if(numId(response['status'])==200){all.remove(n);}else{n['state']=numId(response['status'])==403?'revoked':'conflict';n['message']=response['message'];}
     }await repo.save(_key('notes'),jsonEncode(all),secure:true);changed();
   }
-  Future<Json> record(String kind,int id,{bool fresh=false})async{
-    final key='$grantId:$kind:$id';if(!fresh&&_records.containsKey(key))return _records[key]!;
-    Json result;
-    switch(kind){
-      case 'case':result=obj(await read('/api/vet/cases/$id'));break;
-      case 'prescription':result=obj(await read('/api/vet/prescriptions/$id',query:scoped()));break;
-      case 'document':result=obj(await read('/api/agent/commercial/documents/$id/receipt',query:scoped()));break;
-      case 'pickup':
-        final request=(await all('/api/agent/pickup/requests',query:scoped())).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));
-        Json movement={};
-        try{movement=obj(await read('/api/agent/pickup/requests/$id/custody-details',query:scoped()));}
-        on Failure catch(e){if(e.status!=404)rethrow;}
-        result={...movement,...request,'movement':movement};break;
-      case 'campaign':result=obj(await read('/api/agent/field/campaigns/$id/report'));break;
-      case 'task':result=(await page('/api/agent/field/tasks',afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'visit':
-        final tasks=await all('/api/agent/field/tasks');
-        final visits=[for(final task in tasks)for(final visit in maps(task['visits'])){...visit,'taskId':task['id'],'taskStatus':task['status']}];
-        result=visits.firstWhere((v)=>numId(v['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'stock':result=(await page('/api/agent/commerce/inventory',query:scoped(),afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'proposal':result=(await page('/api/agent/marketplace/proposals',afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'transfer':result=(await page('/api/agent/commerce/transfers',query:scoped(),afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'procurement':result=(await page('/api/agent/procurement',query:scoped(),afterId:id-1)).firstWhere((r)=>numId(r['id'])==id,orElse:()=>throw const Failure(404,''));break;
-      case 'auction':
-        final data=obj(await read('/api/agent/marketplace/auctions',query:scoped()));
-        final auction=maps(data['auctions']).firstWhere((a)=>numId(a['id'])==id,orElse:()=>throw const Failure(404,''));
-        final review=maps(data['reviews']).firstWhere((r)=>numId(r['relatedId'])==id,orElse:()=>{});
-        result={...auction,'version':review['version'],'review':review};break;
-      default:throw const Failure(404,'');
-    }
-    _records[key]=result;return result;
+  Future<RecordPage> cursorPage(String path, {int afterId = 0, Json? query}) async =>
+      RecordPage.from(await read(path, query: {...?query, 'afterId': afterId}));
+
+  Future<Json> record(String kind, int id, {bool fresh = false}) async {
+    final scope = scopeRevision;
+    final epoch = repo.epoch;
+    final key = '$grantId:$kind:$id';
+    if (!fresh && _records.containsKey(key)) return _records[key]!;
+    final route = switch (kind) {
+      'case' => '/api/vet/cases/$id',
+      'prescription' => '/api/vet/prescriptions/$id',
+      'document' => '/api/agent/commercial/documents/$id/receipt',
+      'settlement' => '/api/agent/finance/settlements/$id',
+      'pickup' => '/api/agent/pickup/requests/$id',
+      'campaign' => '/api/agent/field/campaigns/$id/report',
+      'task' => '/api/agent/field/tasks/$id',
+      'visit' => '/api/agent/field/visits/$id',
+      'stock' => '/api/agent/commerce/inventory/$id',
+      'proposal' => '/api/agent/marketplace/proposals/$id',
+      'transfer' => '/api/agent/commerce/transfers/$id',
+      'procurement' => '/api/agent/procurement/$id',
+      'auction' => '/api/agent/marketplace/auctions/$id',
+      _ => throw const Failure(404, ''),
+    };
+    final scopedRecord = !const {'case', 'campaign', 'task', 'visit'}.contains(kind);
+    final raw = obj(await read(route, query: scopedRecord ? scoped() : null));
+    if (scopeRevision != scope || repo.epoch != epoch) throw const Failure(403, '');
+    final result = kind == 'auction'
+        ? {...obj(raw['auction']), 'version': raw['version'], 'review': obj(raw['review'])}
+        : raw;
+    if (result.isEmpty) throw const Failure(404, '');
+    _records[key] = result;
+    return result;
   }
 }

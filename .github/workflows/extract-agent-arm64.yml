@@ -1,6 +1,9 @@
 name: Verify and extract Mazraa Agent ARM64
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths: ['lib/**', 'test/**', 'pubspec.yaml', '.github/workflows/extract-agent-arm64.yml']
   push:
     branches: [main]
     paths: ['.build/extract-once']
@@ -20,7 +23,7 @@ jobs:
       - name: Checkout latest requested branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
       - name: Record actual source commit
@@ -80,6 +83,7 @@ jobs:
           flutter analyze --no-fatal-infos
           flutter test --reporter expanded
       - name: Build one compact ARM64 release APK
+        if: github.event_name != 'pull_request'
         run: |
           flutter build apk --release --no-pub --target-platform android-arm64 --split-per-abi --tree-shake-icons --obfuscate --split-debug-info=build/agent-symbols
           apk=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
@@ -93,6 +97,7 @@ jobs:
             echo 'One ABI, release optimizations, cached Flutter/Pub/Gradle; Firebase setup is not required.'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload installable APK
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: mazraa-agent-arm64

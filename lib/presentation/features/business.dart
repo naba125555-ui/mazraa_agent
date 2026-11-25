@@ -17,7 +17,7 @@ import 'clinical.dart';
 
 const listBindings=<String,(String,String)>{
   'I01':('/api/agent/commerce/inventory','I02'),'I06':('/api/agent/commerce/transfers','I08'),
-  'T06':('/api/agent/commerce/documents','T07'),'T10':('/api/Suppliers','T10'),
+  'T06':('/api/agent/commerce/documents','T07'),
   'T11':('/api/agent/commerce/documents','T07'),'T13':('/api/agent/procurement','T13'),
   'P01':('/api/agent/pickup/points','P02'),'P02':('/api/agent/pickup/requests','P03'),
   'G01':('/api/agent/marketplace/proposals','G03'),
@@ -45,22 +45,50 @@ class BusinessPage extends StatelessWidget{
       _EmbeddedRecords(load:()=>app.all('/api/agent/supply/requests',query:app.scoped())),
     ]);
     if(screen=='T12')return OperationPage(embedded:true,operation:operations['procurement']!);
-    if(screen=='T08'||screen=='T14')return OperationPage(embedded:true,operation:operations['return']!,initial:id==null?{}:{'originalDocumentId':id});
+    if ((screen=='T08'||screen=='T14') && id!=null) {
+      return Resource(identity: '$screen:$id:${app.revision}', load: () => app.record('document', id!,fresh:true), builder: (data, refresh) {
+        final invoice = obj(data);
+        if (invoice['type'] != (screen == 'T08' ? 'SalesInvoice' : 'PurchaseInvoice') || invoice['isPosted'] != true) {
+          return PageBody(children: [Notice(context.tr('هذه الفاتورة غير مؤهلة للمرتجع.', 'This invoice is not eligible for return.'))]);
+        }
+        return OperationPage(embedded:true,operation:operations['return']!, id:id, seed:invoice,initial:{'originalDocumentId':id});
+      });
+    }
     if(screen=='T05')return OperationPage(embedded:true,operation:operations['sale']!,initial:{
       ...app.sale,'lines':app.basket.map((l)=>{for(final k in ['productVariantId','batchId','quantity'])k:l[k]}).toList(),
       'paidAmount':null,'paymentMethod':'Cash'});
     if(screen=='A02'||screen=='A03'||screen=='A04')return AuctionWizard(screen:screen);
-    if(screen=='A01')return Resource(identity:app.revision,load:()=>app.read('/api/agent/marketplace/auctions',query:app.scoped()),builder:(data,refresh)=>PageBody(children:[
-      SectionBanner(art:SectionArt.workspace,icon:Icons.gavel_outlined,title:context.tr('مزادات الفرع','Branch auctions')),
-      const SizedBox(height:12),
-      FilledButton.icon(onPressed:()=>context.open('A02'),icon:const Icon(Icons.add),label:Text(context.tr('إنشاء مزاد','Create auction'))),const SizedBox(height:16),
-      if(maps(obj(data)['auctions']).isEmpty)const Empty(),for(final a in maps(obj(data)['auctions']))RecordTile(a,icon:Icons.gavel_outlined,onTap:()=>context.open('A05',id:numId(a['id']))),
-    ]));
-    if(['N01','N02','N03','N04'].contains(screen))return Resource(identity:app.revision,load:()=>app.read('/api/agent/operations/cashbox',query:app.scoped()),builder:(data,refresh){
+    if (screen == 'A01') return PagedRecords(
+      key: ValueKey('auctions:${app.revision}'),
+      loadPage: (afterId) async {
+        final result = obj(await app.read('/api/agent/marketplace/auctions',
+          query: app.scoped({'afterId': afterId})));
+        final page = RecordPage.from(result);
+        return RecordPage(maps(result['auctions']), page.nextAfterId);
+      },
+      header: [
+        SectionBanner(art:SectionArt.workspace,icon:Icons.gavel_outlined,title:context.tr('مزادات الفرع','Branch auctions')),
+        const SizedBox(height:12),
+        FilledButton.icon(onPressed:()=>context.open('A02'),icon:const Icon(Icons.add),label:Text(context.tr('إنشاء مزاد','Create auction'))),
+        const SizedBox(height:16),
+      ],
+      itemBuilder: (auction) => RecordTile(auction, icon: Icons.gavel_outlined,
+        onTap: () => context.open('A05', id:numId(auction['id']), seed:auction)),
+    );
+    if (screen == 'N02') return PagedRecords(
+      key: ValueKey('cash:${app.revision}'),
+      pageSize: 100,
+      load: (afterId) async => rows(await app.read('/api/agent/operations/cashbox',
+        query: app.scoped({'afterTransactionId': afterId}))),
+      header: [SectionBanner(art: SectionArt.commerce, title: context.tr('حركات الصندوق', 'Cash transactions')), const SizedBox(height: 12)],
+      itemBuilder: (row) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Facts(row)),
+    );
+    if(['N01','N03','N04'].contains(screen))return Resource(identity:app.revision,load:()=>app.read('/api/agent/operations/cashbox',query:app.scoped()),builder:(data,refresh){
       final box=obj(data),shifts=maps(box['shifts']),active=shifts.where((r)=>r['status']=='Active').firstOrNull;
       if(screen=='N04'){
         final shift=id==null?active:shifts.where((s)=>numId(s['id'])==id).firstOrNull;
         if(shift==null)return PageBody(children:[Empty(text:context.tr('لا توجد وردية مفتوحة','No active shift'))]);
+        if (shift['status'] != 'Active') return PageBody(children: [Facts(payload(shift)), StatusTag(str(shift['status']))]);
         return OperationPage(embedded:true,operation:operations['closeShift']!,id:numId(shift['id']),seed:shift);
       }
       return PageBody(children:[
@@ -79,40 +107,40 @@ class BusinessPage extends StatelessWidget{
         if(screen=='N02')... [Heading(context.tr('حركات الصندوق','Cash transactions')),for(final t in maps(box['transactions']))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(t))],
       ]);
     });
-    if(screen=='T09')return PageBody(children:[
-      FilledButton.icon(onPressed:()=>openOperation(context,'quote'),icon:const Icon(Icons.add),label:Text(context.tr('عرض سعر جديد','New quotation'))),
-      Heading(context.tr('عروضي','My quotations')),
-      _EmbeddedRecords(load:()async{
-        final changes=(await app.changes()).where((v)=>v['kind']=='SaleQuote');
-        return Future.wait(changes.map((c)=>app.read('/api/agent/commercial/quotes/${c['id']}')));
-      }),
-    ]);
-    if (screen == 'T10') {
-      return Resource(
-        load: () => app.read('/api/Suppliers'),
-        builder: (data, _) => PageBody(children: [
-          if (rows(data).isEmpty) const Empty(),
-          for (final supplier in rows(data))
-            RecordTile(supplier, onTap: () => showDialog<void>(
-              context: context,
-              builder: (_) => AlertDialog(title: Text(titleOf(supplier)), content: Facts(supplier)),
-            )),
-        ]),
-      );
-    }
+    if (screen == 'T09') return PagedRecords(
+      key: ValueKey('quotes:${app.revision}'),
+      loadPage: (afterId) => app.cursorPage('/api/agent/commercial/quotes', afterId: afterId, query: app.scoped()),
+      header: [
+        FilledButton.icon(onPressed: () => openOperation(context, 'quote'), icon: const Icon(Icons.add), label: Text(context.tr('عرض سعر جديد', 'New quotation'))),
+        Heading(context.tr('عروضي', 'My quotations')),
+      ],
+      itemBuilder: (quote) => Padding(padding: const EdgeInsets.only(bottom: 10),
+        child: RecordTile(quote, subtitle: '${display(context, payload(quote)['total'])} ${str(payload(quote)['currency'])}',
+          onTap: () => showDialog<void>(context: context, builder: (_) => AlertDialog(
+            title: Text(context.tr('عرض السعر', 'Quotation')),
+            content: SingleChildScrollView(child: RecordDetails(payload(quote))),
+          )))),
+    );
+    if (screen == 'T10') return PagedRecords(
+      loadPage: (afterId) => app.cursorPage('/api/agent/directory/suppliers', afterId: afterId, query: app.scoped()),
+      itemBuilder: (supplier) => RecordTile(supplier, onTap: () => showDialog<void>(
+        context: context, builder: (_) => AlertDialog(title: Text(titleOf(supplier)), content: Facts(supplier)),
+      )),
+    );
+    if (screen == 'I04' && id != null) return PagedRecords(
+      loadPage: (afterId) => app.cursorPage('/api/agent/commerce/inventory/$id/transactions', afterId: afterId, query: app.scoped()),
+      itemBuilder: (row) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Facts(row)),
+    );
     if (listBindings.containsKey(screen) && !(screen == 'T13' && id != null)) {
       final binding = listBindings[screen]!;
       return PagedRecords(
         key: ValueKey('$screen:$id:${app.revision}'),
-        load: (afterId) => app.page(binding.$1, query: app.scoped(), afterId: afterId),
+        load: (afterId) => app.page(binding.$1, query: app.scoped({
+          if (screen == 'T06') 'type': 'SalesInvoice',
+          if (screen == 'T11') 'type': 'PurchaseInvoice',
+          if (screen == 'P02' && id != null) 'pointId': id,
+        }), afterId: afterId),
         pageSize: screen == 'I01' ? 100 : 50,
-        include: (row) => switch (screen) {
-          'T06' => str(row['type']).contains('Sales'),
-          'T11' => str(row['type']).contains('Purchase'),
-          'P01' => numId(row['warehouseId']) == app.grant?.warehouse,
-          'P02' when id != null => numId(row['pointId']) == id,
-          _ => true,
-        },
         header: [
           if (['I01','T06','T11','P01','P02','G01'].contains(screen)) ...[
             SectionBanner(art:SectionArt.commerce, title:context.app.tr(screenById(screen).ar,screenById(screen).en)),
@@ -149,7 +177,7 @@ class BusinessPage extends StatelessWidget{
     }
     if(id==null)return _RecordSelector(target:screen);
     final kind=screen.startsWith('I')?'stock':screen.startsWith('P')?'pickup':screen.startsWith('A')?'auction':screen.startsWith('G')?'proposal':
-      screen=='T13'?'procurement':screen=='I08'?'transfer':'document';
+      screen=='T13'?'procurement':screen=='N07'?'settlement':'document';
     final actualKind=screen=='I08'?'transfer':screen=='T04'?'variant':kind;
     return Resource(identity:'$screen:$id:${app.revision}',load:()async{
       if(actualKind=='variant')return app.variant(id!);
@@ -161,9 +189,19 @@ class BusinessPage extends StatelessWidget{
       }catch(_){return data;}
     },builder:(data,refresh){
       final row=obj(data),d=payload(row);
-      if(screen=='I08'||screen=='T13')return OperationPage(embedded:true,operation:operations[screen=='I08'?'receiveTransfer':'receivePurchase']!,id:id,seed:row);
-      if(screen=='N07')return OperationPage(embedded:true,operation:operations['settle']!,id:id,seed:row);
-      if(screen=='I04')return _RemoteList('/api/Inventory/$id/transactions');
+      if (screen=='I08'||screen=='T13') {
+        final receivable = screen=='I08'
+            ? row['status']=='Active' && numId(row['otherWarehouseId'])==app.grant?.warehouse
+            : row['status']=='Approved' && app.allows(Cap.cash);
+        if (!receivable) return PageBody(children: [StatusTag(str(row['status'])), Facts(d),
+          for (final line in maps(d['lines'])) RecordDetails(line)]);
+        return OperationPage(embedded:true,operation:operations[screen=='I08'?'receiveTransfer':'receivePurchase']!,id:id,seed:row);
+      }
+      if (screen=='N07') {
+        if (decimal(row['remainingAmount']) <= 0) return PageBody(children: [Facts(row),
+          Notice(context.tr('لا يوجد مبلغ متبقٍ للتسوية.', 'There is no amount left to settle.'))]);
+        return OperationPage(embedded:true,operation:operations['settle']!,id:id,seed:row);
+      }
       if(screen=='I02'||screen=='I03'||screen=='T04')return PageBody(children:[
         if(screen=='T04')
           RecordTile(row,icon:Icons.inventory_2_outlined,imageUrl:productImage(row),subtitle:str(row['sku']))
@@ -180,22 +218,74 @@ class BusinessPage extends StatelessWidget{
         BusyButton(icon:Icons.share_outlined,label:context.tr('مشاركة الإيصال','Share receipt'),run:()async{
           final text='${row['documentNumber']}\n${word(context,str(row['type']))}\n${context.tr('الإجمالي','Total')}: ${row['totalAmount']} ${row['currency']}\n${context.tr('المدفوع','Paid')}: ${row['paidAmount']}';
           await SharePlus.instance.share(ShareParams(text:text));}),
-        const SizedBox(height:12),OutlinedButton(onPressed:()=>context.open(str(row['type']).contains('Purchase')?'T14':'T08',id:id),child:Text(context.tr('طلب مرتجع مرتبط بالفاتورة','Request return against this invoice'))),
-        if(app.allows(32))_InlineLink('N07',id!),
+        if (row['isPosted']==true && ['SalesInvoice','PurchaseInvoice'].contains(row['type'])) ...[
+          const SizedBox(height:12),OutlinedButton(onPressed:()=>context.open(row['type']=='PurchaseInvoice'?'T14':'T08',id:id),child:Text(context.tr('طلب مرتجع مرتبط بالفاتورة','Request return against this invoice'))),
+          if(app.allows(Cap.cash) && decimal(row['remainingAmount'])>0)_InlineLink('N07',id!),
+        ],
       ]);
-      if(screen.startsWith('P')){
-        final op={'P04':'custody','P05':'shelf','P06':'handover','P07':'pickupIssue'}[screen];
-        if(op!=null)return OperationPage(embedded:true,operation:operations[op]!,id:id,seed:row);
-        return PageBody(children:[Facts(row),Heading(context.tr('مراحل الاستلام','Pickup stages')),
-          for(final step in ['P04','P05','P06','P07'])if(app.canOpen(screenById(step)))_InlineLink(step,id!),
-          const SizedBox(height:12),BusyButton(label:context.tr('إنشاء رمز للسائق','Generate driver handoff code'),run:()async{
-            final result=await openOperation(context,'driverCode',id:id,seed:row);if(result==null||!context.mounted)return;
-            await showDialog<void>(context:context,builder:(c)=>AlertDialog(content:CodeCard(result)));refresh();}),
+      if (screen.startsWith('P')) {
+        final movement = obj(row['movement']);
+        final pending = row['status'] == 'Draft';
+        final active = row['status'] == 'Active';
+        final operationsForRecord = <String, String>{
+          if (pending && movement.isEmpty && row['orderId'] != null) 'P04': 'custody',
+          if (active && movement['status'] == 'Active') 'P05': 'shelf',
+          if (row['canComplete'] == true) 'P06': 'handover',
+          if (active) 'P07': 'pickupIssue',
+        };
+        final action = operationsForRecord[screen];
+        if (screen != 'P03') {
+          if (action == null) return PageBody(children: [Facts(row, fields:['status','paymentStatus','cashToCollect','currency']),
+            Notice(row['requiresCash'] == true && row['cashShiftReady'] != true
+              ? context.tr('يتطلب التحصيل صندوقًا مفوّضًا ووردية مفتوحة.', 'Cash collection requires an assigned cashbox and open shift.')
+              : context.tr('الإجراء غير متاح لحالة هذا الطلب.', 'This action is unavailable for the current order status.'))]);
+          final actionSeed = screen=='P05' ? {...row, 'version': movement['version']} : row;
+          return OperationPage(embedded:true,operation:operations[action]!,id:id,seed:actionSeed);
+        }
+        return PageBody(children:[
+          Facts(row, fields: ['orderId','status','paymentStatus','cashToCollect','currency','readyAt','completedAt']),
+          if (movement.isNotEmpty) Facts(movement, fields: ['status','shelf','deadline']),
+          Heading(context.tr('مراحل الاستلام','Pickup stages')),
+          for (final step in operationsForRecord.keys) _InlineLink(step, id!),
+          if (active && row['requiresCash'] == true && row['cashShiftReady'] != true)
+            Notice(context.tr('يحتاج الطلب إلى تحصيل نقدي عبر وردية مفوّضة.', 'Use an authorized cash shift to collect this order.')),
+          if (pending && movement['status']=='Pending') BusyButton(
+            label: context.tr('إنشاء رمز للسائق','Generate driver handoff code'),run:()async{
+              final result=await openOperation(context,'driverCode',id:id,seed:{...row,'version':movement['version']});
+              if(result==null||!context.mounted)return;
+              await showDialog<void>(context:context,builder:(c)=>AlertDialog(content:CodeCard(result)));refresh();
+            }),
         ]);
       }
       if(screen.startsWith('A')){
         if(screen=='A09')return Resource(load:()=>app.read('/api/identifiers/auctions/$id'),builder:(label,r)=>PageBody(children:[CodeCard(obj(label))]));
-        if(screen=='A08')return _RemoteList('/api/agent/marketplace/auctions/$id/fulfillment',onTap:(order)=>openOperation(context,'auctionHandover',id:numId(order['orderId']),seed:order));
+        if (screen == 'A08') return Resource(
+          identity: 'auction-fulfillment:$id:${app.revision}',
+          load: () => app.read('/api/agent/marketplace/auctions/$id/fulfillment'),
+          builder: (data, refresh) => PageBody(children: [
+            if (rows(data).isEmpty) const Empty(),
+            for (final winner in rows(data)) ...[
+              Facts(winner, fields: ['orderId','orderStatus','paymentStatus','finalPrice']),
+              if (winner['canPrepare'] == true) BusyButton(label: context.tr('تجهيز الطلب', 'Prepare order'), run: () async {
+                await openOperation(context, 'prepare', id: numId(winner['orderId']));
+                refresh();
+              }),
+              if (winner['canHandover'] == true) BusyButton(label: context.tr('تسليم الطلب', 'Hand over order'), run: () async {
+                final winners = rows(await app.read('/api/agent/marketplace/auctions/$id/fulfillment'));
+                if (!context.mounted) return;
+                final current = winners.where((row) => row['orderId'] == winner['orderId']).firstOrNull;
+                if (current?['codeIssued'] != true) {
+                  toast(context, context.tr('اطلب من العميل إصدار رمز تسليم صالح.', 'Ask the customer to issue a valid handover code.'));
+                  refresh();
+                  return;
+                }
+                await openOperation(context, 'auctionHandover', id: numId(current!['orderId']), seed: current);
+                refresh();
+              }),
+              const SizedBox(height: 14),
+            ],
+          ]),
+        );
         if(screen=='A07')return PageBody(children:[Facts(row),Heading(context.tr('المعروض والمزايدات','Lots and bids')),
           for(final lot in maps(row['items']))... [Facts(lot),_EmbeddedRecords(load:()=>app.read('/api/AuctionBids/auction-item/${lot['id']}'))]]);
         final review=obj(row['review']);
@@ -203,8 +293,10 @@ class BusinessPage extends StatelessWidget{
           Heading(context.tr('المعروض','Lots')),for(final lot in maps(row['items']))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(lot)),
           if(['Draft','NeedsChanges','Rejected'].contains(review['status']))BusyButton(label:context.tr('إرسال للمراجعة','Submit for review'),run:()async{await openOperation(context,'submitAuction',id:id,seed:row);refresh();}),
           if(review['status']=='Approved')BusyButton(label:context.tr('نشر المزاد','Publish auction'),run:()async{await openOperation(context,'publishAuction',id:id,seed:row);refresh();}),
-          const SizedBox(height:12),_InlineLink('A07',id!),_InlineLink('A08',id!),_InlineLink('A09',id!),
-          OutlinedButton(onPressed:()=>openOperation(context,'cancelAuction',id:id,seed:row),child:Text(context.tr('إلغاء المزاد','Cancel auction'))),
+          const SizedBox(height:12),
+          if (['Scheduled','Active','Ended'].contains(row['status'])) ...[_InlineLink('A07',id!),_InlineLink('A08',id!),_InlineLink('A09',id!)],
+          if (!['Ended','Cancelled'].contains(row['status']))
+            OutlinedButton(onPressed:()=>openOperation(context,'cancelAuction',id:id,seed:row),child:Text(context.tr('إلغاء المزاد','Cancel auction'))),
         ]);
       }
       if(screen.startsWith('G'))return PageBody(children:[Facts(d),const SizedBox(height:12),StatusTag(str(row['status'])),
@@ -274,19 +366,35 @@ class BusinessHub extends StatelessWidget{
     if(context.app.access.grants.isEmpty)Notice(context.tr('لا يوجد تفويض تجاري نشط. تواصل مع الإدارة لتحديد نطاقك.','No active business delegation. Contact your administrator to assign a work context.')),
   ]);
 }
-class _RecordSelector extends StatelessWidget{
-  const _RecordSelector({required this.target});final String target;
-  @override Widget build(BuildContext context){final app=context.app;
-    final binding=target.startsWith('I')?('/api/agent/commerce/inventory',true):target.startsWith('P')?('/api/agent/pickup/requests',true):
-      target.startsWith('G')?('/api/agent/marketplace/proposals',false):('/api/agent/commerce/documents',true);
+class _RecordSelector extends StatelessWidget {
+  const _RecordSelector({required this.target});
+  final String target;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.app;
+    final (path, query, size) = switch (target) {
+      'P06' => ('/api/agent/pickup/requests', {'status': 'Active'}, 50),
+      'T08' => ('/api/agent/commerce/documents', {'type': 'SalesInvoice'}, 50),
+      'T14' => ('/api/agent/commerce/documents', {'type': 'PurchaseInvoice'}, 50),
+      'N07' => ('/api/agent/finance/settlements', <String,dynamic>{}, 50),
+      'I03' => ('/api/agent/commerce/inventory', <String,dynamic>{}, 100),
+      _ => ('', <String,dynamic>{}, 50),
+    };
+    if (path.isEmpty) return PageBody(children: [Empty(
+      text: context.tr('افتح السجل المرتبط من قائمته أولًا.', 'Open the linked record from its list first.'),
+    )]);
     return PagedRecords(
-      load:(cursor)=>app.page(binding.$1,query:binding.$2?app.scoped():null,afterId:cursor),
-      pageSize:target.startsWith('I')?100:50,
+      pageSize: size,
+      load: target=='N07' ? null : (afterId) => app.page(path, query: app.scoped(query), afterId: afterId),
+      loadPage: target=='N07' ? (afterId) => app.cursorPage(path, query: app.scoped(), afterId: afterId) : null,
+      include: (row) => !['T08','T14'].contains(target) || row['isPosted'] == true,
       header:[Heading(context.tr('اختر سجلًا للمتابعة','Choose a record to continue'))],
-      itemBuilder:(row)=>RecordTile(row,onTap:()=>context.open(target,id:numId(row['id']),seed:row)),
+      itemBuilder: (row) => RecordTile(row, onTap: () => context.open(target,id:numId(row['id']),seed:row)),
     );
   }
 }
+
 class _RemoteList extends StatelessWidget{
   const _RemoteList(this.path,{this.query,this.onTap});final String path;final Json? query;
   final void Function(Json)? onTap;
@@ -514,7 +622,7 @@ class _AccountStatementState extends State<AccountStatement>{
   bool supplier=false;Json? party;
   @override Widget build(BuildContext context)=>PageBody(children:[
     SwitchListTile(title:Text(context.tr('حساب مورد','Supplier account')),value:supplier,onChanged:(v)=>setState((){supplier=v;party=null;})),
-    OutlinedButton.icon(onPressed:()async{final selected=await chooseReference(context,supplier?'suppliers':'customers');if(selected!=null)setState(()=>party=selected);},
+    OutlinedButton.icon(onPressed:()async{final selected=await chooseReference(context,supplier?'statementSuppliers':'statementCustomers');if(selected!=null)setState(()=>party=selected);},
       icon:const Icon(Icons.person_search_outlined),label:Text(party==null?context.tr('اختيار الحساب','Choose account'):titleOf(party!))),
     if(party!=null)... [Heading(context.tr('كشف الحساب','Account statement')),
       _EmbeddedRecords(key:ValueKey('${party!['id']}:$supplier'),load:()=>context.app.read('/api/agent/finance/statements',query:context.app.scoped({'partyId':party!['id'],'supplier':supplier})))],

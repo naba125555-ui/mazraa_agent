@@ -365,7 +365,8 @@ void main(){
     await tester.pumpAndSettle();
     final navigation = find.byType(AgentGlassNavigationBar);
     final dock = tester.widget<AgentGlassNavigationBar>(navigation);
-    expect(dock.layout.items.length, inInclusiveRange(2,5));
+    expect(dock.layout.items.single.route, 'H05');
+    expect(dock.layout.primaryIndex, -1);
     expect(dock.layout.items.any((item) => item.route=='C01'||item.route=='I01'), isFalse);
     final context = tester.element(find.byType(ScreenPage));
     context.open('C02', id: 7);

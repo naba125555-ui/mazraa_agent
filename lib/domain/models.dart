@@ -54,6 +54,18 @@ class Access {
     grants:maps(bootstrap['delegations']).map(Grant.new).toList(),
     permissions:(home['permissions'] is List?home['permissions'] as List:[]).map((v)=>'$v').toSet());
 }
+class RecordPage {
+  const RecordPage(this.items, this.nextAfterId);
+  final List<Json> items;
+  final int? nextAfterId;
+
+  factory RecordPage.from(Object? raw) {
+    final data = obj(raw);
+    final next = numId(data['nextAfterId']);
+    return RecordPage(rows(data), data['hasMore'] == true && next > 0 ? next : null);
+  }
+}
+
 class Failure implements Exception {
   const Failure(this.status,this.message,{this.uncertain=false});
   final int status;final String message;final bool uncertain;

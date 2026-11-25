@@ -23,3 +23,5 @@ Final glyph-accurate screenshot verification: load Cairo and MaterialIcons befor
 Final QA assertion: overview and pickup segmented bars must paint visible 23dp segments (stretched children), not only legends; 11 screens pictured with Cairo and MaterialIcons. Release APK.
 
 2026-11-25 home-only reference-image alignment: the actual home hero photo is flush with the pinned toolbar (no opaque top mask); greeting/description/scope controls are bottom-anchored immediately above the gold/green wave. All other routes retain their pinned toolbar only; no home wave or scope strip. Verify RTL/LTR, light/dark, 320dp/200%, wave hide/reveal, home photo edge and scope inset; extract compact ARM64 APK and screenshot previews. Do not modify other modules, docs, server or navigation.
+
+2026-11-26: verify scoped reads, server insights, record actions and all screen routes; extract the ARM64 agent release.

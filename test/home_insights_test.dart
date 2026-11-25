@@ -105,41 +105,39 @@ void main() {
     doctor.dispose();
   });
 
-  test('server summary counters are not manufactured when fields are absent',
-      () async {
-    final app=sample(CountingRepository());
-    app.summary={'activeCases':2};
-    final overview=await HomeInsightsData.load(app,InsightKind.overview);
-    expect(overview.values.map((v)=>v.label(true)).toList(),['حالات نشطة']);
-    final clinic=await HomeInsightsData.load(app,InsightKind.clinic);
-    expect(clinic.headline,2);
-    expect(clinic.values.first.value,isNull);
-    expect(clinic.values.last.value,isNull);
-    app.dispose();
-  });
-
-  test('cash balance is real; unverified history stays explicitly partial',
-      () async {
+  test('exhaustive server figures are used without requesting sample lists', () async {
     final repo=CountingRepository();
     final app=sample(repo);
+    final overview=await HomeInsightsData.load(app,InsightKind.overview);
+    expect(overview.values.map((v)=>v.value),[3,2,1,1]);
+    final clinic=await HomeInsightsData.load(app,InsightKind.clinic);
+    expect(clinic.values.last.value,4);
     final finance=await HomeInsightsData.load(app,InsightKind.finance);
     expect(finance.headline,1200);
     expect(finance.currency,'SAR');
-    expect(repo.requested,contains('/api/agent/operations/cashbox'));
+    expect(finance.series.first,200);
+    expect(finance.secondary.first,20);
     final sales=await HomeInsightsData.load(app,InsightKind.sales);
     expect(sales.values.last.value,1);
-    expect(repo.requested,contains('/api/agent/commerce/documents'));
+    expect(sales.series.first,150);
+    expect(sales.series,hasLength(7));
+    expect(repo.requested,[
+      '/api/agent/operations/insights/overview',
+      '/api/agent/operations/insights/clinic',
+      '/api/agent/operations/insights/finance',
+      '/api/agent/operations/insights/sales',
+    ]);
     app.dispose();
   });
 
-  test('pickup status never equates Active with Ready; synced ratio is unknown',
-      () async {
+  test('pickup readiness and sync history use the confirmed server counts', () async {
     final app=sample(CountingRepository());
     final pickup=await HomeInsightsData.load(app,InsightKind.pickup);
-    expect(pickup.headline,isNull);
-    expect(pickup.parts.first.ar,'Active');
+    expect(pickup.headline,3);
+    expect(pickup.parts[1].value,2);
     final sync=await HomeInsightsData.load(app,InsightKind.sync);
-    expect(sync.values[1].value,isNull);
+    expect(sync.headline,0);
+    expect(sync.values[1].value,2);
     app.dispose();
   });
 
@@ -157,7 +155,7 @@ void main() {
       expect(find.byKey(const ValueKey('home-insights-card')),findsOneWidget);
       final frameSize=tester.getSize(
           find.byKey(const ValueKey('home-insights-card')));
-      expect(repo.requested,isEmpty); // Summary slide uses bootstrap state.
+      expect(repo.requested, ['/api/agent/operations/insights/overview']);
       expect(find.text(lang=='ar'?'نظرة عامة':'Overview'),findsOneWidget);
       final segment=find.byKey(const ValueKey('insight-segment-0'));
       expect(segment,findsOneWidget);
@@ -166,12 +164,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(lang=='ar'?'العيادة البيطرية':'Veterinary clinic'),
           findsOneWidget);
-      expect(repo.requested,isEmpty); // Clinic uses summary state too.
+      expect(repo.requested, contains('/api/agent/operations/insights/clinic'));
       await tester.tap(find.byKey(const ValueKey('insight-dot-3')));
       await tester.pumpAndSettle();
       expect(tester.getSize(find.byKey(const ValueKey('home-insights-card'))),
           frameSize);
-      expect(repo.requested,contains('/api/agent/commerce/documents'));
+      expect(repo.requested,contains('/api/agent/operations/insights/sales'));
       expect(tester.takeException(),isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       app.dispose();

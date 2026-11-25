@@ -117,16 +117,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     });
   }
 
-  void _selectNavigation(AgentNavItem item) {
-    final destination = item.openRoute;
-    if (destination != item.route) {
-      toast(context, context.tr(
-        'اختر سجلًا من القائمة لإكمال الإجراء.',
-        'Select an authorized record from the list to continue.',
-      ));
-    }
-    open(destination);
-  }
+  void _selectNavigation(AgentNavItem item) => open(item.route);
 
   void open(String route, {int? id, Json? seed}) {
     if (!implementedScreens.contains(route)) return;
@@ -263,6 +254,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       workspace = AgentWorkspace.home;
     }
     final layout = AgentNavigationRegistry.resolve(app, workspace);
+    final activeRoute = tabRoutes[index];
+    final selectedRoute = layout.items.any((item) => item.route == activeRoute)
+        ? activeRoute : AgentNavigationRegistry.entry(app, layout.workspace);
 
     return NavScope(open: open, child: PopScope(
       canPop: false,
@@ -290,7 +284,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         bottomNavigationBar: AgentGlassNavigationBar(
           layout: layout,
           arabic: app.ar,
-          selectedRoute: tabRoutes[index],
+          selectedRoute: selectedRoute,
           onSelect: _selectNavigation,
         ),
       ),
