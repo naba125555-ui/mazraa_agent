@@ -455,6 +455,9 @@ void main(){
     expect(obj(posted['body'])['expectedTotal'],150);
     expect(app.basket,isEmpty);
     expect(find.text('TEST-001'),findsWidgets);
+    expect(find.byWidgetPredicate(
+      (widget)=>widget is ScreenPage && widget.route=='T05', skipOffstage:false,
+    ),findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
   });

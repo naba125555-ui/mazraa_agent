@@ -185,7 +185,7 @@ class _SaleCheckoutState extends State<SaleCheckout> {
               await app.repo.write(
                 'POST',
                 '/api/agent/commercial/quotes/preview',
-                body,
+                {...body, 'requestId': uuid()},
               ),
             );
       if (!mounted || _scope != app.scopeRevision) return;
@@ -248,7 +248,8 @@ class _SaleCheckoutState extends State<SaleCheckout> {
             ? context.tr('تم حفظ عرض السعر', 'Quotation saved')
             : context.tr('تم ترحيل فاتورة البيع', 'Sales invoice posted'),
       );
-      Navigator.of(context).maybePop();
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) navigator.pop();
       if (widget.quote) {
         open('T09');
       } else {
