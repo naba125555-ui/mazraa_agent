@@ -241,7 +241,7 @@ class BusinessPage extends StatelessWidget{
       }
       if(screen=='I02'||screen=='I03'||screen=='T04')return PageBody(children:[
         if(screen=='T04')
-          RecordTile(row,icon:Icons.inventory_2_outlined,imageUrl:productImage(row),subtitle:str(row['sku']))
+          RecordTile(row,icon:Icons.inventory_2_outlined,imageUrls:productImages(row),subtitle:str(row['sku']))
         else
           _StockTile(row:row),
         Facts(row,fields:['quantityOnHand','availableQuantity','reservedQuantity','averageCost']),
@@ -251,7 +251,7 @@ class BusinessPage extends StatelessWidget{
         if(app.allows(1))BusyButton(label:context.tr('حجز دفعة للمراجعة','Quarantine a batch'),run:()async{await openOperation(context,'hold');refresh();}),
       ]);
       if(screen=='T07')return PageBody(children:[Panel(child:Column(children:[const BrandLogo(size:54),const SizedBox(height:14),Text(str(row['documentNumber']),style:Theme.of(context).textTheme.titleLarge),StatusTag(row['isPosted']==true?'Completed':'Draft')])),
-        const SizedBox(height:14),Facts(row),Heading(context.tr('الأصناف','Invoice items')),for(final line in maps(row['items']))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(line)),
+        const SizedBox(height:14),Facts(row),Heading(context.tr('الأصناف','Invoice items')),for(final line in maps(row['items']))Padding(padding:const EdgeInsets.only(bottom:10),child:ItemFacts(line)),
         BusyButton(icon:Icons.share_outlined,label:context.tr('مشاركة الإيصال','Share receipt'),run:()async{
           final text='${row['documentNumber']}\n${str(row['customerName'])}\n${word(context,str(row['type']))}\n${context.tr('الإجمالي','Total')}: ${row['totalAmount']} ${row['currency']}\n${context.tr('المدفوع','Paid')}: ${row['paidAmount']}';
           await SharePlus.instance.share(ShareParams(text:text));}),
@@ -331,7 +331,7 @@ class BusinessPage extends StatelessWidget{
           for(final lot in maps(row['items']))... [Facts(lot),_EmbeddedRecords(load:()=>app.read('/api/AuctionBids/auction-item/${lot['id']}'))]]);
         final review=obj(row['review']);
         return PageBody(children:[Facts(row),Heading(context.tr('حالة المراجعة','Review status')),Facts(payload(review)),StatusTag(str(review['status'])),
-          Heading(context.tr('المعروض','Lots')),for(final lot in maps(row['items']))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(lot)),
+          Heading(context.tr('المعروض','Lots')),for(final lot in maps(row['items']))Padding(padding:const EdgeInsets.only(bottom:10),child:ItemFacts(lot)),
           if(['Draft','NeedsChanges','Rejected'].contains(review['status']))BusyButton(label:context.tr('إرسال للمراجعة','Submit for review'),run:()async{await openOperation(context,'submitAuction',id:id,seed:row);refresh();}),
           if(review['status']=='Approved')BusyButton(label:context.tr('نشر المزاد','Publish auction'),run:()async{await openOperation(context,'publishAuction',id:id,seed:row);refresh();}),
           const SizedBox(height:12),
@@ -366,7 +366,7 @@ class _StockTile extends StatelessWidget {
       final batches=maps(row['batches']).length;
       return RecordTile(
         {...row,...variant,'id':row['id']},
-        imageUrl:productImage(variant),icon:Icons.inventory_2_outlined,
+        imageUrls:productImages(variant),icon:Icons.inventory_2_outlined,
         subtitle:'${context.tr('المتاح','Available')}  ${display(context,row['availableQuantity'])}   ·   ${context.tr('الدفعات','Batches')}  ${display(context,batches)}',
         onTap:onTap,
       );
@@ -497,7 +497,7 @@ class _PointOfSaleState extends State<PointOfSale> {
     final limit = math.min(usable, decimal(stock['availableQuantity']));
     final existing = app.basket.where((line) => numId(line['productVariantId']) == id).firstOrNull;
     final line = existing ?? {'productVariantId':id, 'quantity':0};
-    line.addAll({'name':titleOf(stock), 'sku':stock['sku'], 'imageUrl':productImage(stock),
+    line.addAll({'name':titleOf(stock), 'sku':stock['sku'], 'imageUrls':productImages(stock),
       'unitPrice':stock['unitPrice'], 'availableStock':limit});
     changeQuantity(line, decimal(line['quantity']) + 1);
   }
@@ -519,7 +519,7 @@ class _PointOfSaleState extends State<PointOfSale> {
               Padding(padding:const EdgeInsets.only(bottom:8),child:Panel(child:Column(
                 crossAxisAlignment:CrossAxisAlignment.start,children:[
                   Row(children:[
-                    ProductThumbnail(url:productImage(line),size:44),
+                    ProductThumbnail(urls:productImages(line),size:44),
                     const SizedBox(width:12),
                     Expanded(child:Text(str(line['name']),maxLines:2,overflow:TextOverflow.ellipsis,
                       style:Theme.of(context).textTheme.titleMedium)),
@@ -594,7 +594,7 @@ class _PointOfSaleState extends State<PointOfSale> {
           final id=numId(stock['productVariantId']);
           final quantity=app.basket.where((line)=>numId(line['productVariantId'])==id).firstOrNull?['quantity'];
           return RecordTile(stock,key:ValueKey('pos-item-$id'),
-            imageUrl:productImage(stock),icon:Icons.add_shopping_cart_outlined,
+            imageUrls:productImages(stock),icon:Icons.add_shopping_cart_outlined,
             subtitle:[str(stock['sku']),str(stock['unit']),
               '${display(context,stock['unitPrice'])} ${app.currency}',
               '${context.tr('متاح','Available')} ${display(context,stock['availableQuantity'])}',
@@ -684,13 +684,25 @@ class AuctionWizard extends StatefulWidget{
 }
 class _AuctionWizardState extends State<AuctionWizard>{
   final form=GlobalKey<FormState>();
+  String? scheduleError;
   @override Widget build(BuildContext context){final app=context.app,draft=app.auctionDraft;
     final fields=operations['auction']!.fields.where((f)=>widget.screen=='A02'?f.kind!=InputKind.lines&&f.kind!=InputKind.photos:
       widget.screen=='A03'?f.kind==InputKind.lines:f.kind==InputKind.photos).toList();
     return Form(key:form,child:PageBody(children:[
       Padding(padding:const EdgeInsets.only(bottom:20),child:LinearProgressIndicator(value:widget.screen == 'A02' ? 0.33 : widget.screen == 'A03' ? 0.66 : 1.0)),
       for(final f in fields)Padding(padding:const EdgeInsets.only(bottom:14),child:InputControl(spec:f,value:draft[f.key],parentValues:draft,onChanged:(v)=>setState(()=>draft[f.key]=v))),
-      if(widget.screen!='A04')FilledButton(onPressed:(){if(!form.currentState!.validate())return;form.currentState!.save();context.open(widget.screen=='A02'?'A03':'A04');},child:Text(context.tr('متابعة','Continue')))
+      if(widget.screen=='A02')Notice(context.tr('اختر بداية مستقبلية ونهاية خلال 30 يومًا من البداية.','Choose a future start and an end within 30 days of that start.')),
+      if(scheduleError!=null)Notice(scheduleError!,error:true),
+      if(widget.screen!='A04')FilledButton(onPressed:(){
+        if(!form.currentState!.validate())return;
+        form.currentState!.save();
+        if(widget.screen=='A02'){
+          final problem=auctionScheduleMessage(context,draft);
+          setState(()=>scheduleError=problem);
+          if(problem!=null)return;
+        }
+        context.open(widget.screen=='A02'?'A03':'A04');
+      },child:Text(context.tr('متابعة','Continue')))
       else BusyButton(label:context.tr('مراجعة وحفظ مسودة المزاد','Review and save auction'),run:()async{
         if(!form.currentState!.validate())return;form.currentState!.save();
         final result=await openOperation(context,'auction',initial:draft);if(result==null||!context.mounted)return;

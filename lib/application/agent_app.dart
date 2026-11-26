@@ -94,10 +94,10 @@ class AgentApp extends ChangeNotifier {
   Future<Json> variant(int id) => _variants.putIfAbsent(id, () async {
     final variant = obj(await read('/api/product-variants/$id'));
     final productId = numId(variant['productId']);
-    if(productId==0) return variant;
+    if(productId==0 || str(variant['productImageUrl']).trim().isNotEmpty) return variant;
     try {
       final images = rows(await read('/api/Images/by-entity',query:{'type':'Product','entityId':productId}));
-      return {...variant,'images':images};
+      return {...variant,'productImages':images};
     } on Failure {
       return variant;
     }

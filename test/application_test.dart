@@ -1,13 +1,65 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mazraa_agent/application/agent_app.dart';
 import 'package:mazraa_agent/application/workflows.dart';
+import 'package:mazraa_agent/data/remote_repository.dart';
+import 'package:mazraa_agent/domain/api_origin.dart';
 import 'package:mazraa_agent/domain/models.dart';
 import 'package:mazraa_agent/domain/screens.dart';
 import 'package:mazraa_agent/presentation/features/general.dart';
+import 'package:mazraa_agent/presentation/shared/product_thumbnail.dart';
 import 'package:mazraa_agent/presentation/shell.dart';
 import 'fake_repository.dart';
 
 void main(){
+  test('auction schedule enforces future start, ordered dates and the thirty-day limit', () {
+    final now = DateTime.utc(2026, 11, 26, 21, 42);
+    expect(auctionScheduleIssue({'startAt':'2026-11-26T21:39:00Z','endAt':'2027-01-30T21:39:00Z'}, now),
+      AuctionScheduleIssue.pastStart);
+    final start = now.add(const Duration(days: 1));
+    AuctionScheduleIssue? issue(DateTime end) =>
+        auctionScheduleIssue({'startAt':start.toIso8601String(),'endAt':end.toIso8601String()}, now);
+    expect(issue(start), AuctionScheduleIssue.invalidEnd);
+    expect(issue(start.add(const Duration(days: 30, seconds: 1))), AuctionScheduleIssue.duration);
+    expect(issue(start.add(const Duration(days: 30))), isNull);
+  });
+
+  test('remote repository reads nested validation errors from the API', () async {
+    final dio = Dio(BaseOptions(baseUrl: apiBaseUrl));
+    final repo = RemoteRepository(client: dio);
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (request, handler) {
+      handler.reject(DioException(
+        requestOptions: request, type: DioExceptionType.badResponse,
+        response: Response(requestOptions: request, statusCode: 422,
+          data: {'error': {'message': 'An auction cannot exceed 30 days.', 'status': 422}}),
+      ));
+    }));
+    await expectLater(repo.write('POST', '/api/agent/marketplace/auctions', {}),
+      throwsA(isA<Failure>().having((e) => e.status, 'status', 422)
+        .having((e) => e.message, 'message', 'An auction cannot exceed 30 days.')));
+  });
+
+  test('variant images are preserved separately from the parent gallery', () async {
+    final repo = FakeRepository();
+    final app = AgentApp(repo);
+    addTearDown(app.dispose);
+    repo.responses['/api/product-variants/5'] = {'productId': 3, 'images': [
+      {'imageUrl': '/images/productitems/variant.webp'},
+    ]};
+    repo.responses['/api/Images/by-entity'] = [
+      {'imageUrl': '/images/products/parent.webp'},
+    ];
+    expect(productImages(await app.variant(5)), [
+      '$apiBaseUrl/images/productitems/variant.webp',
+      '$apiBaseUrl/images/products/parent.webp',
+    ]);
+    expect(productImages({
+      'variantImageUrl': 'https://invalid.example/variant.jpg',
+      'thumbnail': '',
+      'productImageUrl': '/images/products/parent.webp',
+    }), ['$apiBaseUrl/images/products/parent.webp']);
+  });
+
   test('92 unique bilingual screens have a concrete route binding',(){
     expect(screens.length,92);expect(screens.map((s)=>s.id).toSet(),implementedScreens);
     expect(screens.every((s)=>s.ar.isNotEmpty&&s.en.isNotEmpty),isTrue);

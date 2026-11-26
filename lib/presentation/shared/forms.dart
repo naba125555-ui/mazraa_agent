@@ -7,6 +7,7 @@ import '../../domain/models.dart';
 import '../navigation.dart';
 import 'labels.dart';
 import 'paged_records.dart';
+import 'product_thumbnail.dart';
 import 'scope.dart';
 import 'widgets.dart';
 import 'scanner.dart';
@@ -17,6 +18,15 @@ bool _canRun(AgentApp app, Operation operation) =>
     (!operation.scope || app.grant != null) &&
     (operation.cap == 0 || app.allows(operation.cap)) &&
     (!operation.dispenser || app.access.dispenser);
+
+String? auctionScheduleMessage(BuildContext context, Json values) =>
+    switch (auctionScheduleIssue(values, DateTime.now())) {
+      AuctionScheduleIssue.missing => context.tr('اختر تاريخ ووقت البداية والنهاية.', 'Choose a start and end date and time.'),
+      AuctionScheduleIssue.pastStart => context.tr('وقت بداية المزاد يجب أن يكون في المستقبل.', 'The auction start must be in the future.'),
+      AuctionScheduleIssue.invalidEnd => context.tr('وقت نهاية المزاد يجب أن يكون بعد بدايته.', 'The auction end must be after the start.'),
+      AuctionScheduleIssue.duration => context.tr('مدة المزاد لا يمكن أن تتجاوز 30 يومًا.', 'An auction cannot exceed 30 days.'),
+      null => null,
+    };
 
 Future<Json?> openOperation(
   BuildContext context, String key, {int? id, Json seed = const {}, Json initial = const {}}
@@ -42,11 +52,22 @@ class OperationPage extends StatefulWidget{
 class _OperationPageState extends State<OperationPage>{
   final form=GlobalKey<FormState>();late Json values;bool busy=false,review=false;Object? error;Json? quoted;
   int? responseVersion;
+  String? auctionRequestId;
   @override void initState(){super.initState();values={for(final f in widget.operation.fields)f.key:f.initial,...widget.initial};}
   Future<void> submit()async{
     final app = context.app, op = widget.operation;
     if (busy || !_canRun(app, op) || (op.key == 'handover' && widget.seed['canComplete'] != true)) return;
     if(!review){if(!form.currentState!.validate())return;form.currentState!.save();}
+    if (op.key == 'auction' && auctionRequestId == null) {
+      final problem = auctionScheduleMessage(context, values);
+      if (problem != null) {
+        setState(() {
+          review = false;
+          error = Failure(422, problem);
+        });
+        return;
+      }
+    }
     if(widget.operation.fields.any((f)=>f.kind==InputKind.boolean&&f.key.startsWith('items')&&values[f.key]!=true)){
       toast(context,context.tr('يجب توثيق التحقق الفعلي أولًا.','Confirm the physical verification first.'));return;
     }
@@ -70,7 +91,9 @@ class _OperationPageState extends State<OperationPage>{
     try{
       final body=prepareBody(op,values,widget.seed,app.grantId,app.repo.session?.userId);
       if (responseVersion != null) body['version'] = responseVersion;
-      final result=obj(await app.execute(op.path.replaceAll('{id}','${widget.id}'),body,method:op.method,title:app.tr(op.ar,op.en)));
+      if (op.key == 'auction') auctionRequestId ??= uuid();
+      final result=obj(await app.execute(op.path.replaceAll('{id}','${widget.id}'),body,method:op.method,
+        title:app.tr(op.ar,op.en),requestId:auctionRequestId));
       if(!mounted)return;
       if (result['accepted'] == false) {
         setState(() {
@@ -84,7 +107,12 @@ class _OperationPageState extends State<OperationPage>{
       if(op.key=='sale'){app.basket.clear();app.sale={};}
       toast(context,context.tr('تمت العملية بنجاح','Operation confirmed'));Navigator.pop(context,result);
       if(op.key=='sale'&&numId(result['documentId'])>0)open('T07',id:numId(result['documentId']));
-    }catch(e){if(mounted)setState(()=>error=e);}finally{if(mounted)setState(()=>busy=false);}
+    }catch(e){
+      if(mounted)setState((){
+        if (e is Failure && !e.uncertain) auctionRequestId = null;
+        error=e;
+      });
+    }finally{if(mounted)setState(()=>busy=false);}
   }
   @override Widget build(BuildContext context){final op=widget.operation,app=context.app;
     final allowed = _canRun(app, op) && (op.key != 'handover' || widget.seed['canComplete'] == true);
@@ -107,7 +135,7 @@ class _OperationPageState extends State<OperationPage>{
         if(quoted!=null)...[Heading(context.tr('العرض النهائي والضريبة','Final quote and tax')),RecordDetails(payload(quoted!))],
         for(final field in op.fields.where((f)=>f.kind==InputKind.lines))...[
           Heading(word(context,field.key)),for(final row in maps(values[field.key]))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(row))],
-        TextButton(onPressed:busy?null:()=>setState((){review=false;if(op.key=='sale'){values['quoteId']=null;quoted=null;}}),child:Text(context.tr('تعديل البيانات','Edit details'))),
+        TextButton(onPressed:busy||auctionRequestId!=null?null:()=>setState((){review=false;error=null;if(op.key=='sale'){values['quoteId']=null;quoted=null;}}),child:Text(context.tr('تعديل البيانات','Edit details'))),
       ],
       Offstage(offstage:review,child:Column(children:[for(final field in op.fields.where((f)=>!(op.key=='return'&&widget.id!=null&&f.key=='originalDocumentId')&&!(op.key=='visitState'&&widget.seed['status']=='Scheduled'&&['diagnosis','findings','treatment','recommendations'].contains(f.key))))Padding(padding:const EdgeInsets.only(bottom:15),
         child:InputControl(spec:field,value:values[field.key],parentValues:{
@@ -155,10 +183,12 @@ class InputControl extends StatelessWidget{
         },icon:const Icon(Icons.event_outlined),label:Text(value==null?title:'$title · ${display(context,value)}')),
           if(state.hasError)Text(state.errorText!,style:TextStyle(color:Theme.of(context).colorScheme.error))]));
       case InputKind.reference:return FormField<int>(initialValue:value==null?null:numId(value),validator:(v)=>f.required&&(v??0)<=0?context.tr('اختر السجل','Select a record'):null,
-        builder:(state)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[OutlinedButton.icon(onPressed:()async{
+        builder:(state)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Wrap(crossAxisAlignment:WrapCrossAlignment.center,children:[OutlinedButton.icon(onPressed:()async{
           final result=await chooseReference(context,f.source!,parentValues:parentValues);if(result==null||!state.mounted)return;
           final id=numId(result['id']);state.didChange(id);onChanged(id);onRecordSelected?.call(result);
         },icon:const Icon(Icons.search),label:Text(value==null?title:'$title · #$value')),
+          if(!f.required&&value!=null)IconButton(icon:const Icon(Icons.close),
+            tooltip:context.tr('مسح الاختيار','Clear selection'),onPressed:(){state.didChange(null);onChanged(null);})]),
           if(state.hasError)Text(state.errorText!,style:TextStyle(color:Theme.of(context).colorScheme.error))]));
       case InputKind.lines:return LineItems(mode:f.mode!,value:maps(value),onChanged:onChanged,parentValues:parentValues);
       case InputKind.photos:return PhotoCollector(value:value is List?(value as List).map(numId).toList():[],items:maps(parentValues['items']),onChanged:onChanged);
@@ -204,6 +234,12 @@ class _ReferencePickerState extends State<ReferencePicker>{
     _ => null,
   };
 
+  String? get auctionDirectory => switch (widget.source) {
+    'auctionProducts' => 'auction-products',
+    'auctionAnimals' => 'auction-animals',
+    _ => null,
+  };
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -220,7 +256,6 @@ class _ReferencePickerState extends State<ReferencePicker>{
     final app = context.app;
     switch (widget.source) {
       case 'products': return app.read('/api/product-variants');
-      case 'animals': return app.read('/api/Animals');
       case 'documents': return app.all('/api/agent/commerce/documents', query: app.scoped());
       case 'originalItems': return (await app.record('document', numId(widget.parentValues['originalDocumentId'])))['items'];
       case 'transferLines':
@@ -243,8 +278,11 @@ class _ReferencePickerState extends State<ReferencePicker>{
       return PageBody(children: [Notice(context.tr('تغيّر نطاق العمل. افتح الاختيار مجددًا.', 'Work scope changed. Reopen the picker.'))]);
     }
     final remote = directory;
+    final auction = auctionDirectory;
+    final endpoint = auction != null ? '/api/agent/marketplace/$auction'
+        : remote == null ? null : '/api/agent/directory/${remote.path}';
     Widget tile(Json row) => RecordTile(row, onTap: () => Navigator.pop(context, row),
-      subtitle: str(row['sku'] ?? row['code']));
+      imageUrls: productImages(row), subtitle: str(row['sku'] ?? row['code'] ?? row['species']));
     return Column(children: [
       Padding(padding: const EdgeInsets.all(16), child: TextField(
         decoration: InputDecoration(prefixIcon: const Icon(Icons.search),
@@ -258,13 +296,13 @@ class _ReferencePickerState extends State<ReferencePicker>{
           });
         },
       )),
-      Expanded(child: remote != null
+      Expanded(child: endpoint != null
         ? PagedRecords(
           key: ValueKey('${widget.source}:$search'),
-          loadPage: (afterId) => app.cursorPage('/api/agent/directory/${remote.path}',
+          loadPage: (afterId) => app.cursorPage(endpoint,
             afterId: afterId, query: app.scoped({
               if (search.isNotEmpty) 'search': search,
-              if (remote.purpose != null) 'purpose': remote.purpose,
+              if (remote?.purpose != null) 'purpose': remote?.purpose,
             })),
           itemBuilder: tile,
         )
@@ -293,7 +331,7 @@ class _LineItemsState extends State<LineItems>{
     'purchase'=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'products'),const InputSpec('quantity',kind:InputKind.number),
       const InputSpec('unitCost',kind:InputKind.number),const InputSpec('batchNumber'),const InputSpec('expiryDate',kind:InputKind.date,required:false)],
     'return'=>[const InputSpec('originalItemId',kind:InputKind.reference,source:'originalItems'),const InputSpec('quantity',kind:InputKind.number)],
-    'auction'=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'products',required:false),const InputSpec('animalId',kind:InputKind.reference,source:'animals',required:false),
+    'auction'=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'auctionProducts',required:false),const InputSpec('animalId',kind:InputKind.reference,source:'auctionAnimals',required:false),
       const InputSpec('startPrice',kind:InputKind.number),const InputSpec('reservePrice',kind:InputKind.number,required:false),const InputSpec('minBidIncrement',kind:InputKind.number)],
     _=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'products'),const InputSpec('quantity',kind:InputKind.number)],
   };
@@ -352,20 +390,29 @@ class _PhotoCollectorState extends State<PhotoCollector>{
   bool uploading=false;
   Future<void> capture(ImageSource source)async{
     if(widget.items.isEmpty){toast(context,context.tr('أضف المعروض أولًا لربط الصورة به.','Add a lot before uploading its photo.'));return;}
+    if(widget.value.length>=20){toast(context,context.tr('يمكن إرفاق 20 صورة للمزاد.','An auction can have up to 20 photos.'));return;}
+    final app=context.app, scope=app.scopeRevision;
     final lot=await showModalBottomSheet<Json>(context:context,builder:(c)=>ListView(shrinkWrap:true,children:[
       for(final item in widget.items)ListTile(title:Text('#${item['productVariantId']??item['animalId']}'),
         leading:Icon(item['animalId']==null?Icons.inventory_2_outlined:Icons.pets_outlined),onTap:()=>Navigator.pop(c,item))]));
-    if(lot==null)return;
-    final image=await ImagePicker().pickImage(source:source,maxWidth:1600,imageQuality:82);if(image==null||!mounted)return;
+    if(lot==null||!mounted||app.scopeRevision!=scope)return;
     setState(()=>uploading=true);
     try{
-      final result=obj(await context.app.repo.upload('/api/Media/upload',image.name,await image.readAsBytes(),{
+      final image=await ImagePicker().pickImage(source:source,maxWidth:1600,imageQuality:82);
+      if(image==null||!mounted||app.scopeRevision!=scope)return;
+      final bytes=await image.readAsBytes();
+      if(!mounted||app.scopeRevision!=scope)return;
+      if(bytes.length>5*1024*1024)throw Failure(422,context.tr('اختر صورة أصغر من 5 ميغابايت.','Choose a photo smaller than 5 MB.'));
+      final result=obj(await app.repo.upload('/api/Media/upload',image.name,bytes,{
         'kind':'Image','type':lot['animalId']==null?'ProductItem':'Animal','entityId':lot['animalId']??lot['productVariantId']}));
-      final id=numId(result['id']);if(id<=0)throw const Failure(422,'');
+      if(!mounted||app.scopeRevision!=scope)return;
+      final id=numId(result['id']);if(id<=0)throw Failure(422,context.tr('لم يُرجع السيرفر معرّف الصورة المرفوعة. أعد رفعها.','The server did not return an uploaded photo ID. Upload it again.'));
       widget.onChanged([...widget.value,id]);
     }catch(e){if(mounted)toast(context,failureText(context,e));}finally{if(mounted)setState(()=>uploading=false);}
   }
-  @override Widget build(BuildContext context)=>FormField<List<int>>(validator:(_)=>widget.value.isEmpty?context.tr('أضف صورة للمعروض','Add a lot photo'):null,
+  @override Widget build(BuildContext context)=>FormField<List<int>>(validator:(_)=>uploading
+      ?context.tr('انتظر اكتمال رفع الصورة.','Wait for the current photo upload to complete.')
+      :widget.value.isEmpty?context.tr('أضف صورة للمعروض','Add a lot photo'):null,
     builder:(state)=>Panel(child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[Heading(context.tr('صور المعروض','Lot photography')),
       if(uploading)const LinearProgressIndicator(),Wrap(spacing:8,children:[for(final id in widget.value)InputChip(label:Text('#$id'),avatar:const Icon(Icons.image_outlined),
         onDeleted:(){widget.onChanged([...widget.value]..remove(id));})]),

@@ -91,7 +91,7 @@ class ClinicalPage extends StatelessWidget{
         for(final order in rows(orders))RecordTile(order,onTap:()=>openOperation(context,'releasePrescription',id:numId(payload(order)['orderId']),seed:order)),
       ]));
       return PageBody(children:[Facts(d),Heading(context.tr('الأدوية والكميات','Medicines and quantities')),
-        for(final line in maps(d['lines']))Padding(padding:const EdgeInsets.only(bottom:12),child:Facts(line)),
+        for(final line in maps(d['lines']))Padding(padding:const EdgeInsets.only(bottom:12),child:ItemFacts(line)),
         if(app.allows(290)&&app.access.dispenser)_RouteTile('C13',Icons.medication_outlined,id:id),
         _RouteTile('C14',Icons.receipt_long_outlined,id:id),
         if(row['ownerId']==app.repo.session?.userId&&row['status']=='Approved')OutlinedButton(onPressed:()=>openOperation(context,'cancelPrescription',id:id,seed:row),child:Text(context.tr('إلغاء الوصفة','Cancel prescription'))),

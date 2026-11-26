@@ -127,6 +127,18 @@ const operations=<String,Operation>{
     InputSpec('estimatedCost',kind:InputKind.number,required:false),InputSpec('currency',required:false)],scope:true,version:true,cap:1),
 };
 
+enum AuctionScheduleIssue { missing, pastStart, invalidEnd, duration }
+
+AuctionScheduleIssue? auctionScheduleIssue(Json values, DateTime now) {
+  final start = DateTime.tryParse(str(values['startAt']));
+  final end = DateTime.tryParse(str(values['endAt']));
+  if (start == null || end == null) return AuctionScheduleIssue.missing;
+  if (!start.isAfter(now)) return AuctionScheduleIssue.pastStart;
+  if (!end.isAfter(start)) return AuctionScheduleIssue.invalidEnd;
+  if (end.difference(start) > const Duration(days: 30)) return AuctionScheduleIssue.duration;
+  return null;
+}
+
 Json prepareBody(Operation op,Json values,Json seed,int? grant,int? actor){
   var body=<String,dynamic>{...op.constants,...values};
   if(op.key=='profile')body={for(final k in ['gender','dateOfBirth'])k:seed[k],...body};

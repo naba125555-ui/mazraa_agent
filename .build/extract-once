@@ -27,3 +27,5 @@ Final QA assertion: overview and pickup segmented bars must paint visible 23dp s
 2026-11-26: verify scoped reads, server insights, record actions and all screen routes; extract the ARM64 agent release.
 
 2026-11-26: verify counter sales and customer names, then export the Android ARM64 release.
+
+2026-11-27: verify photographed auction drafts, variant/parent catalog image fallback, and extract the Android ARM64 release.
