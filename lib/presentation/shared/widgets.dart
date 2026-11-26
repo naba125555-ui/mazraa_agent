@@ -145,10 +145,10 @@ class StatusTag extends StatelessWidget{
       child:Text(word(context,value),style:TextStyle(color:color,fontSize:11,fontWeight:FontWeight.w700)));}
 }
 class RecordTile extends StatelessWidget{
-  const RecordTile(this.data,{super.key,this.onTap,this.icon=Icons.description_outlined,this.subtitle,this.trailing,this.imageUrl});
-  final Json data;final VoidCallback? onTap;final IconData icon;final String? subtitle,imageUrl;final Widget? trailing;
+  const RecordTile(this.data,{super.key,this.onTap,this.icon=Icons.description_outlined,this.subtitle,this.trailing,this.imageUrls=const []});
+  final Json data;final VoidCallback? onTap;final IconData icon;final String? subtitle;final List<String> imageUrls;final Widget? trailing;
   @override Widget build(BuildContext context){final status=str(data['status']??payload(data)['status']);return Padding(padding:const EdgeInsets.only(bottom:10),child:Panel(onTap:onTap,child:Row(children:[
-    ProductThumbnail(url:imageUrl,size:imageUrl==null?44:54,icon:icon),const SizedBox(width:12),
+    ProductThumbnail(urls:imageUrls,size:imageUrls.isEmpty?44:54,icon:icon),const SizedBox(width:12),
     Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(titleOf(data),style:Theme.of(context).textTheme.titleMedium),
       if(subtitle?.isNotEmpty==true)Text(subtitle!,maxLines:2,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),if(status.isNotEmpty)...[const SizedBox(height:4),StatusTag(status)]])),
     if(trailing!=null)trailing!
@@ -185,10 +185,34 @@ class Facts extends StatelessWidget{
 }
 class RecordDetails extends StatelessWidget{
   const RecordDetails(this.data,{super.key});final Json data;
-  @override Widget build(BuildContext context)=>Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[Facts(data),
+  @override Widget build(BuildContext context)=>Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[ItemFacts(data),
     for(final key in ['lines','items','batches'])if(maps(data[key]).isNotEmpty)...[
-      Heading(word(context,key)),for(final row in maps(data[key]))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(row))],
+      Heading(word(context,key)),for(final row in maps(data[key]))Padding(padding:const EdgeInsets.only(bottom:10),child:ItemFacts(row))],
   ]);
+}
+class ItemFacts extends StatelessWidget {
+  const ItemFacts(this.data, {super.key});
+  final Json data;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = numId(data['productVariantId']);
+    if (id <= 0) return Facts(data);
+    final images = productImages(data);
+    Widget row(List<String> thumbnails) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ProductThumbnail(urls: thumbnails, size: 44),
+        const SizedBox(width: 8),
+        Expanded(child: Facts(data)),
+      ],
+    );
+    if (images.isNotEmpty) return row(images);
+    return FutureBuilder<Json>(
+      future: context.app.variant(id),
+      builder: (context, snapshot) => row(productImages(snapshot.data ?? const {})),
+    );
+  }
 }
 class BusyButton extends StatefulWidget{
   const BusyButton({super.key,required this.label,required this.run,this.icon=Icons.check});

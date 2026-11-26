@@ -81,7 +81,8 @@ class RemoteRepository implements AgentRepository {
   }
   Failure _failure(DioException e){
     final raw=e.response?.data,map=obj(raw);
-    var message=str(map['message']??map['detail']??map['title']);
+    final error=map['error'];
+    var message=str(obj(error)['message']??map['message']??map['detail']??map['title']??(error is String?error:null));
     if(map['errors'] is Map)message=obj(map['errors']).values.expand((v)=>v is List?v:[v]).join('\n');
     if(raw is String&&raw.length<1000&&!raw.contains('<'))message=raw;
     return Failure(e.response?.statusCode??0,message,uncertain:e.response==null&&e.type!=DioExceptionType.cancel);

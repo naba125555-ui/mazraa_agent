@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mazraa_agent/application/agent_app.dart';
+import 'package:mazraa_agent/application/workflows.dart';
 import 'package:mazraa_agent/domain/models.dart';
 import 'package:mazraa_agent/domain/screens.dart';
 import 'package:mazraa_agent/presentation/design/brand_theme.dart';
@@ -17,6 +18,7 @@ import 'package:mazraa_agent/presentation/features/sign_in.dart';
 import 'package:mazraa_agent/presentation/features/home_insights_carousel.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
+import 'package:mazraa_agent/presentation/shared/product_thumbnail.dart';
 import 'package:mazraa_agent/presentation/shared/forms.dart';
 import 'package:mazraa_agent/presentation/shared/scope.dart';
 import 'package:mazraa_agent/presentation/shared/section_banner.dart';
@@ -407,6 +409,60 @@ void main(){
     app.dispose();
   });
 
+  testWidgets('A failed variant image loads the product image next', (tester) async {
+    final urls = productImages({
+      'variantImageUrl': '/images/productitems/missing.webp',
+      'productImageUrl': '/images/products/parent.webp',
+    });
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ProductThumbnail(urls: urls))));
+    final itemImage = tester.widget<Image>(find.byType(Image));
+    expect((itemImage.image as ResizeImage).imageProvider, NetworkImage(urls[0]));
+    final fallback = itemImage.errorBuilder!(tester.element(find.byType(Image)), StateError('404'), null) as Image;
+    expect((fallback.image as ResizeImage).imageProvider, NetworkImage(urls[1]));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Auction review preserves the photo and safely retries an uncertain save', (tester) async {
+    tester.view.physicalSize=const Size(430,932);
+    tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final app = fixture('en','light');
+    final repo = app.repo as FakeRepository;
+    final start = DateTime.now().toUtc().add(const Duration(days: 2));
+    final values = {
+      'title':'Auction fixture','description':'Description','terms':'Terms','guaranteeAmount':2000,
+      'startAt':start.toIso8601String(),'endAt':start.add(const Duration(days: 1)).toIso8601String(),
+      'items':[{'animalId':4,'startPrice':1200,'reservePrice':1400,'minBidIncrement':200}],
+      'photoMediaIds':[88],
+    };
+    await tester.pumpWidget(host(app, OperationPage(operation: operations['auction']!, initial: values)));
+    await tester.pumpAndSettle();
+    final review = find.widgetWithText(FilledButton, 'Review details');
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(review, 300, scrollable: scrollable);
+    await tester.ensureVisible(review);
+    await tester.tap(review);
+    await tester.pumpAndSettle();
+    final confirm = find.widgetWithText(FilledButton, 'Confirm operation');
+    await tester.scrollUntilVisible(confirm, 250, scrollable: scrollable);
+    await tester.ensureVisible(confirm);
+    repo.nextFailure = const Failure(0, '', uncertain:true);
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    final first = obj(repo.writes.single['body']);
+    expect(first['photoMediaIds'], [88]);
+    expect((await app.pending()).single['id'], first['requestId']);
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    expect(repo.writes.last['body'], first);
+    expect(await app.pending(), isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
   testWidgets('Point of sale increments items and posts from the cart above the dock', (tester) async {
     tester.view.physicalSize=const Size(390,844);
     tester.view.devicePixelRatio=1;
@@ -428,7 +484,7 @@ void main(){
     await tester.tap(item);
     await tester.pumpAndSettle();
     expect(app.basket.single['quantity'],2);
-    expect(app.basket.single['imageUrl'],endsWith('/uploads/test-variant.webp'));
+    expect((app.basket.single['imageUrls'] as List).single,endsWith('/uploads/test-variant.webp'));
     expect(find.text('Choose a batch'),findsNothing);
 
     await tester.tap(find.text('View cart'));
