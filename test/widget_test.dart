@@ -440,12 +440,13 @@ void main(){
     await tester.pumpWidget(host(app, OperationPage(operation: operations['auction']!, initial: values)));
     await tester.pumpAndSettle();
     final review = find.widgetWithText(FilledButton, 'Review details');
-    await tester.scrollUntilVisible(review, 300);
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(review, 300, scrollable: scrollable);
     await tester.ensureVisible(review);
     await tester.tap(review);
     await tester.pumpAndSettle();
     final confirm = find.widgetWithText(FilledButton, 'Confirm operation');
-    await tester.scrollUntilVisible(confirm, 250);
+    await tester.scrollUntilVisible(confirm, 250, scrollable: scrollable);
     await tester.ensureVisible(confirm);
     repo.nextFailure = const Failure(0, '', uncertain:true);
     await tester.tap(confirm);
