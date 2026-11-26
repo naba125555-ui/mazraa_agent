@@ -407,6 +407,99 @@ void main(){
     app.dispose();
   });
 
+  testWidgets('Point of sale increments items and posts from the cart above the dock', (tester) async {
+    tester.view.physicalSize=const Size(390,844);
+    tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final app=fixture('en','light');
+    final repo=app.repo as FakeRepository;
+    repo.responses['/api/agent/directory/customers']={
+      'items':[{'id':22,'name':'Existing customer'}],'knownNames':[],
+    };
+    await tester.pumpWidget(host(app,const AppShell()));
+    await tester.pumpAndSettle();
+    tester.element(find.byType(ScreenPage).first).open('T02');
+    await tester.pumpAndSettle();
+
+    final item=find.byKey(const ValueKey('pos-item-1'));
+    await tester.tap(item);
+    await tester.pumpAndSettle();
+    await tester.tap(item);
+    await tester.pumpAndSettle();
+    expect(app.basket.single['quantity'],2);
+    expect(app.basket.single['imageUrl'],endsWith('/uploads/test-variant.webp'));
+    expect(find.text('Choose a batch'),findsNothing);
+
+    await tester.tap(find.text('View cart'));
+    await tester.pumpAndSettle();
+    final sell=find.byKey(const ValueKey('cart-sell'));
+    expect(sell.hitTestable(),findsOneWidget);
+    expect(find.byKey(const ValueKey('cart-quote')).hitTestable(),findsOneWidget);
+    await tester.tap(sell);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('checkout-customer')),'Existing');
+    await tester.pumpAndSettle(const Duration(milliseconds:300));
+    await tester.tap(find.text('Existing customer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('checkout-submit')));
+    await tester.pumpAndSettle();
+    expect(repo.writes.single['path'],'/api/agent/commercial/quotes/preview');
+    await tester.tap(find.byKey(const ValueKey('checkout-submit')));
+    await tester.pumpAndSettle();
+
+    final posted=repo.writes.last;
+    expect(posted['path'],'/api/agent/commerce/documents');
+    expect(obj(posted['body'])['partyId'],22);
+    expect(maps(obj(posted['body'])['lines']).single['quantity'],2);
+    expect(obj(posted['body'])['expectedTotal'],150);
+    expect(app.basket,isEmpty);
+    expect(find.text('TEST-001'),findsWidgets);
+    expect(find.byWidgetPredicate(
+      (widget)=>widget is ScreenPage && widget.route=='T05', skipOffstage:false,
+    ),findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
+  testWidgets('A typed customer name is saved on a quotation without posting a sale', (tester) async {
+    tester.view.physicalSize=const Size(390,844);
+    tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final app=fixture('en','light');
+    final repo=app.repo as FakeRepository;
+    app.access=Access(grants:[Grant({'id':1,'warehouseId':1,'capabilities':Cap.sell})]);
+    repo.responses['/api/agent/directory/customers']={'items':[],'knownNames':['Walk-in customer']};
+    await tester.pumpWidget(host(app,const AppShell()));
+    await tester.pumpAndSettle();
+    tester.element(find.byType(ScreenPage).first).open('T02');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pos-item-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View cart'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cart-sell')),findsNothing);
+    await tester.tap(find.byKey(const ValueKey('cart-quote')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const ValueKey('checkout-customer')),'Walk');
+    await tester.pumpAndSettle(const Duration(milliseconds:300));
+    await tester.tap(find.text('Walk-in customer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('checkout-submit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('checkout-submit')));
+    await tester.pumpAndSettle();
+    expect(repo.writes.map((write)=>write['path']),[
+      '/api/agent/commercial/quotes/preview','/api/agent/commercial/quotes',
+    ]);
+    expect(obj(repo.writes.last['body']),containsPair('customerName','Walk-in customer'));
+    expect(obj(repo.writes.last['body']),containsPair('partyId',0));
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
   testWidgets('Prepaid pickup is actionable without a cash grant', (tester) async {
     final app=fixture('en','light');
     app.access=Access(grants:[Grant({'id':1,'warehouseId':1,'capabilities':Cap.pickup})]);

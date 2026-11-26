@@ -37,7 +37,7 @@ void main() {
       (false,Cap.cash,'N01'),
       (false,Cap.pickup,'P02'),
       (false,Cap.auction,'A01'),
-      (false,Cap.sell,'T09'),
+      (false,Cap.sell,'T02'),
       (false,Cap.purchase,'T12'),
       (false,Cap.transfer,'T01'),
       (false,Cap.sell|Cap.cash,'T02'),
@@ -49,7 +49,7 @@ void main() {
       }
       final layout=AgentNavigationRegistry.resolve(app,AgentWorkspace.home);
       expect(layout.items[layout.primaryIndex].route,want);
-      expect(layout.items.any((item)=>item.route=='T02'),bits==34);
+      expect(layout.items.any((item)=>item.route=='T02'),(bits&Cap.sell)==Cap.sell);
       app.dispose();
     }
   });

@@ -31,7 +31,7 @@ class AgentApp extends ChangeNotifier {
       signedIn &&
       (!spec.doctor || access.doctor) &&
       (spec.cap == 0 || allows(spec.cap)) &&
-      (spec.id != 'T04' || allows(Cap.sell) || allows(Cap.inventory)) &&
+      (!const {'T04','T07'}.contains(spec.id) || allows(Cap.sell) || allows(Cap.inventory)) &&
       (spec.id != 'C13' || access.dispenser);
   Future<void> initialize()async{
     try{
@@ -132,11 +132,14 @@ class AgentApp extends ChangeNotifier {
     final raw=await repo.local(_key('pending'),secure:true);return raw==null?[]:maps(jsonDecode(raw));
   }
   Future<void> _savePending(List<Json> commands)=>repo.save(_key('pending'),jsonEncode(commands),secure:true);
-  Future<dynamic> execute(String path,Json body,{String method='POST',String? title})async{
-    final command=<String,dynamic>{'id':uuid(),'method':method,'path':path,'title':title,
+  Future<dynamic> execute(String path,Json body,{String method='POST',String? title,String? requestId})async{
+    final command=<String,dynamic>{'id':requestId??uuid(),'method':method,'path':path,'title':title,
       'body':body,'createdAt':DateTime.now().toUtc().toIso8601String()};
     command['body']={...body,'requestId':command['id']};
-    final commands=await pending();commands.add(command);await _savePending(commands);
+    final commands=await pending();
+    final queued=commands.where((entry)=>entry['id']==command['id']).firstOrNull;
+    if(queued!=null) return retry(queued);
+    commands.add(command);await _savePending(commands);
     return retry(command);
   }
   Future<dynamic> retry(Json command)async{

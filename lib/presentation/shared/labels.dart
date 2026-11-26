@@ -71,6 +71,7 @@ const words=<String,List<String>>{
   'totalAmount':['الإجمالي','Total'],'total':['الإجمالي','Total'],'currencyCode':['العملة','Currency'],
   'currentBalance':['الرصيد الحالي','Current balance'],'openingBalance':['الرصيد الافتتاحي','Opening balance'],
   'direction':['الاتجاه','Direction'],'transactionType':['نوع الحركة','Transaction type'],'unitPrice':['سعر الوحدة','Unit price'],
+  'customerName':['اسم العميل','Customer name'],
   'documentNumber':['رقم الفاتورة','Invoice number'],'remainingAmount':['المتبقي','Remaining'],'isPosted':['تم الترحيل','Posted'],
   'reviewNotes':['ملاحظات المراجع','Review notes'],'readyAt':['جاهز منذ','Ready since'],'completedAt':['تاريخ الإنجاز','Completed'],
   'orderId':['رقم الطلب','Order number'],'species':['النوع','Species'],'breed':['السلالة','Breed'],
