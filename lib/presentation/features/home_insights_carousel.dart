@@ -443,8 +443,8 @@ class _InsightGraph extends StatelessWidget {
         return data.series.isEmpty
           ? _NoGraph(message:context.tr('بيانات الرسم غير متاحة بصورة موثوقة',
               'No reliable chart data available'))
-          : _WeekBars(values:data.series,labels:data.days,
-              currency:data.currency);
+          : _WeekBars(values:data.series,other:data.secondary,labels:data.days,
+              currency:data.currency,sales:true);
       case InsightKind.field:
         return _AreaGraph(values:data.series,labels:data.days);
       case InsightKind.inventory:
@@ -464,8 +464,7 @@ class _InsightGraph extends StatelessWidget {
           ? _SegmentedDistribution(parts:data.parts)
           : _WaffleGraph(parts:data.parts);
       case InsightKind.sync:
-        return _DonutGraph(parts:const [],
-          center:'—%',caption:context.tr('غير متاحة','Unavailable'));
+        return _HorizontalStatuses(parts:data.values);
     }
   }
 }
@@ -620,7 +619,8 @@ class _RingPainter extends CustomPainter {
 
 class _WeekBars extends StatefulWidget {
   const _WeekBars({required this.values,required this.labels,
-    this.other=const [],this.currency});
+    this.other=const [],this.currency,this.sales=false});
+  final bool sales;
   final List<double> values,other;
   final List<String> labels;
   final String? currency;
@@ -638,8 +638,8 @@ class _WeekBarsState extends State<_WeekBars> {
       if(grouped) Padding(
         padding:const EdgeInsets.only(bottom:3),
         child:Wrap(spacing:11,children:[
-          _Legend(context.tr('تحصيل','Inflow'),_chartColors[0],''),
-          _Legend(context.tr('صرف','Outflow'),_chartColors[2],''),
+          _Legend(widget.sales?context.tr('فواتير البيع','Sales invoices'):context.tr('تحصيل','Inflow'),_chartColors[0],''),
+          _Legend(widget.sales?context.tr('المرتجعات','Returns'):context.tr('صرف','Outflow'),_chartColors[2],''),
         ]),
       ),
       Expanded(child:Row(crossAxisAlignment:CrossAxisAlignment.end,children:[
@@ -654,9 +654,10 @@ class _WeekBarsState extends State<_WeekBars> {
               padding:const EdgeInsets.symmetric(horizontal:3),
               child:Column(children:[
                 SizedBox(height:20,child:selected==i
-                  ? FittedBox(child:Text(_format(context,
-                      widget.values[i]+(grouped?widget.other[i]:0),
-                      currency:widget.currency),
+                  ? FittedBox(child:Text([
+                      _format(context,widget.values[i],currency:widget.currency),
+                      if(grouped) _format(context,widget.other[i],currency:widget.currency),
+                    ].join(' / '),
                     style:TextStyle(color:cs.primary,fontSize:9,
                       fontWeight:FontWeight.w800)))
                   : const SizedBox.shrink()),
@@ -775,34 +776,31 @@ class _HorizontalStatuses extends StatelessWidget {
         'لا توجد حالات معتمدة','No verified statuses'));
     final maximum=math.max(1,parts.fold<double>(0,(a,b)=>
       math.max(a,b.value??0)));
-    return Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-      for(var i=0;i<parts.length;i++) Expanded(child:Padding(
-        padding:const EdgeInsets.symmetric(vertical:3),
-        child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Row(children:[
-            Expanded(child:Text(parts[i].label(context.app.ar),
-              maxLines:1,overflow:TextOverflow.ellipsis,
-              style:Theme.of(context).textTheme.bodySmall
-                ?.copyWith(fontSize:9.7,fontWeight:FontWeight.w700))),
-            Text(_format(context,parts[i].value),
-              style:TextStyle(color:_chartColors[i%_chartColors.length],
-                fontSize:10,fontWeight:FontWeight.w900)),
-          ]),
-          const SizedBox(height:3),
-          Expanded(child:ClipRRect(
-            borderRadius:BorderRadius.circular(8),
-            child:Stack(fit:StackFit.expand,children:[
-              ColoredBox(color:Theme.of(context).colorScheme
-                .outline.withValues(alpha:.14)),
-              FractionallySizedBox(
-                alignment:AlignmentDirectional.centerStart,
-                widthFactor:((parts[i].value??0)/maximum).clamp(0.0,1.0),
-                child:ColoredBox(color:_chartColors[i%_chartColors.length]),
-              ),
-            ]),
-          )),
-        ]),
-      )),
+    final palette=Theme.of(context).colorScheme;
+    return Column(children:[
+      for(var i=0;i<parts.length;i++) Expanded(child:Row(children:[
+        Expanded(flex:4,child:FittedBox(
+          fit:BoxFit.scaleDown,alignment:AlignmentDirectional.centerStart,
+          child:Text(parts[i].label(context.app.ar),maxLines:1,
+            style:const TextStyle(fontSize:10,fontWeight:FontWeight.w700)))),
+        const SizedBox(width:6),
+        Expanded(flex:5,child:ClipRRect(
+          borderRadius:BorderRadius.circular(8),
+          child:SizedBox(height:7,child:Stack(fit:StackFit.expand,children:[
+            ColoredBox(color:palette.outline.withValues(alpha:.14)),
+            FractionallySizedBox(
+              alignment:AlignmentDirectional.centerStart,
+              widthFactor:((parts[i].value??0)/maximum).clamp(0.0,1.0),
+              child:ColoredBox(color:_chartColors[i%_chartColors.length]),
+            ),
+          ])),
+        )),
+        const SizedBox(width:6),
+        SizedBox(width:30,child:FittedBox(
+          fit:BoxFit.scaleDown,alignment:AlignmentDirectional.centerEnd,
+          child:Text(_format(context,parts[i].value),style:TextStyle(
+            color:_chartColors[i%_chartColors.length],fontSize:10,fontWeight:FontWeight.w900)))),
+      ])),
     ]);
   }
 }

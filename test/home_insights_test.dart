@@ -223,6 +223,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('home-insights-card')),findsOneWidget);
     expect(tester.takeException(),isNull);
+    await tester.tap(find.byKey(const ValueKey('insight-dot-4')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(),isNull,reason:'five inventory metrics');
     await tester.pumpWidget(const SizedBox.shrink());
     app.dispose();
   });
