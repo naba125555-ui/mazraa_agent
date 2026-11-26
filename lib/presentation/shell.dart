@@ -266,7 +266,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         if (mounted && index != 0) selectTab(0);
       },
       child: Scaffold(
-        extendBody: true,
+        extendBody: !const {'T02','T05'}.contains(activeRoute),
         body: IndexedStack(index: index, children: [
           for (var i = 0; i < roots.length; i++)
             if (available.contains(i) && visited.contains(i))

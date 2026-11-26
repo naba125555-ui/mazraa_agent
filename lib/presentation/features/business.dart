@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,6 +16,7 @@ import '../shared/section_banner.dart';
 import '../shared/product_thumbnail.dart';
 import '../shared/widgets.dart';
 import 'clinical.dart';
+import 'sale_checkout.dart';
 
 const listBindings=<String,(String,String)>{
   'I01':('/api/agent/commerce/inventory','I02'),'I06':('/api/agent/commerce/transfers','I08'),
@@ -60,9 +63,7 @@ class BusinessPage extends StatelessWidget{
         return OperationPage(embedded:true,operation:operations['return']!, id:id, seed:invoice,initial:{'originalDocumentId':id});
       });
     }
-    if(screen=='T05')return OperationPage(embedded:true,operation:operations['sale']!,initial:{
-      ...app.sale,'lines':app.basket.map((l)=>{for(final k in ['productVariantId','batchId','quantity'])k:l[k]}).toList(),
-      'paidAmount':null,'paymentMethod':'Cash'});
+    if (screen == 'T05') return SaleCheckout(quote:seed['quote']==true, existingQuote:obj(seed['existingQuote']));
     if(screen=='A02'||screen=='A03'||screen=='A04')return AuctionWizard(screen:screen);
     if (screen == 'A01') return PagedRecords(
       key: ValueKey('auctions:${app.revision}'),
@@ -120,12 +121,35 @@ class BusinessPage extends StatelessWidget{
         FilledButton.icon(onPressed: () => openOperation(context, 'quote'), icon: const Icon(Icons.add), label: Text(context.tr('عرض سعر جديد', 'New quotation'))),
         Heading(context.tr('عروضي', 'My quotations')),
       ],
-      itemBuilder: (quote) => Padding(padding: const EdgeInsets.only(bottom: 10),
-        child: RecordTile(quote, subtitle: '${display(context, payload(quote)['total'])} ${str(payload(quote)['currency'])}',
-          onTap: () => showDialog<void>(context: context, builder: (_) => AlertDialog(
+      itemBuilder: (quote) {
+        final data=payload(quote);
+        final name=str(data['customerName']).trim();
+        final expires=DateTime.tryParse(str(data['expiresAt']));
+        final canPost=app.allows(Cap.sell|Cap.cash) && quote['status']=='Pending'
+            && (expires?.isAfter(DateTime.now().toUtc())??false);
+        return RecordTile({...quote, if(name.isNotEmpty)'title':name},
+          subtitle:'${display(context, data['total'])} ${str(data['currency'])}',
+          onTap: () => showDialog<void>(context: context, builder: (dialog) => AlertDialog(
             title: Text(context.tr('عرض السعر', 'Quotation')),
-            content: SingleChildScrollView(child: RecordDetails(payload(quote))),
-          )))),
+            content: SingleChildScrollView(child: RecordDetails(data)),
+            actions: [
+              TextButton.icon(icon:const Icon(Icons.share_outlined),
+                label:Text(context.tr('مشاركة العرض','Share quotation')),
+                onPressed:()=>SharePlus.instance.share(ShareParams(text:[
+                  '${context.tr('عرض سعر','Quotation')} #${quote['id']}',
+                  if(name.isNotEmpty)name,
+                  for(final line in maps(data['lines']))
+                    '#${line['productVariantId']} × ${line['quantity']} · ${line['total']} ${data['currency']}',
+                  '${context.tr('الإجمالي','Total')} ${data['total']} ${data['currency']}',
+                ].join('\n')))),
+              if(canPost) FilledButton(
+                onPressed:(){
+                  Navigator.pop(dialog);
+                  context.open('T05',id:numId(quote['id']),seed:{'existingQuote':quote});
+                }, child:Text(context.tr('بيع هذا العرض','Sell this quotation'))),
+            ],
+          )));
+      },
     );
     if (screen == 'T10') return PagedRecords(
       loadPage: (afterId) => app.cursorPage('/api/agent/directory/suppliers', afterId: afterId, query: app.scoped()),
@@ -229,7 +253,7 @@ class BusinessPage extends StatelessWidget{
       if(screen=='T07')return PageBody(children:[Panel(child:Column(children:[const BrandLogo(size:54),const SizedBox(height:14),Text(str(row['documentNumber']),style:Theme.of(context).textTheme.titleLarge),StatusTag(row['isPosted']==true?'Completed':'Draft')])),
         const SizedBox(height:14),Facts(row),Heading(context.tr('الأصناف','Invoice items')),for(final line in maps(row['items']))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(line)),
         BusyButton(icon:Icons.share_outlined,label:context.tr('مشاركة الإيصال','Share receipt'),run:()async{
-          final text='${row['documentNumber']}\n${word(context,str(row['type']))}\n${context.tr('الإجمالي','Total')}: ${row['totalAmount']} ${row['currency']}\n${context.tr('المدفوع','Paid')}: ${row['paidAmount']}';
+          final text='${row['documentNumber']}\n${str(row['customerName'])}\n${word(context,str(row['type']))}\n${context.tr('الإجمالي','Total')}: ${row['totalAmount']} ${row['currency']}\n${context.tr('المدفوع','Paid')}: ${row['paidAmount']}';
           await SharePlus.instance.share(ShareParams(text:text));}),
         if (row['isPosted']==true && ['SalesInvoice','PurchaseInvoice'].contains(row['type'])) ...[
           const SizedBox(height:12),OutlinedButton(onPressed:()=>context.open(row['type']=='PurchaseInvoice'?'T14':'T08',id:id),child:Text(context.tr('طلب مرتجع مرتبط بالفاتورة','Request return against this invoice'))),
@@ -429,117 +453,128 @@ class CodeCard extends StatelessWidget{
     ]));}
 }
 
-class PointOfSale extends StatefulWidget{
+class PointOfSale extends StatefulWidget {
   const PointOfSale({super.key});
-  @override State<PointOfSale> createState()=>_PointOfSaleState();
-}
-class _PointOfSaleState extends State<PointOfSale> {
-  final searchController=TextEditingController();
-  String search='';
 
   @override
-  void dispose(){
+  State<PointOfSale> createState() => _PointOfSaleState();
+}
+
+class _PointOfSaleState extends State<PointOfSale> {
+  final searchController = TextEditingController();
+  String search = '';
+
+  @override
+  void dispose() {
     searchController.dispose();
     super.dispose();
   }
 
-  void changeQuantity(Json line,double desired){
-    final basket=context.app.basket;
-    final inOtherBatches=basket.where((other)=>other!=line&&other['productVariantId']==line['productVariantId'])
-        .fold(0.0,(total,other)=>total+decimal(other['quantity']));
-    if(desired>decimal(line['maxQuantity'])||desired+inOtherBatches>decimal(line['availableStock'])){
-      toast(context,context.tr('الكمية المطلوبة تتجاوز الرصيد المتاح.','The requested quantity exceeds available stock.'));
+  void changeQuantity(Json line, double desired) {
+    final basket = context.app.basket;
+    if (desired > decimal(line['availableStock'])) {
+      toast(context, context.tr('الكمية المطلوبة تتجاوز الرصيد المتاح.', 'The requested quantity exceeds available stock.'));
       return;
     }
-    setState((){
-      if(desired<=0){basket.remove(line);}
-      else{line['quantity']=desired;if(!basket.contains(line))basket.add(line);}
+    if (desired > 0 && !basket.contains(line) && basket.length >= 100) {
+      toast(context, context.tr('يمكن إضافة 100 صنف إلى الفاتورة.', 'An invoice can contain 100 items.'));
+      return;
+    }
+    setState(() {
+      if (desired <= 0) {
+        basket.remove(line);
+      } else {
+        line['quantity'] = desired;
+        if (!basket.contains(line)) basket.add(line);
+      }
     });
   }
 
-  Future<void> add(Json variant,Json stock)async{
-    final batches=maps(stock['batches']).where((batch){
-      final expiry=DateTime.tryParse(str(batch['expiryDate']));
-      return decimal(batch['quantity'])>0&&(expiry==null||expiry.isAfter(DateTime.now().toUtc()));
-    }).toList();
-    final batch=await showModalBottomSheet<Json>(context:context,useSafeArea:true,builder:(sheet)=>PageBody(children:[
-      Heading(sheet.tr('اختر الدفعة','Choose a batch')),
-      if(batches.isEmpty)Empty(text:sheet.tr('لا توجد دفعة صالحة للبيع','No eligible batch is available')),
-      for(final item in batches)
-        RecordTile(item,icon:Icons.inventory_2_outlined,
-          subtitle:'${display(sheet,item['quantity'])} · ${display(sheet,item['expiryDate'])}',
-          onTap:()=>Navigator.pop(sheet,item)),
-    ]));
-    if(batch==null||!mounted)return;
-    final variantId=numId(stock['productVariantId']);
-    final basket=context.app.basket;
-    final existing=basket.where((line)=>line['productVariantId']==variantId).firstOrNull;
-    if (existing!=null && existing['batchId']!=batch['id']) {
-      toast(context,context.tr('اختر دفعة واحدة لكل صنف في الفاتورة.', 'Choose one batch per product on this invoice.'));
-      return;
-    }
-    final line=existing??{
-      'productVariantId':variantId,'batchId':batch['id'],'quantity':0,
-      'name':titleOf(variant),'unitPrice':variant['salePrice']??variant['price'],'batchNumber':batch['batchNumber'],
-      'maxQuantity':batch['quantity'],'availableStock':stock['availableQuantity'],
-    };
-    changeQuantity(line,decimal(line['quantity'])+1);
+  void add(Json stock) {
+    final app = context.app;
+    final id = numId(stock['productVariantId']);
+    final usable = maps(stock['batches']).fold<double>(0, (sum, batch) => sum + decimal(batch['quantity']));
+    final limit = math.min(usable, decimal(stock['availableQuantity']));
+    final existing = app.basket.where((line) => numId(line['productVariantId']) == id).firstOrNull;
+    final line = existing ?? {'productVariantId':id, 'quantity':0};
+    line.addAll({'name':titleOf(stock), 'sku':stock['sku'], 'imageUrl':productImage(stock),
+      'unitPrice':stock['unitPrice'], 'availableStock':limit});
+    changeQuantity(line, decimal(line['quantity']) + 1);
   }
 
-  Future<void> openCart()async{
-    final app=context.app;
-    final continueToPayment=await showModalBottomSheet<bool>(
-      context:context,useSafeArea:true,isScrollControlled:true,
-      builder:(sheet)=>StatefulBuilder(builder:(context,refresh)=>FractionallySizedBox(
-        heightFactor:.78,
-        child:Column(children:[
-          Expanded(child:PageBody(children:[
+  Future<void> openCart() async {
+    final app = context.app;
+    final scope = app.scopeRevision;
+    final action = await showModalBottomSheet<String>(
+      context:context, useRootNavigator:true, useSafeArea:true, isScrollControlled:true,
+      builder:(sheet) => StatefulBuilder(builder:(context, update) {
+        final scoped = scope == app.scopeRevision;
+        final basket = scoped ? app.basket : const <Json>[];
+        final subtotal = basket.fold<double>(0,(total,line)=>total+decimal(line['quantity'])*decimal(line['unitPrice']));
+        return FractionallySizedBox(heightFactor:.82, child:Column(children:[
+          Expanded(child:ListView(padding:const EdgeInsets.fromLTRB(18,18,18,8),children:[
             Heading(context.tr('سلة البيع','Sale cart')),
-            if(app.basket.isEmpty)const Empty(icon:Icons.shopping_cart_outlined),
-            for(final line in app.basket)
+            if(basket.isEmpty)const Empty(icon:Icons.shopping_cart_outlined),
+            for(final line in basket)
               Padding(padding:const EdgeInsets.only(bottom:8),child:Panel(child:Column(
-                crossAxisAlignment:CrossAxisAlignment.start,
-                children:[
-                  Text(str(line['name']),style:Theme.of(context).textTheme.titleMedium),
-                  Fact('batchNumber',line['batchNumber']),
+                crossAxisAlignment:CrossAxisAlignment.start,children:[
+                  Row(children:[
+                    ProductThumbnail(url:productImage(line),size:44),
+                    const SizedBox(width:12),
+                    Expanded(child:Text(str(line['name']),maxLines:2,overflow:TextOverflow.ellipsis,
+                      style:Theme.of(context).textTheme.titleMedium)),
+                  ]),
                   Row(children:[
                     IconButton(tooltip:context.tr('إنقاص الكمية','Decrease quantity'),
-                      onPressed:()=>refresh(()=>changeQuantity(line,decimal(line['quantity'])-1)),
+                      onPressed:()=>update(()=>changeQuantity(line,decimal(line['quantity'])-1)),
                       icon:const Icon(Icons.remove_circle_outline)),
                     Text(display(context,line['quantity'])),
                     IconButton(tooltip:context.tr('زيادة الكمية','Increase quantity'),
-                      onPressed:()=>refresh(()=>changeQuantity(line,decimal(line['quantity'])+1)),
+                      onPressed:()=>update(()=>changeQuantity(line,decimal(line['quantity'])+1)),
                       icon:const Icon(Icons.add_circle_outline)),
                     const Spacer(),
-                    Text('${display(context,decimal(line['quantity'])*decimal(line['unitPrice']))} ${app.currency}'),
+                    Flexible(child:Text('${display(context,decimal(line['quantity'])*decimal(line['unitPrice']))} ${app.currency}',
+                      overflow:TextOverflow.ellipsis)),
                   ]),
                 ],
               ))),
           ])),
-          Padding(padding:const EdgeInsets.fromLTRB(18,8,18,18),child:SizedBox(
-            width:double.infinity,
-            child:FilledButton.icon(
-              onPressed:app.basket.isEmpty?null:()=>Navigator.pop(sheet,true),
-              icon:const Icon(Icons.receipt_long_outlined),
-              label:Text(context.tr('مراجعة المبلغ والدفع','Review amount and payment')),
-            ),
-          )),
-        ]),
-      )),
+          SafeArea(top:false,child:Padding(padding:const EdgeInsets.fromLTRB(18,8,18,12),child:Column(
+            crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+              Text('${context.tr('الإجمالي المبدئي','Estimated total')}  ${display(context,subtotal)} ${app.currency}',
+                textAlign:TextAlign.center),
+              const SizedBox(height:10),
+              Row(children:[
+                if(app.allows(Cap.sell|Cap.cash)) ...[
+                  Expanded(child:FilledButton.icon(key:const ValueKey('cart-sell'),
+                    onPressed:basket.isEmpty?null:()=>Navigator.pop(sheet,'sale'),
+                    icon:const Icon(Icons.point_of_sale_outlined),label:Text(context.tr('بيع','Sell')))),
+                  const SizedBox(width:8),
+                ],
+                Expanded(child:OutlinedButton.icon(key:const ValueKey('cart-quote'),
+                  onPressed:basket.isEmpty?null:()=>Navigator.pop(sheet,'quote'),
+                  icon:const Icon(Icons.request_quote_outlined),label:Text(context.tr('فاتورة عرض سعر','Quotation')))),
+              ]),
+            ],
+          ))),
+        ]));
+      }),
     );
-    if(continueToPayment==true&&mounted)context.open('T05');
+    if (action != null && mounted && app.scopeRevision == scope && app.basket.isNotEmpty) {
+      context.open('T05',seed:{'quote':action=='quote'});
+    }
   }
 
   @override
-  Widget build(BuildContext context){
-    final app=context.app,theme=Theme.of(context);
-    final count=app.basket.fold(0.0,(total,line)=>total+decimal(line['quantity']));
-    final subtotal=app.basket.fold(0.0,(total,line)=>total+decimal(line['quantity'])*decimal(line['unitPrice']));
+  Widget build(BuildContext context) {
+    final app=context.app, theme=Theme.of(context);
+    final count=app.basket.fold<double>(0,(total,line)=>total+decimal(line['quantity']));
+    final subtotal=app.basket.fold<double>(0,(total,line)=>total+decimal(line['quantity'])*decimal(line['unitPrice']));
     return Column(children:[
-      Padding(padding:const EdgeInsets.symmetric(horizontal:18), child:TextField(
+      Padding(padding:const EdgeInsets.symmetric(horizontal:18),child:TextField(
         controller:searchController,textInputAction:TextInputAction.search,
         decoration:InputDecoration(prefixIcon:const Icon(Icons.search),
-          hintText:context.tr('اسم الصنف أو رمزه','Product name or SKU'),
+          hintText:context.tr('اسم الصنف أو رمزه','Item name or SKU'),
           suffixIcon:IconButton(tooltip:context.tr('مسح رمز','Scan code'),
             icon:const Icon(Icons.qr_code_scanner),onPressed:()=>context.open('T03'))),
         onChanged:(value){if(value.isEmpty)setState(()=>search='');},
@@ -549,47 +584,35 @@ class _PointOfSaleState extends State<PointOfSale> {
       Expanded(child:PagedRecords(
         key:ValueKey('pos:${app.grantId}:${app.revision}:$search'),
         loadPage:(cursor)=>app.cursorPage('/api/agent/directory/sale-stock',
-          query:app.scoped({if(search.isNotEmpty)'search':search}), afterId:cursor),
+          query:app.scoped({if(search.isNotEmpty)'search':search}),afterId:cursor),
         header:[
           SectionBanner(art:SectionArt.commerce,icon:Icons.point_of_sale_outlined,
-            title:context.tr('البيع من مخزنك','Sell from your inventory')),
+            title:context.tr('أصناف البيع','Items for sale')),
           const SizedBox(height:12),
         ],
-        itemBuilder:(stock){
+        itemBuilder:(stock) {
           final id=numId(stock['productVariantId']);
-          return FutureBuilder<Json>(
-            future:app.variant(id),
-            builder:(context,snapshot){
-              final product=snapshot.data;
-              if(product==null){
-                if(snapshot.hasError && search.isEmpty){
-                  return RecordTile({'title':'${context.tr('صنف المخزون','Stock item')} #$id'},
-                    icon:Icons.inventory_2_outlined,subtitle:context.tr('تعذر تحميل تفاصيل الصنف','Product details unavailable'));
-                }
-                return snapshot.connectionState==ConnectionState.done?const SizedBox.shrink():
-                  const Padding(padding:EdgeInsets.all(14),child:LinearProgressIndicator());
-              }
-              if(product['isAvailable']==false){
-                return const SizedBox.shrink();
-              }
-              return RecordTile(product,imageUrl:productImage(product),icon:Icons.add_shopping_cart,
-                subtitle:'${display(context,product['salePrice']??product['price'])} ${app.currency}  ·  ${context.tr('متاح','Available')} ${display(context,stock['availableQuantity'])}',
-                onTap:()=>add(product,stock));
-            },
-          );
+          final quantity=app.basket.where((line)=>numId(line['productVariantId'])==id).firstOrNull?['quantity'];
+          return RecordTile(stock,key:ValueKey('pos-item-$id'),
+            imageUrl:productImage(stock),icon:Icons.add_shopping_cart_outlined,
+            subtitle:[str(stock['sku']),str(stock['unit']),
+              '${display(context,stock['unitPrice'])} ${app.currency}',
+              '${context.tr('متاح','Available')} ${display(context,stock['availableQuantity'])}',
+            ].where((text)=>text.trim().isNotEmpty).join(' · '),
+            trailing:quantity!=null ? Chip(label:Text(display(context,quantity))) : const Icon(Icons.add_circle_outline),
+            onTap:stock['unitPrice'] is num ? ()=>add(stock) : null);
         },
       )),
-      Material(color:theme.colorScheme.surface,child:SafeArea(
-        top:false,
-        child:Padding(padding:const EdgeInsets.symmetric(horizontal:18,vertical:10),child:Row(children:[
+      Material(color:theme.colorScheme.surface,child:SafeArea(top:false,child:Padding(
+        padding:const EdgeInsets.symmetric(horizontal:18,vertical:10),child:Row(children:[
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
             Text('${display(context,count)} ${context.tr('وحدة في السلة','units in cart')}',style:theme.textTheme.bodySmall),
             Text('${display(context,subtotal)} ${app.currency}',style:theme.textTheme.titleMedium),
           ])),
           FilledButton.icon(onPressed:count>0?openCart:null,icon:const Icon(Icons.shopping_basket_outlined),
             label:Text(context.tr('عرض السلة','View cart'))),
-        ])),
-      )),
+        ]),
+      ))),
     ]);
   }
 }

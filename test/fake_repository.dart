@@ -19,6 +19,15 @@ class FakeRepository implements AgentRepository {
   @override Future<dynamic> write(String method,String path,Object? body)async{
     writes.add({'method':method,'path':path,'body':body});
     if(nextFailure!=null){final failure=nextFailure!;nextFailure=null;throw failure;}
+    if(path=='/api/agent/commercial/quotes/preview'){
+      final input=obj(body);
+      final lines=maps(input['lines']);
+      final total=lines.fold<double>(0,(sum,line)=>sum+75*decimal(line['quantity']));
+      return {'customerName':input['customerName']??'Existing customer','total':total,'currency':'SAR','lines':[
+        for(final line in lines){...line,'unitPrice':75,'total':75*decimal(line['quantity'])},
+      ]};
+    }
+    if(path=='/api/agent/commerce/documents')return {'documentId':1,'isPosted':true};
     if(path.endsWith('sync/clinical-notes'))return {'results':[for(final op in maps(body)){'requestId':op['requestId'],'status':200}]};
     return {'id':1,'documentId':1,'status':'Completed'};
   }
@@ -38,7 +47,12 @@ class FakeRepository implements AgentRepository {
     if (responses.containsKey(path)) return responses[path];
     if(numId(query?['afterId'])>0)return [];
     if(path.startsWith('/api/agent/operations/insights/')) return insight(path.split('/').last);
-    if(path=='/api/agent/directory/sale-stock')return {'items':[stock],'hasMore':false};
+    if(path=='/api/agent/directory/sale-stock')return {'items':[
+      {...stock,'name':'Test item','sku':'TEST-1','unit':'Box','unitPrice':75,'imageUrl':'/uploads/test-variant.webp'},
+    ],'hasMore':false};
+    if(path=='/api/agent/commercial/checkout-options')return {
+      'cash':true,'cashShiftOpen':true,'bankTransfer':false,'credit':true,'maxDiscountPercent':0,
+    };
     if(path=='/api/agent/directory/stock-batches')return {'items':[for(final b in maps(stock['batches'])) {...b,'productVariantId':1}],'hasMore':false};
     final directory = path.startsWith('/api/agent/directory/');
     if (directory) return {'items': [{'id': 1, 'name': 'Test record'}], 'hasMore': false};
