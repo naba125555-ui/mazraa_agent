@@ -41,8 +41,9 @@ class FieldPage extends StatelessWidget{
       );
     }
     if(screen=='F03')return const FieldCalendar();
-    if(id==null)return Resource(load:()=>app.all('/api/agent/field/tasks'),builder:(data,refresh)=>PageBody(children:[
-      for(final task in rows(data))for(final visit in maps(task['visits']))RecordTile(visit,onTap:()=>context.open(screen,id:numId(visit['id']),seed:visit))]));
+    if (id == null) return screen == 'F05' ? const _VisitPicker() : PageBody(
+      children: [Empty(text: context.tr('اختر المهمة أو الزيارة المرتبطة أولًا.', 'Choose the related task or visit first.'))],
+    );
     if(screen=='F04')return DirectionsPage(id:id!,seed:seed);
     final campaign=['F10','F11','F12'].contains(screen);
     final task=screen=='F02';
@@ -57,7 +58,13 @@ class FieldPage extends StatelessWidget{
         Heading(context.tr('الزيارات','Visits')),for(final visit in maps(row['visits']))RecordTile(visit,onTap:()=>context.open('F06',id:numId(visit['id']),seed:visit)),
         if(['Accepted','InProgress'].contains(row['status']))OutlinedButton.icon(onPressed:()async{await openOperation(context,'createVisit',id:id,seed:row);refresh();},icon:const Icon(Icons.add_location_alt_outlined),label:Text(context.tr('إضافة زيارة','Add a visit'))),
       ]);
-      if(screen=='F05')return VisitCheckIn(visit:row);
+      if (screen=='F05') {
+        if (row['status'] != 'Scheduled' || !['Accepted','InProgress'].contains(row['taskStatus'])) {
+          return PageBody(children: [Facts(row,fields:['status','taskStatus']),
+            Notice(context.tr('هذه الزيارة ليست متاحة للبدء.', 'This visit cannot be started.'))]);
+        }
+        return VisitCheckIn(visit:row);
+      }
       if(screen=='F06')return PageBody(children:[Facts(row),Heading(context.tr('إجراءات الزيارة','Visit actions')),
         if(row['status']=='Scheduled')_FieldLink('F05',id!,Icons.location_on_outlined),
         if(row['status']=='Started')...[_FieldLink('F08',id!,Icons.monitor_heart_outlined),_FieldLink('F13',id!,Icons.task_alt)],
@@ -74,10 +81,10 @@ class FieldPage extends StatelessWidget{
         for(final animal in rows(animals))RecordTile(animal,icon:Icons.pets_outlined,onTap:()=>context.open('C06',id:numId(animal['caseId'])))]));
       if(screen=='F08')return OperationPage(embedded:true,operation:operations['inspection']!,id:id,seed:row,initial:seed);
       if(screen=='F13')return PageBody(children:[Facts(row),const SizedBox(height:16),
-        BusyButton(label:context.tr('إكمال تقرير الزيارة','Complete visit report'),run:()async{await openOperation(context,'visitState',id:id,seed:row);refresh();}),
-        const SizedBox(height:12),BusyButton(label:context.tr('مراجعة المهمة وإقفالها','Review and close task'),run:()async{
+        if (row['status']=='Started') BusyButton(label:context.tr('إكمال تقرير الزيارة','Complete visit report'),run:()async{await openOperation(context,'visitState',id:id,seed:row);refresh();}),
+        if (row['status']=='Completed' && row['taskStatus']=='InProgress') ...[const SizedBox(height:12),BusyButton(label:context.tr('مراجعة المهمة وإقفالها','Review and close task'),run:()async{
           final parent=await app.record('task',numId(row['taskId']),fresh:true);if(!context.mounted)return;
-          await openOperation(context,'taskState',id:numId(parent['id']),seed:parent,initial:{'status':'Completed'});refresh();}),
+          await openOperation(context,'taskState',id:numId(parent['id']),seed:parent,initial:{'status':'Completed'});refresh();})],
       ]);
       if(screen=='F11')return OperationPage(embedded:true,operation:operations['vaccinate']!,id:id,seed:row);
       if(screen=='F12')return PageBody(children:[Facts(d),const SizedBox(height:16),
@@ -102,6 +109,41 @@ class FieldPage extends StatelessWidget{
     });
   }
 }
+class _VisitPicker extends StatefulWidget {
+  const _VisitPicker();
+  @override
+  State<_VisitPicker> createState() => _VisitPickerState();
+}
+
+class _VisitPickerState extends State<_VisitPicker> {
+  String action = 'start';
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.app;
+    return PagedRecords(
+      key: ValueKey('$action:${app.revision}'),
+      loadPage: (afterId) => app.cursorPage('/api/agent/field/visits', afterId: afterId, query: {'action':action}),
+      header: [
+        SectionBanner(art: SectionArt.field, title: context.tr('زياراتي', 'My visits')),
+        const SizedBox(height: 12),
+        SegmentedButton<String>(
+          segments: [
+            ButtonSegment(value:'start', label:Text(context.tr('بدء زيارة','Start'))),
+            ButtonSegment(value:'resume', label:Text(context.tr('استكمال زيارة','Resume'))),
+          ],
+          selected: {action},
+          onSelectionChanged: (choice) => setState(() => action = choice.single),
+        ),
+        const SizedBox(height: 12),
+      ],
+      itemBuilder: (row) => RecordTile({...row, 'title': row['taskTitle']},
+        subtitle: display(context, row['startedAt']),
+        onTap: () => context.open(action == 'start' ? 'F05' : 'F06', id:numId(row['id']), seed:row)),
+    );
+  }
+}
+
 class _FieldLink extends StatelessWidget{
   const _FieldLink(this.route,this.id,this.icon);final String route;final int id;final IconData icon;
   @override Widget build(BuildContext context){final titles={

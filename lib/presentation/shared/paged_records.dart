@@ -7,14 +7,16 @@ import 'widgets.dart';
 class PagedRecords extends StatefulWidget {
   const PagedRecords({
     super.key,
-    required this.load,
+    this.load,
+    this.loadPage,
     required this.itemBuilder,
     this.header = const [],
     this.pageSize = 50,
     this.include,
-  });
+  }) : assert((load == null) != (loadPage == null));
 
-  final Future<List<Json>> Function(int afterId) load;
+  final Future<List<Json>> Function(int afterId)? load;
+  final Future<RecordPage> Function(int afterId)? loadPage;
   final Widget Function(Json row) itemBuilder;
   final List<Widget> header;
   final int pageSize;
@@ -70,16 +72,30 @@ class _PagedRecordsState extends State<PagedRecords> {
       error = null;
     });
     try {
-      final page = await widget.load(after);
+      final loadPage = widget.loadPage;
+      final response = loadPage == null ? null : await loadPage(after);
+      final page = response?.items ?? await widget.load!(after);
       if (!mounted || generation != request) return;
       setState(() {
-        for (final row in page) {
-          final id = numId(row['id']);
-          if (id <= cursor) continue;
-          cursor = id;
-          if (widget.include?.call(row) ?? true) records.add(row);
+        if (response != null) {
+          final known = records.map((row) => numId(row['id'])).toSet();
+          for (final row in page) {
+            if (known.add(numId(row['id'])) && (widget.include?.call(row) ?? true)) {
+              records.add(row);
+            }
+          }
+          final next = response.nextAfterId;
+          hasMore = next != null && next > after;
+          if (hasMore) cursor = next!;
+        } else {
+          for (final row in page) {
+            final id = numId(row['id']);
+            if (id <= cursor) continue;
+            cursor = id;
+            if (widget.include?.call(row) ?? true) records.add(row);
+          }
+          hasMore = page.length >= widget.pageSize && cursor > after;
         }
-        hasMore = page.length >= widget.pageSize && cursor > after;
         loading = false;
       });
     } catch (failure) {

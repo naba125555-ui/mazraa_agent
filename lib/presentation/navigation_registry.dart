@@ -14,21 +14,16 @@ enum AgentWorkspace {
 class AgentNavItem {
   const AgentNavItem(
     this.route, this.ar, this.en, this.icon, {
-    this.chooser,
     this.highlight = false,
   });
 
   final String route, ar, en;
   final IconData icon;
-  /// When a record ID is required, open a documented authorized list first.
-  final String? chooser;
   final bool highlight;
 
   String label(bool arabic) => arabic ? ar : en;
-  String get openRoute => chooser ?? route;
 
-  AgentNavItem asPrimary() =>
-      AgentNavItem(route, ar, en, icon, chooser: chooser, highlight: true);
+  AgentNavItem asPrimary() => AgentNavItem(route, ar, en, icon, highlight: true);
 }
 
 class AgentNavLayout {
@@ -70,11 +65,11 @@ abstract final class AgentNavigationRegistry {
         AgentWorkspace.clinic => allowed(app, 'C01'),
         AgentWorkspace.field => allowed(app, 'F01'),
         AgentWorkspace.branch => hasBranchAccess(app),
-        AgentWorkspace.sales => allowed(app, 'T02') || allowed(app, 'T06'),
+        AgentWorkspace.sales => ['T02','T06','T09'].any((route) => allowed(app, route)),
         AgentWorkspace.inventory => allowed(app, 'I01') || allowed(app, 'I09'),
         AgentWorkspace.finance => allowed(app, 'N01'),
         AgentWorkspace.pickup => allowed(app, 'P02'),
-        AgentWorkspace.purchasing => allowed(app, 'T12'),
+        AgentWorkspace.purchasing => allowed(app, 'T12') || allowed(app, 'T11'),
         AgentWorkspace.auctions => allowed(app, 'A01'),
       };
 
@@ -88,31 +83,31 @@ abstract final class AgentNavigationRegistry {
       AgentWorkspace.field => ['F01'],
       AgentWorkspace.branch => ['T01', 'I01', 'N01', 'P02', 'A01'],
       AgentWorkspace.account => ['H08'],
-      AgentWorkspace.sales => ['T02', 'T06'],
+      AgentWorkspace.sales => ['T02', 'T06', 'T09'],
       AgentWorkspace.inventory => ['I01', 'I09'],
       AgentWorkspace.finance => ['N01'],
       AgentWorkspace.pickup => ['P02'],
-      AgentWorkspace.purchasing => ['T12'],
+      AgentWorkspace.purchasing => ['T13','T11','T12'],
       AgentWorkspace.auctions => ['A01'],
     };
     return choices.firstWhere((route) => allowed(app, route),
         orElse: () => 'H05');
   }
 
-  static AgentWorkspace? workspaceForEntry(String route) => switch (route) {
-    'H05' || 'H01' => AgentWorkspace.home,
-    'H08' => AgentWorkspace.account,
-    'C01' => AgentWorkspace.clinic,
-    'F01' => AgentWorkspace.field,
-    'T01' => AgentWorkspace.branch,
-    'T02' => AgentWorkspace.sales,
-    'I01' => AgentWorkspace.inventory,
-    'N01' => AgentWorkspace.finance,
-    'P02' || 'P01' => AgentWorkspace.pickup,
-    'T12' || 'T11' => AgentWorkspace.purchasing,
-    'A01' => AgentWorkspace.auctions,
-    _ => null, // Keep workspace stable on detail/form screens.
-  };
+  static AgentWorkspace? workspaceForEntry(String route) {
+    if (route == 'H05' || route == 'H01') return AgentWorkspace.home;
+    if (route.startsWith('H')) return AgentWorkspace.account;
+    if (route.startsWith('C')) return AgentWorkspace.clinic;
+    if (route.startsWith('F')) return AgentWorkspace.field;
+    if (route.startsWith('I')) return AgentWorkspace.inventory;
+    if (route.startsWith('N')) return AgentWorkspace.finance;
+    if (route.startsWith('P')) return AgentWorkspace.pickup;
+    if (route.startsWith('A')) return AgentWorkspace.auctions;
+    if (route.startsWith('G') || route == 'T01') return AgentWorkspace.branch;
+    if (route == 'T07') return null; // Receipt keeps its sales or purchase origin.
+    if (['T10','T11','T12','T13','T14'].contains(route)) return AgentWorkspace.purchasing;
+    return route.startsWith('T') ? AgentWorkspace.sales : null;
+  }
 
   static AgentNavLayout resolve(AgentApp app, AgentWorkspace wanted) {
     final workspace = canEnter(app, wanted) ? wanted : AgentWorkspace.home;
@@ -125,7 +120,7 @@ abstract final class AgentNavigationRegistry {
           AgentNavItem('H05', 'الرئيسية', 'Home', Icons.home_rounded),
           AgentNavItem('C01', 'العيادة', 'Clinic', Icons.medical_services_outlined),
           AgentNavItem('F01', 'الميدان', 'Field', Icons.location_on_outlined),
-          AgentNavItem('H08', 'حسابي', 'Account', Icons.person_outline_rounded),
+          AgentNavItem('T01', 'الفرع', 'Branch', Icons.storefront_outlined),
         ]);
         candidates.addAll(const [
           AgentNavItem('T02', 'البيع', 'Sell', Icons.shopping_cart_outlined),
@@ -134,17 +129,15 @@ abstract final class AgentNavigationRegistry {
           AgentNavItem('P02', 'الاستلام', 'Pickup', Icons.local_shipping_outlined),
           AgentNavItem('A01', 'المزادات', 'Auctions', Icons.gavel_outlined),
           AgentNavItem('T12', 'المشتريات', 'Purchases', Icons.add_shopping_cart_outlined),
+          AgentNavItem('T09', 'عروض الأسعار', 'Quotes', Icons.request_quote_outlined),
           AgentNavItem('T01', 'الفرع', 'Branch', Icons.storefront_outlined),
           AgentNavItem('C01', 'استشاراتي', 'Cases', Icons.medical_services_outlined),
           AgentNavItem('F01', 'مهامي', 'Tasks', Icons.assignment_outlined),
-          AgentNavItem('H08', 'حسابي', 'Account', Icons.person_outline_rounded),
         ]);
       case AgentWorkspace.clinic:
         side.addAll(const [
           AgentNavItem('C01', 'الإحالات', 'Referrals', Icons.assignment_outlined),
-          AgentNavItem('C04', 'المراسلات', 'Messages', Icons.chat_bubble_outline, chooser: 'C01'),
           AgentNavItem('C12', 'الوصفات', 'Prescriptions', Icons.medication_outlined),
-          AgentNavItem('C09', 'المواعيد', 'Visits', Icons.event_outlined, chooser: 'C01'),
         ]);
         candidates.add(const AgentNavItem('C01', 'استشاراتي', 'My cases', Icons.medical_services_outlined));
       case AgentWorkspace.field:
@@ -152,9 +145,8 @@ abstract final class AgentNavigationRegistry {
           AgentNavItem('F01', 'مهامي', 'My tasks', Icons.assignment_outlined),
           AgentNavItem('F03', 'التقويم', 'Calendar', Icons.calendar_month_outlined),
           AgentNavItem('F09', 'الحملات', 'Campaigns', Icons.groups_outlined),
-          AgentNavItem('F11', 'التلقيح', 'Vaccination', Icons.vaccines_outlined, chooser: 'F09'),
         ]);
-        candidates.add(const AgentNavItem('F05', 'الزيارة', 'Visit', Icons.location_on_outlined));
+        candidates.add(const AgentNavItem('F05', 'زياراتي', 'Visits', Icons.location_on_outlined));
       case AgentWorkspace.branch:
         side.addAll(const [
           AgentNavItem('T06', 'الفواتير', 'Invoices', Icons.receipt_long_outlined),
@@ -186,11 +178,13 @@ abstract final class AgentNavigationRegistry {
           AgentNavItem('T08', 'المرتجعات', 'Returns', Icons.assignment_return_outlined),
           AgentNavItem('N07', 'التسويات', 'Settlement', Icons.account_balance_outlined),
         ]);
-        candidates.add(const AgentNavItem('T02', 'نقطة البيع', 'Checkout', Icons.shopping_cart_outlined));
+        candidates.addAll(const [
+          AgentNavItem('T02', 'نقطة البيع', 'Checkout', Icons.shopping_cart_outlined),
+          AgentNavItem('T09', 'عروض الأسعار', 'Quotes', Icons.request_quote_outlined),
+        ]);
       case AgentWorkspace.inventory:
         side.addAll(const [
           AgentNavItem('I01', 'الأرصدة', 'Stock', Icons.inventory_2_outlined),
-          AgentNavItem('I03', 'الدفعات', 'Batches', Icons.layers_outlined, chooser: 'I01'),
           AgentNavItem('I06', 'التحويلات', 'Transfers', Icons.swap_horiz_outlined),
           AgentNavItem('I05', 'التنبيهات', 'Alerts', Icons.notifications_active_outlined),
         ]);
@@ -209,14 +203,9 @@ abstract final class AgentNavigationRegistry {
       case AgentWorkspace.pickup:
         side.addAll(const [
           AgentNavItem('P02', 'الطابور', 'Queue', Icons.list_alt_outlined),
-          AgentNavItem('P03', 'الحيازة', 'Custody', Icons.inventory_outlined, chooser: 'P02'),
-          AgentNavItem('P05', 'الرفوف', 'Shelves', Icons.view_module_outlined, chooser: 'P02'),
-          AgentNavItem('P07', 'الاستثناءات', 'Exceptions', Icons.report_outlined, chooser: 'P02'),
+          AgentNavItem('P01', 'نقاط الاستلام', 'Pickup points', Icons.location_on_outlined),
         ]);
-        candidates.addAll(const [
-          AgentNavItem('P06', 'التسليم', 'Handover', Icons.handshake_outlined, chooser: 'P02'),
-          AgentNavItem('P02', 'الطلبات', 'Orders', Icons.local_shipping_outlined),
-        ]);
+        candidates.add(const AgentNavItem('P06', 'الجاهزة', 'Ready', Icons.handshake_outlined));
       case AgentWorkspace.purchasing:
         side.addAll(const [
           AgentNavItem('T11', 'المشتريات', 'Purchases', Icons.receipt_long_outlined),
@@ -228,47 +217,23 @@ abstract final class AgentNavigationRegistry {
       case AgentWorkspace.auctions:
         side.addAll(const [
           AgentNavItem('A01', 'مزاداتي', 'Auctions', Icons.gavel_outlined),
-          AgentNavItem('A07', 'المزايدات', 'Bids', Icons.trending_up_outlined, chooser: 'A01'),
-          AgentNavItem('A06', 'النشر', 'Publish', Icons.publish_outlined, chooser: 'A01'),
-          AgentNavItem('A08', 'الفائزون', 'Winners', Icons.emoji_events_outlined, chooser: 'A01'),
         ]);
         candidates.add(const AgentNavItem('A02', 'مزاد جديد', 'New auction', Icons.add_circle_outline));
     }
 
-    final primary = candidates
-        .where((item) => allowed(app, item.route) &&
-            (item.chooser == null || allowed(app, item.chooser!)) &&
-            (item.route != 'T01' || hasBranchAccess(app)))
-        .firstOrNull ??
-        const AgentNavItem('H08', 'حسابي', 'Account',
-            Icons.person_outline_rounded);
-
-    // The first physical destination is always Home (right in RTL, left in
-    // LTR). It does not consume the elevated central action and is present
-    // for clinical, field, commerce, and account contexts alike.
-    const home = AgentNavItem(
-        'H05', 'الرئيسية', 'Home', Icons.home_rounded);
+    bool visible(AgentNavItem item) => allowed(app, item.route)
+        && (item.route != 'T01' || hasBranchAccess(app));
+    final primary = candidates.where(visible).firstOrNull;
+    const home = AgentNavItem('H05', 'الرئيسية', 'Home', Icons.home_rounded);
     final options = <AgentNavItem>[home];
+    final seen = {'H05', if (primary != null) primary.route};
     for (final item in side) {
-      if (!allowed(app, item.route) ||
-          (item.chooser != null && !allowed(app, item.chooser!)) ||
-          item.route == primary.route ||
-          options.any((existing) => existing.route == item.route)) {
-        continue;
-      }
-      options.add(item);
+      if (visible(item) && seen.add(item.route)) options.add(item);
     }
-
-    // Five slots at most, including the permanent Home and highlighted
-    // action. Keep the primary in the physical center when four side
-    // destinations are allowed; otherwise leave no fake unauthorized tabs.
+    if (primary == null) return AgentNavLayout(workspace, options.take(5).toList(), -1);
     final before = options.take(2).toList();
-    final after = options.skip(2).take(2).toList();
-    final items = <AgentNavItem>[
-      ...before,
-      primary.asPrimary(),
-      ...after,
-    ];
-    return AgentNavLayout(workspace, items, before.length);
+    return AgentNavLayout(workspace, [
+      ...before, primary.asPrimary(), ...options.skip(2).take(2),
+    ], before.length);
   }
 }

@@ -17,6 +17,7 @@ import 'package:mazraa_agent/presentation/features/sign_in.dart';
 import 'package:mazraa_agent/presentation/features/home_insights_carousel.dart';
 import 'package:mazraa_agent/presentation/navigation.dart';
 import 'package:mazraa_agent/presentation/shared/paged_records.dart';
+import 'package:mazraa_agent/presentation/shared/forms.dart';
 import 'package:mazraa_agent/presentation/shared/scope.dart';
 import 'package:mazraa_agent/presentation/shared/section_banner.dart';
 import 'package:mazraa_agent/presentation/shared/widgets.dart';
@@ -365,7 +366,8 @@ void main(){
     await tester.pumpAndSettle();
     final navigation = find.byType(AgentGlassNavigationBar);
     final dock = tester.widget<AgentGlassNavigationBar>(navigation);
-    expect(dock.layout.items.length, inInclusiveRange(2,5));
+    expect(dock.layout.items.single.route, 'H05');
+    expect(dock.layout.primaryIndex, -1);
     expect(dock.layout.items.any((item) => item.route=='C01'||item.route=='I01'), isFalse);
     final context = tester.element(find.byType(ScreenPage));
     context.open('C02', id: 7);
@@ -405,19 +407,46 @@ void main(){
     app.dispose();
   });
 
-  testWidgets('All 92 routes render without uncaught errors',(tester)async{
-    tester.view.physicalSize=const Size(430,932);tester.view.devicePixelRatio=1;
-    addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
-    final app=fixture('ar','light');
-    for(final spec in screens){
-      await tester.pumpWidget(host(app,ScreenPage(spec.id,key:ValueKey(spec.id),id:1)));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(),isNull,reason:spec.id);
-      expect(find.byKey(const ValueKey('agent-wave-viewport')),
-        spec.id=='H05'?findsOneWidget:findsNothing,reason:spec.id);
-      expect(find.byType(AgentHomeScopeStrip),
-        spec.id=='H05'?findsOneWidget:findsNothing,reason:spec.id);
-      await tester.pumpWidget(const SizedBox.shrink());
-    }app.dispose();
+  testWidgets('Prepaid pickup is actionable without a cash grant', (tester) async {
+    final app=fixture('en','light');
+    app.access=Access(grants:[Grant({'id':1,'warehouseId':1,'capabilities':Cap.pickup})]);
+    final repo=app.repo as FakeRepository;
+    await tester.pumpWidget(host(app,const ScreenPage('P06',id:1)));
+    await tester.pumpAndSettle();
+    expect(find.byType(OperationPage),findsOneWidget);
+    expect(find.text('Review details'),findsOneWidget);
+
+    repo.responses['/api/agent/pickup/requests/1']={
+      'id':1,'version':2,'status':'Active','canComplete':false,
+      'paymentStatus':'Pending','requiresCash':true,'cashToCollect':50,'cashShiftReady':false,
+    };
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.changed();
+    await tester.pumpWidget(host(app,const ScreenPage('P06',id:1)));
+    await tester.pumpAndSettle();
+    expect(find.byType(OperationPage),findsNothing);
+    expect(find.text('Cash collection requires an assigned cashbox and open shift.'),findsOneWidget);
+    expect(repo.writes,isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
   });
+
+  for(final (language,mode) in [('ar','light'),('en','dark')]) {
+    testWidgets('All 92 routes render in $language $mode',(tester)async{
+      tester.view.physicalSize=const Size(430,932);tester.view.devicePixelRatio=1;
+      addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
+      final app=fixture(language,mode);
+      for(final spec in screens){
+        await tester.pumpWidget(host(app,ScreenPage(spec.id,key:ValueKey(spec.id),id:1)));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(),isNull,reason:spec.id);
+        expect(find.byKey(const ValueKey('agent-wave-viewport')),
+          spec.id=='H05'?findsOneWidget:findsNothing,reason:spec.id);
+        expect(find.byType(AgentHomeScopeStrip),
+          spec.id=='H05'?findsOneWidget:findsNothing,reason:spec.id);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+      app.dispose();
+    });
+  }
 }

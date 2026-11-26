@@ -25,7 +25,6 @@ void main() {
       for(final item in layout.items){
         expect(AgentNavigationRegistry.allowed(app,item.route),isTrue,
           reason:'Unauthorized '+item.route+' in '+workspace.name);
-        expect(AgentNavigationRegistry.allowed(app,item.openRoute),isTrue);
       }
     }
     expect(AgentNavigationRegistry.available(app),hasLength(11));
@@ -38,7 +37,7 @@ void main() {
       (false,Cap.cash,'N01'),
       (false,Cap.pickup,'P02'),
       (false,Cap.auction,'A01'),
-      (false,Cap.sell,'T01'),
+      (false,Cap.sell,'T09'),
       (false,Cap.purchase,'T12'),
       (false,Cap.transfer,'T01'),
       (false,Cap.sell|Cap.cash,'T02'),
@@ -67,19 +66,19 @@ void main() {
     expect(countLayout.items[countLayout.primaryIndex].route,'I09');
     counter.dispose();
   });
-  test('a record-dependent destination opens the documented chooser',(){
-    final app=agentWith(doctor:true,bits:Cap.pickup|Cap.cash);
+  test('record actions stay on details while ready orders have a dedicated list',(){
+    final app=agentWith(doctor:true,bits:Cap.pickup);
     final clinic=AgentNavigationRegistry.resolve(app,AgentWorkspace.clinic);
-    expect(clinic.items.firstWhere((item)=>item.route=='C04').openRoute,'C01');
+    expect(clinic.items.any((item)=>item.route=='C04'||item.route=='C09'),isFalse);
     final pickup=AgentNavigationRegistry.resolve(app,AgentWorkspace.pickup);
-    expect(pickup.items.firstWhere((item)=>item.route=='P06').openRoute,'P02');
+    expect(pickup.items[pickup.primaryIndex].route,'P06');
     app.dispose();
   });
   test('detail routes do not silently reset workspace identity',(){
     expect(AgentNavigationRegistry.workspaceForEntry('H05'),AgentWorkspace.home);
     expect(AgentNavigationRegistry.workspaceForEntry('T02'),AgentWorkspace.sales);
     expect(AgentNavigationRegistry.workspaceForEntry('I01'),AgentWorkspace.inventory);
-    expect(AgentNavigationRegistry.workspaceForEntry('C04'),isNull);
-    expect(AgentNavigationRegistry.workspaceForEntry('P03'),isNull);
+    expect(AgentNavigationRegistry.workspaceForEntry('C04'),AgentWorkspace.clinic);
+    expect(AgentNavigationRegistry.workspaceForEntry('P03'),AgentWorkspace.pickup);
   });
 }

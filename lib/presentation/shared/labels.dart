@@ -52,6 +52,7 @@ const words=<String,List<String>>{
   'stage':['مرحلة الحالة','Case stage'],'priority':['الأولوية','Priority'],
   'countedOpening':['الرصيد الافتتاحي المعدود','Counted opening balance'],'countedClosing':['الرصيد الختامي المعدود','Counted closing balance'],
   'code':['رمز التحقق','Verification code'],'accessCode':['رمز موافقة صاحب الوصفة','Prescription consent code'],
+  'cashToCollect':['النقد المطلوب تحصيله','Cash to collect'],'paymentStatus':['حالة الدفع','Payment status'],'orderStatus':['حالة الطلب','Order status'],
   'cashCollected':['النقد المستلم','Cash collected'],'shelf':['الرف / مكان التخزين','Shelf / storage location'],
   'deadline':['آخر موعد للاستلام','Collection deadline'],'itemsVerified':['راجعت الأصناف والكميات فعليًا','I physically verified the items and quantities'],
   'itemsReceived':['استلمت الأصناف فعليًا','I physically received the items'],

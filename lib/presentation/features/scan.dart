@@ -25,8 +25,14 @@ class _ProductScanPageState extends State<ProductScanPage>{
     BusyButton(label:context.tr('البحث عن المنتج','Find product'),run:resolve),if(busy)const LinearProgressIndicator(),
     if(error!=null)...[const SizedBox(height:14),Notice(failureText(context,error!),error:true)],
     if(match!=null)...[Heading(context.tr('النتيجة المطابقة','Matched result')),Facts(obj(match!['product'])),
-      if(match!['variantId']!=null)FilledButton(onPressed:()=>context.open('T04',id:numId(match!['variantId'])),child:Text(context.tr('عرض الصنف','View variant')))
-      else Resource(load:()=>context.app.read('/api/product-variants'),builder:(data,refresh)=>Column(children:[
-        for(final variant in rows(data).where((v)=>v['productId']==match!['productId']))RecordTile(variant,onTap:()=>context.open('T04',id:numId(variant['id']))) ]))],
+      if(!context.app.allows(Cap.sell) && !context.app.allows(Cap.inventory))
+        Notice(context.tr('يتطلب عرض الدفعات تفويض البيع أو المخزون.', 'Batch details require sales or inventory access.'))
+      else if(match!['variantId']!=null)FilledButton(onPressed:()=>context.open('T04',id:numId(match!['variantId'])),child:Text(context.tr('عرض الصنف','View variant')))
+      else if(numId(match!['productId'])>0) Resource(
+        identity: match!['productId'], load:()=>context.app.read('/api/product-variants/by-product/${match!['productId']}'),
+        builder:(data,refresh)=>Column(children:[
+          if(rows(data).isEmpty) const Empty(),
+          for(final variant in rows(data))RecordTile(variant,onTap:()=>context.open('T04',id:numId(variant['id'])))
+        ]))],
   ]);
 }

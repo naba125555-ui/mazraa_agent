@@ -11,12 +11,12 @@ class AgentGlassNavigationBar extends StatelessWidget {
   final ValueChanged<AgentNavItem> onSelect;
   @override Widget build(BuildContext context) {
     final dark=Theme.of(context).brightness==Brightness.dark;
-    final center=layout.items[layout.primaryIndex];
-    final before=layout.items.take(layout.primaryIndex).toList();
-    final after=layout.items.skip(layout.primaryIndex+1).toList();
+    final center=layout.primaryIndex<0 ? null : layout.items[layout.primaryIndex];
+    final before=center==null ? layout.items : layout.items.take(layout.primaryIndex).toList();
+    final after=center==null ? const <AgentNavItem>[] : layout.items.skip(layout.primaryIndex+1).toList();
     return SafeArea(top:false,minimum:const EdgeInsets.only(bottom:7),child:Padding(
       padding:const EdgeInsets.symmetric(horizontal:12),
-      child:SizedBox(height:102,child:Stack(alignment:Alignment.bottomCenter,clipBehavior:Clip.none,children:[
+      child:SizedBox(height:center==null?81:102,child:Stack(alignment:Alignment.bottomCenter,clipBehavior:Clip.none,children:[
         Positioned(left:0,right:0,bottom:0,height:81,child:AnimatedSwitcher(
           duration:const Duration(milliseconds:220),
           child:ClipRRect(key:ValueKey(layout.workspace),borderRadius:BorderRadius.circular(28),
@@ -29,14 +29,16 @@ class AgentGlassNavigationBar extends StatelessWidget {
               ),child:Row(children:[
                 Expanded(child:Row(children:[for(final item in before) Expanded(child:_DockItem(
                   item:item,arabic:arabic,dark:dark,selected:selectedRoute==item.route,onTap:()=>onSelect(item)))])),
-                const SizedBox(width:72),
-                Expanded(child:Row(children:[for(final item in after) Expanded(child:_DockItem(
-                  item:item,arabic:arabic,dark:dark,selected:selectedRoute==item.route,onTap:()=>onSelect(item)))])),
+                if(center!=null)...[
+                  const SizedBox(width:72),
+                  Expanded(child:Row(children:[for(final item in after) Expanded(child:_DockItem(
+                    item:item,arabic:arabic,dark:dark,selected:selectedRoute==item.route,onTap:()=>onSelect(item)))])),
+                ],
               ])),
             ),
           ),
         )),
-        Positioned(top:0,child:Semantics(button:true,label:center.label(arabic),child:Tooltip(
+        if(center!=null) Positioned(top:0,child:Semantics(button:true,label:center.label(arabic),child:Tooltip(
           message:center.label(arabic),
           child:Material(color:Colors.transparent,child:InkWell(
             key:const ValueKey('agent-primary-navigation'),
@@ -50,7 +52,7 @@ class AgentGlassNavigationBar extends StatelessWidget {
             ),child:Icon(center.icon,size:31,color:Colors.white)),
           )),
         ))),
-        Positioned(bottom:5,child:SizedBox(width:75,height:18,child:FittedBox(fit:BoxFit.scaleDown,child:Text(center.label(arabic),
+        if(center!=null) Positioned(bottom:5,child:SizedBox(width:75,height:18,child:FittedBox(fit:BoxFit.scaleDown,child:Text(center.label(arabic),
           textAlign:TextAlign.center,maxLines:1,overflow:TextOverflow.ellipsis,
           style:TextStyle(fontWeight:FontWeight.w900,fontSize:10,color:dark?Colors.white:const Color(0xFF103D30)))))),
       ])),

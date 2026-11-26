@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../application/agent_app.dart';
@@ -5,6 +6,7 @@ import '../../application/workflows.dart';
 import '../../domain/models.dart';
 import '../navigation.dart';
 import 'labels.dart';
+import 'paged_records.dart';
 import 'scope.dart';
 import 'widgets.dart';
 import 'scanner.dart';
@@ -43,7 +45,7 @@ class _OperationPageState extends State<OperationPage>{
   @override void initState(){super.initState();values={for(final f in widget.operation.fields)f.key:f.initial,...widget.initial};}
   Future<void> submit()async{
     final app = context.app, op = widget.operation;
-    if (busy || !_canRun(app, op)) return;
+    if (busy || !_canRun(app, op) || (op.key == 'handover' && widget.seed['canComplete'] != true)) return;
     if(!review){if(!form.currentState!.validate())return;form.currentState!.save();}
     if(widget.operation.fields.any((f)=>f.kind==InputKind.boolean&&f.key.startsWith('items')&&values[f.key]!=true)){
       toast(context,context.tr('يجب توثيق التحقق الفعلي أولًا.','Confirm the physical verification first.'));return;
@@ -85,7 +87,7 @@ class _OperationPageState extends State<OperationPage>{
     }catch(e){if(mounted)setState(()=>error=e);}finally{if(mounted)setState(()=>busy=false);}
   }
   @override Widget build(BuildContext context){final op=widget.operation,app=context.app;
-    final allowed = _canRun(app, op);
+    final allowed = _canRun(app, op) && (op.key != 'handover' || widget.seed['canComplete'] == true);
     if (!allowed) {
       final denial = PageBody(children: [
         Notice(context.tr('لا تملك صلاحية هذه العملية في نطاق العمل الحالي.','This operation is unavailable in this work context.'),error: true),
@@ -93,6 +95,7 @@ class _OperationPageState extends State<OperationPage>{
       return widget.embedded ? denial : Scaffold(appBar: AppBar(title: Text(app.tr(op.ar, op.en))), body: denial);
     }
     final content=Form(key:form,child:PageBody(children:[
+      if(op.key=='handover')Facts(widget.seed,fields:['paymentStatus','cashToCollect','currency']),
       if(op.version)Padding(padding:const EdgeInsets.only(bottom:14),child:StatusTag(str(widget.seed['status']))),
       if(op.key=='profile')Padding(padding:const EdgeInsets.only(bottom:16),child:BusyButton(icon:Icons.account_circle_outlined,label:context.tr('تحديث الصورة الشخصية','Update profile photo'),run:()async{
         final image=await ImagePicker().pickImage(source:ImageSource.gallery,maxWidth:1000,imageQuality:85);if(image==null)return;
@@ -106,8 +109,17 @@ class _OperationPageState extends State<OperationPage>{
           Heading(word(context,field.key)),for(final row in maps(values[field.key]))Padding(padding:const EdgeInsets.only(bottom:10),child:Facts(row))],
         TextButton(onPressed:busy?null:()=>setState((){review=false;if(op.key=='sale'){values['quoteId']=null;quoted=null;}}),child:Text(context.tr('تعديل البيانات','Edit details'))),
       ],
-      Offstage(offstage:review,child:Column(children:[for(final field in op.fields.where((f)=>!(op.key=='visitState'&&widget.seed['status']=='Scheduled'&&['diagnosis','findings','treatment','recommendations'].contains(f.key))))Padding(padding:const EdgeInsets.only(bottom:15),
-        child:InputControl(spec:field,value:values[field.key],parentValues:values,onChanged:(v)=>setState(()=>values[field.key]=v)))])),
+      Offstage(offstage:review,child:Column(children:[for(final field in op.fields.where((f)=>!(op.key=='return'&&widget.id!=null&&f.key=='originalDocumentId')&&!(op.key=='visitState'&&widget.seed['status']=='Scheduled'&&['diagnosis','findings','treatment','recommendations'].contains(f.key))))Padding(padding:const EdgeInsets.only(bottom:15),
+        child:InputControl(spec:field,value:values[field.key],parentValues:{
+          ...values, '_sourceLines':payload(widget.seed)['lines'],
+          '_batchPurpose':switch (op.key) {
+            'sale' || 'quote' => 'sale',
+            'transfer' => 'transfer',
+            'stockCount' => 'count',
+            'dispense' || 'releasePrescription' => 'dispense',
+            _ => 'inventory',
+          },
+        },onChanged:(v)=>setState(()=>values[field.key]=v)))])),
       if(error!=null)...[Notice(failureText(context,error!),error:true),const SizedBox(height:14)],
       FilledButton.icon(onPressed:!allowed||busy?null:submit,
         icon:busy?const SizedBox.square(dimension:18,child:CircularProgressIndicator(strokeWidth:2)):Icon(review?Icons.verified_outlined:Icons.fact_check_outlined),
@@ -123,7 +135,8 @@ class _OperationPageState extends State<OperationPage>{
 }
 
 class InputControl extends StatelessWidget{
-  const InputControl({super.key,required this.spec,required this.value,required this.onChanged,this.parentValues=const {}});
+  const InputControl({super.key,required this.spec,required this.value,required this.onChanged,this.parentValues=const {},this.onRecordSelected});
+  final ValueChanged<Json>? onRecordSelected;
   final InputSpec spec;final Object? value;final ValueChanged<Object?> onChanged;final Json parentValues;
   @override Widget build(BuildContext context){final f=spec;final title=word(context,f.key);
     switch(f.kind){
@@ -143,8 +156,8 @@ class InputControl extends StatelessWidget{
           if(state.hasError)Text(state.errorText!,style:TextStyle(color:Theme.of(context).colorScheme.error))]));
       case InputKind.reference:return FormField<int>(initialValue:value==null?null:numId(value),validator:(v)=>f.required&&(v??0)<=0?context.tr('اختر السجل','Select a record'):null,
         builder:(state)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[OutlinedButton.icon(onPressed:()async{
-          final result=await chooseReference(context,f.source!,parentValues:parentValues);if(result==null)return;
-          final id=numId(result['id']);state.didChange(id);onChanged(id);
+          final result=await chooseReference(context,f.source!,parentValues:parentValues);if(result==null||!state.mounted)return;
+          final id=numId(result['id']);state.didChange(id);onChanged(id);onRecordSelected?.call(result);
         },icon:const Icon(Icons.search),label:Text(value==null?title:'$title · #$value')),
           if(state.hasError)Text(state.errorText!,style:TextStyle(color:Theme.of(context).colorScheme.error))]));
       case InputKind.lines:return LineItems(mode:f.mode!,value:maps(value),onChanged:onChanged,parentValues:parentValues);
@@ -176,27 +189,92 @@ class ReferencePicker extends StatefulWidget{
   @override State<ReferencePicker> createState()=>_ReferencePickerState();
 }
 class _ReferencePickerState extends State<ReferencePicker>{
-  String search='';
-  Future<dynamic> load()async{final app=context.app;
-    switch(widget.source){
-      case 'products':return app.read('/api/product-variants');
-      case 'suppliers':return app.read('/api/Suppliers');
-      case 'customers':return app.read('/api/Users/customers');
-      case 'warehouses':return app.read('/api/Warehouses');
-      case 'animals':return app.read('/api/Animals');
-      case 'documents':return app.all('/api/agent/commerce/documents',query:app.scoped());
-      case 'originalItems':return obj(await app.record('document',numId(widget.parentValues['originalDocumentId'])))['items'];
-      case 'batches':
-        final stock=await app.all('/api/agent/commerce/inventory',query:app.scoped(),pageSize:100);
-        return [for(final item in stock)for(final b in maps(item['batches'])){...b,'name':'${b['batchNumber']} · #${item['productVariantId']}','productVariantId':item['productVariantId']}];
-      default:return [];
+  String search = '';
+  Timer? debounce;
+  int? openedScope;
+
+  ({String path, String? purpose})? get directory => switch (widget.source) {
+    'suppliers' => (path: 'suppliers', purpose: null),
+    'proposalSuppliers' => (path: 'suppliers', purpose: 'proposal'),
+    'statementSuppliers' => (path: 'suppliers', purpose: 'statement'),
+    'customers' => (path: 'customers', purpose: null),
+    'statementCustomers' => (path: 'customers', purpose: 'statement'),
+    'warehouses' => (path: 'transfer-destinations', purpose: null),
+    'batches' => (path: 'stock-batches', purpose: str(widget.parentValues['_batchPurpose']).isEmpty ? 'inventory' : str(widget.parentValues['_batchPurpose'])),
+    _ => null,
+  };
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    openedScope ??= context.app.scopeRevision;
+  }
+
+  @override
+  void dispose() {
+    debounce?.cancel();
+    super.dispose();
+  }
+
+  Future<dynamic> load() async {
+    final app = context.app;
+    switch (widget.source) {
+      case 'products': return app.read('/api/product-variants');
+      case 'animals': return app.read('/api/Animals');
+      case 'documents': return app.all('/api/agent/commerce/documents', query: app.scoped());
+      case 'originalItems': return (await app.record('document', numId(widget.parentValues['originalDocumentId'])))['items'];
+      case 'transferLines':
+        return [for (final line in maps(widget.parentValues['_sourceLines']))
+          if (decimal(line['sent']) > decimal(line['received']) + decimal(line['resolved']))
+            {...line, 'id':line['batchId'], 'name':line['batchNumber'],
+             'remaining':decimal(line['sent'])-decimal(line['received'])-decimal(line['resolved'])}];
+      case 'purchaseLines':
+        return [for (final line in maps(widget.parentValues['_sourceLines']))
+          if (decimal(line['quantity']) > decimal(line['received']))
+            {...line, 'id':line['productVariantId'], 'remaining':decimal(line['quantity'])-decimal(line['received'])}];
+      default: return [];
     }
   }
-  @override Widget build(BuildContext context)=>Column(children:[Padding(padding:const EdgeInsets.all(16),child:TextField(
-    decoration:InputDecoration(prefixIcon:const Icon(Icons.search),hintText:context.tr('بحث بالاسم أو الرقم','Search name or reference')),onChanged:(v)=>setState(()=>search=v.toLowerCase()))),
-    Expanded(child:Resource(load:load,builder:(data,refresh){final list=rows(data).where((r)=>'${titleOf(r)} ${r['id']} ${r['sku']}'.toLowerCase().contains(search)).toList();
-      return PageBody(children:list.isEmpty?[const Empty()]:[for(final row in list)RecordTile(row,onTap:()=>Navigator.pop(context,row),
-        subtitle:str(row['sku']??row['email']??row['phone']))]);}))]);
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.app;
+    if (openedScope != app.scopeRevision) {
+      return PageBody(children: [Notice(context.tr('تغيّر نطاق العمل. افتح الاختيار مجددًا.', 'Work scope changed. Reopen the picker.'))]);
+    }
+    final remote = directory;
+    Widget tile(Json row) => RecordTile(row, onTap: () => Navigator.pop(context, row),
+      subtitle: str(row['sku'] ?? row['code']));
+    return Column(children: [
+      Padding(padding: const EdgeInsets.all(16), child: TextField(
+        decoration: InputDecoration(prefixIcon: const Icon(Icons.search),
+          hintText: widget.source == 'customers'
+              ? context.tr('الاسم أو الهاتف أو البريد الكامل', 'Name or exact phone or email')
+              : context.tr('ابحث بالاسم', 'Search by name')),
+        onChanged: (text) {
+          debounce?.cancel();
+          debounce = Timer(const Duration(milliseconds: 240), () {
+            if (mounted) setState(() => search = text.trim());
+          });
+        },
+      )),
+      Expanded(child: remote != null
+        ? PagedRecords(
+          key: ValueKey('${widget.source}:$search'),
+          loadPage: (afterId) => app.cursorPage('/api/agent/directory/${remote.path}',
+            afterId: afterId, query: app.scoped({
+              if (search.isNotEmpty) 'search': search,
+              if (remote.purpose != null) 'purpose': remote.purpose,
+            })),
+          itemBuilder: tile,
+        )
+        : Resource(load: load, builder: (data, refresh) {
+          final result = rows(data).where((row) =>
+              '${titleOf(row)} ${row['id']} ${row['sku']}'.toLowerCase().contains(search.toLowerCase())).toList();
+          return PageBody(children: result.isEmpty ? [const Empty()] : [for (final row in result) tile(row)]);
+        })),
+    ]);
+  }
 }
 
 class LineItems extends StatefulWidget{
@@ -209,6 +287,9 @@ class _LineItemsState extends State<LineItems>{
     'stock'=>[const InputSpec('batchId',kind:InputKind.reference,source:'batches'),const InputSpec('quantity',kind:InputKind.number)],
     'count'=>[const InputSpec('batchId',kind:InputKind.reference,source:'batches'),const InputSpec('counted',kind:InputKind.number)],
     'prescription'=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'products'),const InputSpec('quantity',kind:InputKind.number),const InputSpec('instructions',kind:InputKind.longText)],
+    'transferReceipt'=>[const InputSpec('batchId',kind:InputKind.reference,source:'transferLines'),const InputSpec('quantity',kind:InputKind.number)],
+    'purchaseReceipt'=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'purchaseLines'),const InputSpec('quantity',kind:InputKind.number),
+      const InputSpec('unitCost',kind:InputKind.number),const InputSpec('batchNumber'),const InputSpec('expiryDate',kind:InputKind.date)],
     'purchase'=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'products'),const InputSpec('quantity',kind:InputKind.number),
       const InputSpec('unitCost',kind:InputKind.number),const InputSpec('batchNumber'),const InputSpec('expiryDate',kind:InputKind.date,required:false)],
     'return'=>[const InputSpec('originalItemId',kind:InputKind.reference,source:'originalItems'),const InputSpec('quantity',kind:InputKind.number)],
@@ -221,14 +302,26 @@ class _LineItemsState extends State<LineItems>{
     final result=await showModalBottomSheet<Json>(context:context,isScrollControlled:true,useSafeArea:true,builder:(c)=>StatefulBuilder(builder:(c,setModal)=>
       Padding(padding:EdgeInsets.fromLTRB(18,0,18,MediaQuery.viewInsetsOf(c).bottom+24),child:SingleChildScrollView(child:Form(key:key,child:Column(mainAxisSize:MainAxisSize.min,children:[
         Heading(c.tr('تفاصيل البند','Line details')),for(final field in fields)Padding(padding:const EdgeInsets.only(bottom:13),child:InputControl(
-          spec:field,value:values[field.key],parentValues:widget.parentValues,onChanged:(v)=>setModal(()=>values[field.key]=v))),
+          spec:field,value:values[field.key],parentValues:widget.parentValues,onChanged:(v)=>setModal(()=>values[field.key]=v),
+          onRecordSelected:field.key=='batchId' ? (row)=>values['productVariantId']=row['productVariantId'] : null,
+        )),
         FilledButton(onPressed:()async{
           if(!key.currentState!.validate())return;key.currentState!.save();
           if(widget.mode=='auction'&&((values['animalId']==null)==(values['productVariantId']==null))){toast(c,c.tr('اختر حيوانًا أو منتجًا واحدًا للبند.','Choose exactly one animal or product.'));return;}
-          if(widget.mode=='stock'){
-            final stock=await context.app.all('/api/agent/commerce/inventory',query:context.app.scoped(),pageSize:100);
-            final item=stock.where((s)=>maps(s['batches']).any((b)=>b['id']==values['batchId'])).firstOrNull;
-            if(item==null)return;values['productVariantId']=item['productVariantId'];
+          if (['stock','transferReceipt'].contains(widget.mode) && numId(values['productVariantId']) <= 0) return;
+          if (['transferReceipt','purchaseReceipt'].contains(widget.mode)) {
+            final transfer = widget.mode=='transferReceipt';
+            final key = transfer ? 'batchId' : 'productVariantId';
+            final source = maps(widget.parentValues['_sourceLines'])
+                .where((line)=>line[key]==values[key]).firstOrNull;
+            final remaining = source == null ? 0.0 : transfer
+                ? decimal(source['sent'])-decimal(source['received'])-decimal(source['resolved'])
+                : decimal(source['quantity'])-decimal(source['received']);
+            if (decimal(values['quantity']) <= 0 || decimal(values['quantity']) > remaining
+                || (!transfer && (decimal(values['unitCost']) < 0 || decimal(values['unitCost']) > decimal(source?['unitCost'])))) {
+              toast(c,c.tr('الكمية أو التكلفة تتجاوز البند المعتمد.', 'Quantity or cost is outside the approved line.'));
+              return;
+            }
           }
           if(c.mounted)Navigator.pop(c,values);
         },child:Text(c.tr('حفظ البند','Save line'))),

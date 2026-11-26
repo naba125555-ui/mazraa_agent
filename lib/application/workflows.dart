@@ -73,7 +73,7 @@ const operations=<String,Operation>{
   'transfer':Operation('transfer','إرسال التحويل','Dispatch stock','/api/agent/commerce/transfers',[
     InputSpec('destinationWarehouseId',kind:InputKind.reference,source:'warehouses'),stockLines,notesField],scope:true,cap:8),
   'receiveTransfer':Operation('receiveTransfer','تأكيد الاستلام الفعلي','Confirm receipt','/api/agent/commerce/transfers/{id}/receive',[
-    stockLines],scope:true,version:true,cap:8),
+    InputSpec('lines',kind:InputKind.lines,mode:'transferReceipt')],scope:true,version:true,cap:8),
   'stockCount':Operation('stockCount','إرسال الجرد للمراجعة','Submit stock count','/api/agent/commerce/stock-counts',[
     InputSpec('lines',kind:InputKind.lines,mode:'count'),reason],scope:true,cap:16),
   'sale':Operation('sale','ترحيل البيع','Post sale','/api/agent/commerce/documents',[
@@ -88,10 +88,10 @@ const operations=<String,Operation>{
   'procurement':Operation('procurement','إرسال طلب الشراء','Submit purchase request','/api/agent/procurement',[
     InputSpec('supplierId',kind:InputKind.reference,source:'suppliers'),purchaseLines,reason],scope:true,cap:4),
   'receivePurchase':Operation('receivePurchase','استلام دفعات الشراء','Receive purchased batches','/api/agent/procurement/{id}/receive',[
-    purchaseLines,InputSpec('paidAmount',kind:InputKind.number),InputSpec('paymentMethod',kind:InputKind.choice,options:['Cash','BankTransfer']),
+    InputSpec('lines',kind:InputKind.lines,mode:'purchaseReceipt'),InputSpec('paidAmount',kind:InputKind.number),InputSpec('paymentMethod',kind:InputKind.choice,options:['Cash','BankTransfer']),
     InputSpec('bankReference',required:false),InputSpec('itemsReceived',kind:InputKind.boolean,initial:false)],scope:true,version:true,cap:36),
   'return':Operation('return','إرسال المرتجع للمراجعة','Submit return','/api/agent/returns',[
-    InputSpec('originalDocumentId',kind:InputKind.reference,source:'documents'),InputSpec('lines',kind:InputKind.lines,mode:'return'),reason],scope:true),
+    InputSpec('originalDocumentId',kind:InputKind.reference,source:'documents'),InputSpec('lines',kind:InputKind.lines,mode:'return'),reason],scope:true,cap:1),
   'openShift':Operation('openShift','فتح الوردية','Open shift','/api/agent/commerce/shifts',[
     InputSpec('countedOpening',kind:InputKind.number)],scope:true,cap:32),
   'closeShift':Operation('closeShift','إقفال الوردية','Close shift','/api/agent/commerce/shifts/{id}/close',[
@@ -106,7 +106,7 @@ const operations=<String,Operation>{
   'shelf':Operation('shelf','تحديث موقع الحفظ','Update storage location','/api/agent/pickup/requests/{id}/shelf',[
     InputSpec('shelf'),InputSpec('deadline',kind:InputKind.date)],scope:true,version:true,cap:64),
   'handover':Operation('handover','تأكيد التسليم والتحصيل','Confirm handover','/api/agent/pickup/requests/{id}/complete',[
-    InputSpec('code'),InputSpec('cashCollected',kind:InputKind.number)],scope:true,version:true,cap:96),
+    InputSpec('code')],scope:true,version:true,cap:64),
   'pickupIssue':Operation('pickupIssue','توثيق الاستثناء','Record pickup exception','/api/agent/pickup/requests/{id}/exceptions',[
     InputSpec('reason',kind:InputKind.choice,options:['damage','refused','uncollected','return-to-source']),notesField],scope:true,version:true,cap:64),
   'auction':Operation('auction','حفظ مسودة المزاد','Save auction draft','/api/agent/marketplace/auctions',[
@@ -120,10 +120,10 @@ const operations=<String,Operation>{
     InputSpec('code'),InputSpec('itemsVerified',kind:InputKind.boolean,initial:false)],scope:true,version:true,cap:128),
   'proposal':Operation('proposal','إرسال الاقتراح','Submit proposal','/api/agent/marketplace/proposals',[
     InputSpec('kind',kind:InputKind.choice,options:['product','purchase','improvement']),InputSpec('title'),
-    InputSpec('description',kind:InputKind.longText),InputSpec('supplierId',kind:InputKind.reference,source:'suppliers',required:false),
+    InputSpec('description',kind:InputKind.longText),InputSpec('supplierId',kind:InputKind.reference,source:'proposalSuppliers',required:false),
     InputSpec('estimatedCost',kind:InputKind.number,required:false),InputSpec('currency',required:false)],scope:true,cap:1),
   'reviseProposal':Operation('reviseProposal','إرسال النسخة المعدلة','Submit revision','/api/agent/marketplace/proposals/{id}/revise',[
-    InputSpec('title'),InputSpec('description',kind:InputKind.longText),InputSpec('supplierId',kind:InputKind.reference,source:'suppliers',required:false),
+    InputSpec('title'),InputSpec('description',kind:InputKind.longText),InputSpec('supplierId',kind:InputKind.reference,source:'proposalSuppliers',required:false),
     InputSpec('estimatedCost',kind:InputKind.number,required:false),InputSpec('currency',required:false)],scope:true,version:true,cap:1),
 };
 
@@ -132,6 +132,7 @@ Json prepareBody(Operation op,Json values,Json seed,int? grant,int? actor){
   if(op.key=='profile')body={for(final k in ['gender','dateOfBirth'])k:seed[k],...body};
   if(op.scope)body['delegationId']=grant;
   if(op.version)body['version']=numId(seed['version']);
+  if(op.key=='handover'){body['cashCollected']=seed['cashToCollect'];}
   if(op.key=='prescribe')body['caseId']=numId(seed['caseId']??seed['id']);
   if(op.key=='taskState')body['expectedStatus']=seed['status'];
   if(op.key=='visitState'){
