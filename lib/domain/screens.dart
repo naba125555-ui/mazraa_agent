@@ -57,7 +57,7 @@ const screens=<ScreenSpec>[
   ScreenSpec('T01','تجارتي','My business',Area.trade),
   ScreenSpec('T02','نقطة البيع','Point of sale',Area.trade,cap:34),
   ScreenSpec('T03','مسح رمز','Scan a code',Area.trade),
-  ScreenSpec('T04','المتغير والدفعة','Variant and batch',Area.trade,cap:1),
+  ScreenSpec('T04','المتغير والدفعة','Variant and batch',Area.trade),
   ScreenSpec('T05','مراجعة البيع والدفع','Payment review',Area.trade,cap:34),
   ScreenSpec('T06','فواتير البيع','Sales invoices',Area.trade,cap:1),
   ScreenSpec('T07','الفاتورة والإيصال','Invoice and receipt',Area.trade,cap:1),

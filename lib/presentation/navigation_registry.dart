@@ -129,6 +129,7 @@ abstract final class AgentNavigationRegistry {
           AgentNavItem('P02', 'الاستلام', 'Pickup', Icons.local_shipping_outlined),
           AgentNavItem('A01', 'المزادات', 'Auctions', Icons.gavel_outlined),
           AgentNavItem('T12', 'المشتريات', 'Purchases', Icons.add_shopping_cart_outlined),
+          AgentNavItem('T09', 'عروض الأسعار', 'Quotes', Icons.request_quote_outlined),
           AgentNavItem('T01', 'الفرع', 'Branch', Icons.storefront_outlined),
           AgentNavItem('C01', 'استشاراتي', 'Cases', Icons.medical_services_outlined),
           AgentNavItem('F01', 'مهامي', 'Tasks', Icons.assignment_outlined),

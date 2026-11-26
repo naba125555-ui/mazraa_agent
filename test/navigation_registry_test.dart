@@ -37,7 +37,7 @@ void main() {
       (false,Cap.cash,'N01'),
       (false,Cap.pickup,'P02'),
       (false,Cap.auction,'A01'),
-      (false,Cap.sell,'T01'),
+      (false,Cap.sell,'T09'),
       (false,Cap.purchase,'T12'),
       (false,Cap.transfer,'T01'),
       (false,Cap.sell|Cap.cash,'T02'),
@@ -67,7 +67,7 @@ void main() {
     counter.dispose();
   });
   test('record actions stay on details while ready orders have a dedicated list',(){
-    final app=agentWith(doctor:true,bits:Cap.pickup|Cap.cash);
+    final app=agentWith(doctor:true,bits:Cap.pickup);
     final clinic=AgentNavigationRegistry.resolve(app,AgentWorkspace.clinic);
     expect(clinic.items.any((item)=>item.route=='C04'||item.route=='C09'),isFalse);
     final pickup=AgentNavigationRegistry.resolve(app,AgentWorkspace.pickup);

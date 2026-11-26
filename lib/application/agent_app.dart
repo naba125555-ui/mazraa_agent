@@ -31,6 +31,7 @@ class AgentApp extends ChangeNotifier {
       signedIn &&
       (!spec.doctor || access.doctor) &&
       (spec.cap == 0 || allows(spec.cap)) &&
+      (spec.id != 'T04' || allows(Cap.sell) || allows(Cap.inventory)) &&
       (spec.id != 'C13' || access.dispenser);
   Future<void> initialize()async{
     try{

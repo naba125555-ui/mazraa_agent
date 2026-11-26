@@ -73,7 +73,7 @@ const operations=<String,Operation>{
   'transfer':Operation('transfer','إرسال التحويل','Dispatch stock','/api/agent/commerce/transfers',[
     InputSpec('destinationWarehouseId',kind:InputKind.reference,source:'warehouses'),stockLines,notesField],scope:true,cap:8),
   'receiveTransfer':Operation('receiveTransfer','تأكيد الاستلام الفعلي','Confirm receipt','/api/agent/commerce/transfers/{id}/receive',[
-    stockLines],scope:true,version:true,cap:8),
+    InputSpec('lines',kind:InputKind.lines,mode:'transferReceipt')],scope:true,version:true,cap:8),
   'stockCount':Operation('stockCount','إرسال الجرد للمراجعة','Submit stock count','/api/agent/commerce/stock-counts',[
     InputSpec('lines',kind:InputKind.lines,mode:'count'),reason],scope:true,cap:16),
   'sale':Operation('sale','ترحيل البيع','Post sale','/api/agent/commerce/documents',[
@@ -88,7 +88,7 @@ const operations=<String,Operation>{
   'procurement':Operation('procurement','إرسال طلب الشراء','Submit purchase request','/api/agent/procurement',[
     InputSpec('supplierId',kind:InputKind.reference,source:'suppliers'),purchaseLines,reason],scope:true,cap:4),
   'receivePurchase':Operation('receivePurchase','استلام دفعات الشراء','Receive purchased batches','/api/agent/procurement/{id}/receive',[
-    purchaseLines,InputSpec('paidAmount',kind:InputKind.number),InputSpec('paymentMethod',kind:InputKind.choice,options:['Cash','BankTransfer']),
+    InputSpec('lines',kind:InputKind.lines,mode:'purchaseReceipt'),InputSpec('paidAmount',kind:InputKind.number),InputSpec('paymentMethod',kind:InputKind.choice,options:['Cash','BankTransfer']),
     InputSpec('bankReference',required:false),InputSpec('itemsReceived',kind:InputKind.boolean,initial:false)],scope:true,version:true,cap:36),
   'return':Operation('return','إرسال المرتجع للمراجعة','Submit return','/api/agent/returns',[
     InputSpec('originalDocumentId',kind:InputKind.reference,source:'documents'),InputSpec('lines',kind:InputKind.lines,mode:'return'),reason],scope:true,cap:1),

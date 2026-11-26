@@ -110,7 +110,16 @@ class _OperationPageState extends State<OperationPage>{
         TextButton(onPressed:busy?null:()=>setState((){review=false;if(op.key=='sale'){values['quoteId']=null;quoted=null;}}),child:Text(context.tr('تعديل البيانات','Edit details'))),
       ],
       Offstage(offstage:review,child:Column(children:[for(final field in op.fields.where((f)=>!(op.key=='return'&&widget.id!=null&&f.key=='originalDocumentId')&&!(op.key=='visitState'&&widget.seed['status']=='Scheduled'&&['diagnosis','findings','treatment','recommendations'].contains(f.key))))Padding(padding:const EdgeInsets.only(bottom:15),
-        child:InputControl(spec:field,value:values[field.key],parentValues:values,onChanged:(v)=>setState(()=>values[field.key]=v)))])),
+        child:InputControl(spec:field,value:values[field.key],parentValues:{
+          ...values, '_sourceLines':payload(widget.seed)['lines'],
+          '_batchPurpose':switch (op.key) {
+            'sale' || 'quote' => 'sale',
+            'transfer' => 'transfer',
+            'stockCount' => 'count',
+            'dispense' || 'releasePrescription' => 'dispense',
+            _ => 'inventory',
+          },
+        },onChanged:(v)=>setState(()=>values[field.key]=v)))])),
       if(error!=null)...[Notice(failureText(context,error!),error:true),const SizedBox(height:14)],
       FilledButton.icon(onPressed:!allowed||busy?null:submit,
         icon:busy?const SizedBox.square(dimension:18,child:CircularProgressIndicator(strokeWidth:2)):Icon(review?Icons.verified_outlined:Icons.fact_check_outlined),
@@ -126,7 +135,8 @@ class _OperationPageState extends State<OperationPage>{
 }
 
 class InputControl extends StatelessWidget{
-  const InputControl({super.key,required this.spec,required this.value,required this.onChanged,this.parentValues=const {}});
+  const InputControl({super.key,required this.spec,required this.value,required this.onChanged,this.parentValues=const {},this.onRecordSelected});
+  final ValueChanged<Json>? onRecordSelected;
   final InputSpec spec;final Object? value;final ValueChanged<Object?> onChanged;final Json parentValues;
   @override Widget build(BuildContext context){final f=spec;final title=word(context,f.key);
     switch(f.kind){
@@ -146,8 +156,8 @@ class InputControl extends StatelessWidget{
           if(state.hasError)Text(state.errorText!,style:TextStyle(color:Theme.of(context).colorScheme.error))]));
       case InputKind.reference:return FormField<int>(initialValue:value==null?null:numId(value),validator:(v)=>f.required&&(v??0)<=0?context.tr('اختر السجل','Select a record'):null,
         builder:(state)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[OutlinedButton.icon(onPressed:()async{
-          final result=await chooseReference(context,f.source!,parentValues:parentValues);if(result==null)return;
-          final id=numId(result['id']);state.didChange(id);onChanged(id);
+          final result=await chooseReference(context,f.source!,parentValues:parentValues);if(result==null||!state.mounted)return;
+          final id=numId(result['id']);state.didChange(id);onChanged(id);onRecordSelected?.call(result);
         },icon:const Icon(Icons.search),label:Text(value==null?title:'$title · #$value')),
           if(state.hasError)Text(state.errorText!,style:TextStyle(color:Theme.of(context).colorScheme.error))]));
       case InputKind.lines:return LineItems(mode:f.mode!,value:maps(value),onChanged:onChanged,parentValues:parentValues);
@@ -190,6 +200,7 @@ class _ReferencePickerState extends State<ReferencePicker>{
     'customers' => (path: 'customers', purpose: null),
     'statementCustomers' => (path: 'customers', purpose: 'statement'),
     'warehouses' => (path: 'transfer-destinations', purpose: null),
+    'batches' => (path: 'stock-batches', purpose: str(widget.parentValues['_batchPurpose']).isEmpty ? 'inventory' : str(widget.parentValues['_batchPurpose'])),
     _ => null,
   };
 
@@ -212,10 +223,15 @@ class _ReferencePickerState extends State<ReferencePicker>{
       case 'animals': return app.read('/api/Animals');
       case 'documents': return app.all('/api/agent/commerce/documents', query: app.scoped());
       case 'originalItems': return (await app.record('document', numId(widget.parentValues['originalDocumentId'])))['items'];
-      case 'batches':
-        final stock = await app.all('/api/agent/commerce/inventory', query: app.scoped(), pageSize: 100);
-        return [for (final item in stock) for (final batch in maps(item['batches']))
-          {...batch, 'name': '${batch['batchNumber']} · #${item['productVariantId']}', 'productVariantId': item['productVariantId']}];
+      case 'transferLines':
+        return [for (final line in maps(widget.parentValues['_sourceLines']))
+          if (decimal(line['sent']) > decimal(line['received']) + decimal(line['resolved']))
+            {...line, 'id':line['batchId'], 'name':line['batchNumber'],
+             'remaining':decimal(line['sent'])-decimal(line['received'])-decimal(line['resolved'])}];
+      case 'purchaseLines':
+        return [for (final line in maps(widget.parentValues['_sourceLines']))
+          if (decimal(line['quantity']) > decimal(line['received']))
+            {...line, 'id':line['productVariantId'], 'remaining':decimal(line['quantity'])-decimal(line['received'])}];
       default: return [];
     }
   }
@@ -271,6 +287,9 @@ class _LineItemsState extends State<LineItems>{
     'stock'=>[const InputSpec('batchId',kind:InputKind.reference,source:'batches'),const InputSpec('quantity',kind:InputKind.number)],
     'count'=>[const InputSpec('batchId',kind:InputKind.reference,source:'batches'),const InputSpec('counted',kind:InputKind.number)],
     'prescription'=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'products'),const InputSpec('quantity',kind:InputKind.number),const InputSpec('instructions',kind:InputKind.longText)],
+    'transferReceipt'=>[const InputSpec('batchId',kind:InputKind.reference,source:'transferLines'),const InputSpec('quantity',kind:InputKind.number)],
+    'purchaseReceipt'=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'purchaseLines'),const InputSpec('quantity',kind:InputKind.number),
+      const InputSpec('unitCost',kind:InputKind.number),const InputSpec('batchNumber'),const InputSpec('expiryDate',kind:InputKind.date)],
     'purchase'=>[const InputSpec('productVariantId',kind:InputKind.reference,source:'products'),const InputSpec('quantity',kind:InputKind.number),
       const InputSpec('unitCost',kind:InputKind.number),const InputSpec('batchNumber'),const InputSpec('expiryDate',kind:InputKind.date,required:false)],
     'return'=>[const InputSpec('originalItemId',kind:InputKind.reference,source:'originalItems'),const InputSpec('quantity',kind:InputKind.number)],
@@ -283,14 +302,26 @@ class _LineItemsState extends State<LineItems>{
     final result=await showModalBottomSheet<Json>(context:context,isScrollControlled:true,useSafeArea:true,builder:(c)=>StatefulBuilder(builder:(c,setModal)=>
       Padding(padding:EdgeInsets.fromLTRB(18,0,18,MediaQuery.viewInsetsOf(c).bottom+24),child:SingleChildScrollView(child:Form(key:key,child:Column(mainAxisSize:MainAxisSize.min,children:[
         Heading(c.tr('تفاصيل البند','Line details')),for(final field in fields)Padding(padding:const EdgeInsets.only(bottom:13),child:InputControl(
-          spec:field,value:values[field.key],parentValues:widget.parentValues,onChanged:(v)=>setModal(()=>values[field.key]=v))),
+          spec:field,value:values[field.key],parentValues:widget.parentValues,onChanged:(v)=>setModal(()=>values[field.key]=v),
+          onRecordSelected:field.key=='batchId' ? (row)=>values['productVariantId']=row['productVariantId'] : null,
+        )),
         FilledButton(onPressed:()async{
           if(!key.currentState!.validate())return;key.currentState!.save();
           if(widget.mode=='auction'&&((values['animalId']==null)==(values['productVariantId']==null))){toast(c,c.tr('اختر حيوانًا أو منتجًا واحدًا للبند.','Choose exactly one animal or product.'));return;}
-          if(widget.mode=='stock'){
-            final stock=await context.app.all('/api/agent/commerce/inventory',query:context.app.scoped(),pageSize:100);
-            final item=stock.where((s)=>maps(s['batches']).any((b)=>b['id']==values['batchId'])).firstOrNull;
-            if(item==null)return;values['productVariantId']=item['productVariantId'];
+          if (['stock','transferReceipt'].contains(widget.mode) && numId(values['productVariantId']) <= 0) return;
+          if (['transferReceipt','purchaseReceipt'].contains(widget.mode)) {
+            final transfer = widget.mode=='transferReceipt';
+            final key = transfer ? 'batchId' : 'productVariantId';
+            final source = maps(widget.parentValues['_sourceLines'])
+                .where((line)=>line[key]==values[key]).firstOrNull;
+            final remaining = source == null ? 0.0 : transfer
+                ? decimal(source['sent'])-decimal(source['received'])-decimal(source['resolved'])
+                : decimal(source['quantity'])-decimal(source['received']);
+            if (decimal(values['quantity']) <= 0 || decimal(values['quantity']) > remaining
+                || (!transfer && (decimal(values['unitCost']) < 0 || decimal(values['unitCost']) > decimal(source?['unitCost'])))) {
+              toast(c,c.tr('الكمية أو التكلفة تتجاوز البند المعتمد.', 'Quantity or cost is outside the approved line.'));
+              return;
+            }
           }
           if(c.mounted)Navigator.pop(c,values);
         },child:Text(c.tr('حفظ البند','Save line'))),

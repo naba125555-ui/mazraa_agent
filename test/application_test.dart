@@ -43,6 +43,55 @@ void main(){
     final model=AgentApp(FakeRepository());model.grantId=1;
     final record=await model.record('pickup',1);expect(record['version'],1);expect(obj(record['movement'])['version'],5);model.dispose();
   });
+  test('scoped deep links use a direct read for each record type',()async{
+    final repo=FakeRepository();
+    final app=AgentApp(repo)..grantId=1;
+    const scoped={
+      'prescription':'/api/vet/prescriptions/1',
+      'document':'/api/agent/commercial/documents/1/receipt',
+      'stock':'/api/agent/commerce/inventory/1',
+      'transfer':'/api/agent/commerce/transfers/1',
+      'procurement':'/api/agent/procurement/1',
+      'pickup':'/api/agent/pickup/requests/1',
+      'auction':'/api/agent/marketplace/auctions/1',
+      'proposal':'/api/agent/marketplace/proposals/1',
+      'settlement':'/api/agent/finance/settlements/1',
+    };
+    const practitioner={
+      'case':'/api/vet/cases/1',
+      'task':'/api/agent/field/tasks/1',
+      'visit':'/api/agent/field/visits/1',
+      'campaign':'/api/agent/field/campaigns/1/report',
+    };
+    for(final entry in {...scoped,...practitioner}.entries){
+      final record=await app.record(entry.key,1);
+      expect(record,isNotEmpty,reason:entry.key);
+      expect(repo.reads.last['path'],entry.value);
+      expect(obj(repo.reads.last['query'])['delegationId'],scoped.containsKey(entry.key)?1:null);
+    }
+    expect(repo.reads.length,scoped.length+practitioner.length);
+    app.dispose();
+  });
+
+  test('every declared operation reaches the repository with scope, method and request ID',()async{
+    final repo=FakeRepository();
+    final app=AgentApp(repo);
+    expect(operations,hasLength(45));
+    for(final operation in operations.values){
+      final body=prepareBody(operation,{}, {'id':8,'version':4,'cashToCollect':0}, 2, 10);
+      final path=operation.path.replaceAll('{id}','8');
+      await app.execute(path,body,method:operation.method);
+      final write=repo.writes.last;
+      expect(write['path'],path,reason:operation.key);
+      expect(write['method'],operation.method);
+      expect(obj(write['body'])['requestId'],isNotEmpty);
+      if(operation.scope&&operation.key!='receivePurchase') expect(body['delegationId'],2);
+      if(operation.version) expect(body['version'],4);
+    }
+    expect(repo.writes.map((write)=>obj(write['body'])['requestId']).toSet(),hasLength(45));
+    expect(await app.pending(),isEmpty);
+    app.dispose();
+  });
   test('local clinical sync removes only server-confirmed notes',()async{
     final model=AgentApp(FakeRepository());await model.saveNote({'caseId':1,'body':'A note','sharedWithCustomer':false});
     expect(await model.notes(),hasLength(1));await model.syncNotes();expect(await model.notes(),isEmpty);model.dispose();

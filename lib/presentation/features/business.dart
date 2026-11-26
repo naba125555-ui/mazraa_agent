@@ -29,7 +29,13 @@ class BusinessPage extends StatelessWidget{
     if(screen=='T02')return const PointOfSale();
     if(screen=='N08')return const BusinessInsights();
     if(screen=='N05')return const AccountStatement();
-    if(screen=='N06')return _RemoteList('/api/agent/finance/journals',query:app.scoped());
+    if(screen=='N06') return PagedRecords(
+      load: (afterId) async => [
+        for (final row in await app.page('/api/agent/finance/journals',afterId:afterId,query:app.scoped()))
+          {...row,'id':row['journalEntryId']},
+      ],
+      itemBuilder: (row) => Padding(padding: const EdgeInsets.only(bottom:10),child:RecordDetails(row)),
+    );
     if(screen=='I05')return const StockAlerts();
     if(screen=='I10')return Resource(load:app.changes,builder:(data,r)=>PageBody(children:[
       Notice(context.tr('تُعتمد فروق الجرد بواسطة مراجع مستقل. تتحدث الحالة من سجل العمليات.','Stock differences require an independent reviewer. Status follows the operation record.')),
@@ -180,7 +186,14 @@ class BusinessPage extends StatelessWidget{
       screen=='T13'?'procurement':screen=='N07'?'settlement':'document';
     final actualKind=screen=='I08'?'transfer':screen=='T04'?'variant':kind;
     return Resource(identity:'$screen:$id:${app.revision}',load:()async{
-      if(actualKind=='variant')return app.variant(id!);
+      if(actualKind=='variant') {
+        final variant=await app.variant(id!);
+        if(!app.allows(Cap.sell)) return variant;
+        final stock=await app.cursorPage('/api/agent/directory/sale-stock',
+          query:app.scoped({'productVariantId':id}));
+        final batches=stock.items.expand((row)=>maps(row['batches'])).toList();
+        return {...variant,'batches':batches};
+      }
       final data=await app.record(actualKind,id!,fresh:true);
       if(actualKind!='stock')return data;
       try {
@@ -228,7 +241,7 @@ class BusinessPage extends StatelessWidget{
         final pending = row['status'] == 'Draft';
         final active = row['status'] == 'Active';
         final operationsForRecord = <String, String>{
-          if (pending && movement.isEmpty && row['orderId'] != null) 'P04': 'custody',
+          if (pending && movement.isEmpty && row['orderStatus']=='Processing') 'P04': 'custody',
           if (active && movement['status'] == 'Active') 'P05': 'shelf',
           if (row['canComplete'] == true) 'P06': 'handover',
           if (active) 'P07': 'pickupIssue',
@@ -239,6 +252,10 @@ class BusinessPage extends StatelessWidget{
             Notice(row['requiresCash'] == true && row['cashShiftReady'] != true
               ? context.tr('يتطلب التحصيل صندوقًا مفوّضًا ووردية مفتوحة.', 'Cash collection requires an assigned cashbox and open shift.')
               : context.tr('الإجراء غير متاح لحالة هذا الطلب.', 'This action is unavailable for the current order status.'))]);
+          if (screen=='P06' && row['codeIssued'] != true) return PageBody(children: [
+            Notice(context.tr('اطلب من العميل إصدار رمز صالح للتسليم، ثم حدّث الطلب.', 'Ask the customer to issue a valid code, then refresh the order.')),
+            OutlinedButton(onPressed:refresh,child:Text(context.tr('تحديث حالة الرمز','Refresh code status'))),
+          ]);
           final actionSeed = screen=='P05' ? {...row, 'version': movement['version']} : row;
           return OperationPage(embedded:true,operation:operations[action]!,id:id,seed:actionSeed);
         }
@@ -395,14 +412,6 @@ class _RecordSelector extends StatelessWidget {
   }
 }
 
-class _RemoteList extends StatelessWidget{
-  const _RemoteList(this.path,{this.query,this.onTap});final String path;final Json? query;
-  final void Function(Json)? onTap;
-  @override Widget build(BuildContext context)=>Resource(load:()=>context.app.read(path,query:query),builder:(data,refresh){
-    final list=rows(data);
-    return PageBody(children:[if(list.isEmpty)const Empty(),for(final row in list)Padding(padding:const EdgeInsets.only(bottom:12),child:onTap==null?RecordDetails(payload(row)):RecordTile(row,onTap:()=>onTap!(row)))]);
-  });
-}
 class _EmbeddedRecords extends StatelessWidget{
   const _EmbeddedRecords({super.key,required this.load});final Future<dynamic> Function() load;
   @override Widget build(BuildContext context)=>Resource(embedded:true,load:load,builder:(data,refresh)=>Column(children:[
@@ -464,7 +473,11 @@ class _PointOfSaleState extends State<PointOfSale> {
     if(batch==null||!mounted)return;
     final variantId=numId(stock['productVariantId']);
     final basket=context.app.basket;
-    final existing=basket.where((line)=>line['productVariantId']==variantId&&line['batchId']==batch['id']).firstOrNull;
+    final existing=basket.where((line)=>line['productVariantId']==variantId).firstOrNull;
+    if (existing!=null && existing['batchId']!=batch['id']) {
+      toast(context,context.tr('اختر دفعة واحدة لكل صنف في الفاتورة.', 'Choose one batch per product on this invoice.'));
+      return;
+    }
     final line=existing??{
       'productVariantId':variantId,'batchId':batch['id'],'quantity':0,
       'name':titleOf(variant),'unitPrice':variant['salePrice']??variant['price'],'batchNumber':batch['batchNumber'],
@@ -523,25 +536,23 @@ class _PointOfSaleState extends State<PointOfSale> {
     final count=app.basket.fold(0.0,(total,line)=>total+decimal(line['quantity']));
     final subtotal=app.basket.fold(0.0,(total,line)=>total+decimal(line['quantity'])*decimal(line['unitPrice']));
     return Column(children:[
+      Padding(padding:const EdgeInsets.symmetric(horizontal:18), child:TextField(
+        controller:searchController,textInputAction:TextInputAction.search,
+        decoration:InputDecoration(prefixIcon:const Icon(Icons.search),
+          hintText:context.tr('اسم الصنف أو رمزه','Product name or SKU'),
+          suffixIcon:IconButton(tooltip:context.tr('مسح رمز','Scan code'),
+            icon:const Icon(Icons.qr_code_scanner),onPressed:()=>context.open('T03'))),
+        onChanged:(value){if(value.isEmpty)setState(()=>search='');},
+        onSubmitted:(value)=>setState(()=>search=value.trim()),
+      )),
+      const SizedBox(height:8),
       Expanded(child:PagedRecords(
-        key:ValueKey('pos:${app.grantId}:${app.revision}'),
-        pageSize:100,
-        load:(cursor)=>app.page('/api/agent/commerce/inventory',query:app.scoped(),afterId:cursor),
-        include:(row)=>decimal(row['availableQuantity'])>0,
+        key:ValueKey('pos:${app.grantId}:${app.revision}:$search'),
+        loadPage:(cursor)=>app.cursorPage('/api/agent/directory/sale-stock',
+          query:app.scoped({if(search.isNotEmpty)'search':search}), afterId:cursor),
         header:[
           SectionBanner(art:SectionArt.commerce,icon:Icons.point_of_sale_outlined,
             title:context.tr('البيع من مخزنك','Sell from your inventory')),
-          const SizedBox(height:12),
-          TextField(controller:searchController,textInputAction:TextInputAction.search,
-            decoration:InputDecoration(prefixIcon:const Icon(Icons.search),
-              hintText:context.tr('اسم الصنف أو رمزه','Product name or SKU'),
-              suffixIcon:IconButton(tooltip:context.tr('مسح رمز','Scan code'),
-                icon:const Icon(Icons.qr_code_scanner),onPressed:()=>context.open('T03'))),
-            onChanged:(value){
-              if(value.isEmpty)setState(()=>search='');
-            },
-            onSubmitted:(value)=>setState(()=>search=value.trim().toLowerCase()),
-          ),
           const SizedBox(height:12),
         ],
         itemBuilder:(stock){
@@ -558,8 +569,7 @@ class _PointOfSaleState extends State<PointOfSale> {
                 return snapshot.connectionState==ConnectionState.done?const SizedBox.shrink():
                   const Padding(padding:EdgeInsets.all(14),child:LinearProgressIndicator());
               }
-              if(product['isAvailable']==false||
-                 !'${titleOf(product)} ${str(product['sku'])}'.toLowerCase().contains(search)){
+              if(product['isAvailable']==false){
                 return const SizedBox.shrink();
               }
               return RecordTile(product,imageUrl:productImage(product),icon:Icons.add_shopping_cart,
@@ -590,16 +600,20 @@ class BusinessInsights extends StatefulWidget{
 class _BusinessInsightsState extends State<BusinessInsights>{
   int days=30;String? currency;
   @override Widget build(BuildContext context){final app=context.app,c=Theme.of(context).colorScheme;
-    return Resource(identity:app.revision,load:()=>app.all('/api/agent/commerce/documents',query:app.scoped()),builder:(data,refresh){
+    final now=DateTime.now().toUtc();
+    final before=DateTime.utc(now.year,now.month,now.day+1);
+    final from=before.subtract(Duration(days:days));
+    return Resource(identity:'report:$days:${app.revision}',load:()=>app.all('/api/agent/commerce/documents',query:app.scoped({
+      'postedFrom':from.toIso8601String(),'postedBefore':before.toIso8601String(),
+    })),builder:(data,refresh){
       final all=rows(data),currencies=all.map((d)=>str(d['currency'])).where((v)=>v.isNotEmpty).toSet().toList()..sort();
-      final current=currency??(currencies.contains(app.currency)?app.currency:currencies.firstOrNull);
-      final cutoff=DateTime.now().toUtc().subtract(Duration(days:days));
-      final documents=all.where((d)=>d['isPosted']==true&&d['currency']==current&&(DateTime.tryParse(str(d['postedAt']))?.isAfter(cutoff)??false)).toList();
+      final current=currencies.contains(currency)?currency:(currencies.contains(app.currency)?app.currency:currencies.firstOrNull);
+      final documents=all.where((d)=>d['isPosted']==true&&d['currency']==current).toList();
       double amount(String type)=>documents.where((d)=>d['type']==type).fold(0,(s,d)=>s+decimal(d['totalAmount']));
       final sales=amount('SalesInvoice')-amount('SalesReturn'),purchases=amount('PurchaseInvoice')-amount('PurchaseReturn');
       final daily=<ChartValue>[];
-      for(var i=6;i>=0;i--){final date=DateTime.now().subtract(Duration(days:i));final total=documents.where((d){
-        final t=DateTime.tryParse(str(d['postedAt']))?.toLocal();return d['type']=='SalesInvoice'&&t!=null&&t.year==date.year&&t.month==date.month&&t.day==date.day;}).fold(0.0,(s,d)=>s+decimal(d['totalAmount']));
+      for(var i=6;i>=0;i--){final date=before.subtract(Duration(days:i+1));final total=documents.where((d){
+        final t=DateTime.tryParse(str(d['postedAt']))?.toUtc();return d['type']=='SalesInvoice'&&t!=null&&t.year==date.year&&t.month==date.month&&t.day==date.day;}).fold(0.0,(s,d)=>s+decimal(d['totalAmount']));
         daily.add(ChartValue('${date.day}/${date.month}',total,c.primary));}
       return PageBody(children:[Wrap(spacing:8,runSpacing:8,children:[for(final period in [7,30,90])ChoiceChip(label:Text('${display(context,period)} ${context.tr('يوم','days')}'),selected:days==period,onSelected:(_)=>setState(()=>days=period))]),
         if(currencies.isNotEmpty)DropdownButton<String>(value:current,items:[for(final code in currencies)DropdownMenuItem(value:code,child:Text(code))],onChanged:(v)=>setState(()=>currency=v)),

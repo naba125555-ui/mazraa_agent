@@ -38,6 +38,8 @@ class FakeRepository implements AgentRepository {
     if (responses.containsKey(path)) return responses[path];
     if(numId(query?['afterId'])>0)return [];
     if(path.startsWith('/api/agent/operations/insights/')) return insight(path.split('/').last);
+    if(path=='/api/agent/directory/sale-stock')return {'items':[stock],'hasMore':false};
+    if(path=='/api/agent/directory/stock-batches')return {'items':[for(final b in maps(stock['batches'])) {...b,'productVariantId':1}],'hasMore':false};
     final directory = path.startsWith('/api/agent/directory/');
     if (directory) return {'items': [{'id': 1, 'name': 'Test record'}], 'hasMore': false};
     if(path=='/api/agent/commerce/inventory/1')return stock;
@@ -49,7 +51,7 @@ class FakeRepository implements AgentRepository {
     if(path=='/api/agent/field/visits/1')return {...maps(task['visits']).single,'taskId':1,'taskStatus':'Accepted'};
     if(path=='/api/agent/field/visits')return {'items':[{'id':1,'taskId':1,'taskTitle':'Visit','status':'Scheduled'}],'hasMore':false};
     if(path=='/api/agent/pickup/requests/1')return {'id':1,'version':1,'status':'Active','orderId':1,'paymentStatus':'Paid','cashToCollect':0,
-      'currency':'SAR','canComplete':true,'requiresCash':false,'movement':{'id':2,'version':5,'shelf':'A-1','status':'Active'}};
+      'currency':'SAR','canComplete':true,'requiresCash':false,'codeIssued':true,'movement':{'id':2,'version':5,'shelf':'A-1','status':'Active'}};
     if(path=='/api/agent/marketplace/auctions/1')return {'auction':{'id':1,'title':'مزاد المنتجات','status':'Active','items':[]},
       'review':{'id':2,'relatedId':1,'version':1,'status':'Completed','details':{}},'version':1};
     if(path=='/api/agent/commercial/quotes')return {'items':[],'hasMore':false};
