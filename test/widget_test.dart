@@ -409,6 +409,69 @@ void main(){
     app.dispose();
   });
 
+  testWidgets('The main warehouse grant opens both auction pickers and reloads POS after a scope switch', (tester) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final app = fixture('en', 'light');
+    final repo = app.repo as FakeRepository;
+    app.access = Access.from({
+      ...app.bootstrap,
+      'delegations': [
+        ...maps(app.bootstrap['delegations']),
+        {'id': 3, 'warehouseId': 1, 'storeId': 2, 'capabilities': Cap.auction | Cap.sell | Cap.cash},
+      ],
+    }, {});
+    const products = '/api/agent/marketplace/auction-products';
+    const animals = '/api/agent/marketplace/auction-animals';
+    repo.responses[products] = {'items': [{'id': 42, 'name': 'Organic fertiliser', 'sku': 'F42'}], 'hasMore': false};
+    repo.responses[animals] = {'items': [{'id': 81, 'name': 'Demo goat', 'species': 'Goat'}], 'hasMore': false};
+    await tester.pumpWidget(host(app, const AppShell()));
+    await tester.pumpAndSettle();
+
+    app.selectGrant(3);
+    await tester.pumpAndSettle();
+    tester.element(find.byType(ScreenPage).first).open('A03');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add item'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Choose a warehouse item'));
+    await tester.pumpAndSettle();
+    expect(find.text('Items in warehouse 1'), findsOneWidget);
+    await tester.tap(find.text('Organic fertiliser'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose a warehouse item · #42'), findsOneWidget);
+    expect(obj(repo.reads.lastWhere((r) => r['path'] == products)['query'])['delegationId'], 3);
+
+    await tester.tap(find.text('Choose one of your animals'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Demo goat'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose one of your animals · #81'), findsOneWidget);
+    expect(find.text('Choose a warehouse item · #42'), findsNothing);
+    expect(obj(repo.reads.lastWhere((r) => r['path'] == animals)['query'])['delegationId'], 3);
+    await tester.tap(find.byTooltip('Clear selection'));
+    await tester.pumpAndSettle();
+    repo.responses[animals] = {'items': [], 'hasMore': false};
+    await tester.tap(find.text('Choose one of your animals'));
+    await tester.pumpAndSettle();
+    expect(find.text('You have no registered animals available for auction.'), findsOneWidget);
+    final picker = find.byType(ReferencePicker);
+    Navigator.of(tester.element(picker)).pop();
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.text('Line details'))).pop();
+    await tester.pumpAndSettle();
+
+    tester.element(find.byType(ScreenPage).last).open('T02');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('pos-item-1')), findsOneWidget);
+    expect(obj(repo.reads.lastWhere((r) => r['path'] == '/api/agent/directory/sale-stock')['query'])['delegationId'], 3);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    app.dispose();
+  });
+
   testWidgets('A failed variant image loads the product image next', (tester) async {
     final urls = productImages({
       'variantImageUrl': '/images/productitems/missing.webp',
