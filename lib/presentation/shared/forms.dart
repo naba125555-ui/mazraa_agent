@@ -166,7 +166,11 @@ class InputControl extends StatelessWidget{
   const InputControl({super.key,required this.spec,required this.value,required this.onChanged,this.parentValues=const {},this.onRecordSelected});
   final ValueChanged<Json>? onRecordSelected;
   final InputSpec spec;final Object? value;final ValueChanged<Object?> onChanged;final Json parentValues;
-  @override Widget build(BuildContext context){final f=spec;final title=word(context,f.key);
+  @override Widget build(BuildContext context){final f=spec;final title=switch(f.source){
+      'auctionProducts'=>context.tr('اختر صنفًا من المخزن','Choose a warehouse item'),
+      'auctionAnimals'=>context.tr('اختر حيوانًا من حسابك','Choose one of your animals'),
+      _=>word(context,f.key),
+    };
     switch(f.kind){
       case InputKind.boolean:return SwitchListTile.adaptive(contentPadding:const EdgeInsets.symmetric(horizontal:10),
         title:Text(title),value:value==true,onChanged:onChanged);
@@ -240,6 +244,14 @@ class _ReferencePickerState extends State<ReferencePicker>{
     _ => null,
   };
 
+  String? emptyAuctionMessage(BuildContext context) {
+    if (auctionDirectory == null) return null;
+    if (search.isNotEmpty) return context.tr('لا توجد نتائج مطابقة. جرّب اسمًا آخر.', 'No matching results. Try another name.');
+    return widget.source == 'auctionAnimals'
+        ? context.tr('لا توجد حيوانات مسجّلة باسمك ومتاحة للمزاد.', 'You have no registered animals available for auction.')
+        : context.tr('لا توجد أصناف متاحة للمزاد في هذا المخزن.', 'This warehouse has no items available for auction.');
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -279,16 +291,29 @@ class _ReferencePickerState extends State<ReferencePicker>{
     }
     final remote = directory;
     final auction = auctionDirectory;
+    if (auction != null && !app.allows(Cap.auction)) {
+      return PageBody(children: [Notice(context.tr(
+        'هذا المخزن لا يتضمن تفويض المزاد. اختر مخزنًا مفوّضًا أو حدّث الصلاحيات.',
+        'This warehouse has no auction authorization. Switch to an authorized warehouse or refresh access.',
+      ))]);
+    }
     final endpoint = auction != null ? '/api/agent/marketplace/$auction'
         : remote == null ? null : '/api/agent/directory/${remote.path}';
     Widget tile(Json row) => RecordTile(row, onTap: () => Navigator.pop(context, row),
       imageUrls: productImages(row), subtitle: str(row['sku'] ?? row['code'] ?? row['species']));
     return Column(children: [
+      if (auction != null) Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+        child: Heading(widget.source == 'auctionAnimals'
+          ? context.tr('حيواناتي المتاحة للمزاد','My animals available for auction')
+          : context.tr('أصناف المخزن رقم ${app.grant!.warehouse}','Items in warehouse ${app.grant!.warehouse}')),
+      ),
       Padding(padding: const EdgeInsets.all(16), child: TextField(
-        decoration: InputDecoration(prefixIcon: const Icon(Icons.search),
+        decoration: InputDecoration(prefixIcon: const Icon(Icons.search), counterText: '',
           hintText: widget.source == 'customers'
               ? context.tr('الاسم أو الهاتف أو البريد الكامل', 'Name or exact phone or email')
               : context.tr('ابحث بالاسم', 'Search by name')),
+        maxLength: auction == null ? null : 100,
         onChanged: (text) {
           debounce?.cancel();
           debounce = Timer(const Duration(milliseconds: 240), () {
@@ -299,6 +324,7 @@ class _ReferencePickerState extends State<ReferencePicker>{
       Expanded(child: endpoint != null
         ? PagedRecords(
           key: ValueKey('${widget.source}:$search'),
+          emptyText: emptyAuctionMessage(context),
           loadPage: (afterId) => app.cursorPage(endpoint,
             afterId: afterId, query: app.scoped({
               if (search.isNotEmpty) 'search': search,
@@ -340,7 +366,13 @@ class _LineItemsState extends State<LineItems>{
     final result=await showModalBottomSheet<Json>(context:context,isScrollControlled:true,useSafeArea:true,builder:(c)=>StatefulBuilder(builder:(c,setModal)=>
       Padding(padding:EdgeInsets.fromLTRB(18,0,18,MediaQuery.viewInsetsOf(c).bottom+24),child:SingleChildScrollView(child:Form(key:key,child:Column(mainAxisSize:MainAxisSize.min,children:[
         Heading(c.tr('تفاصيل البند','Line details')),for(final field in fields)Padding(padding:const EdgeInsets.only(bottom:13),child:InputControl(
-          spec:field,value:values[field.key],parentValues:widget.parentValues,onChanged:(v)=>setModal(()=>values[field.key]=v),
+          spec:field,value:values[field.key],parentValues:widget.parentValues,onChanged:(v)=>setModal((){
+            values[field.key]=v;
+            if(widget.mode=='auction'&&v!=null){
+              if(field.key=='animalId') values.remove('productVariantId');
+              if(field.key=='productVariantId') values.remove('animalId');
+            }
+          }),
           onRecordSelected:field.key=='batchId' ? (row)=>values['productVariantId']=row['productVariantId'] : null,
         )),
         FilledButton(onPressed:()async{

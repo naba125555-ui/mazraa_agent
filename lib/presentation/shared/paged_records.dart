@@ -13,6 +13,7 @@ class PagedRecords extends StatefulWidget {
     this.header = const [],
     this.pageSize = 50,
     this.include,
+    this.emptyText,
   }) : assert((load == null) != (loadPage == null));
 
   final Future<List<Json>> Function(int afterId)? load;
@@ -21,6 +22,7 @@ class PagedRecords extends StatefulWidget {
   final List<Widget> header;
   final int pageSize;
   final bool Function(Json row)? include;
+  final String? emptyText;
 
   @override
   State<PagedRecords> createState() => _PagedRecordsState();
@@ -131,7 +133,7 @@ class _PagedRecordsState extends State<PagedRecords> {
         child: Text(context.tr('عرض المزيد', 'Load more')),
       ));
     }
-    return records.isEmpty ? const Empty() : const SizedBox.shrink();
+    return records.isEmpty ? Empty(text: widget.emptyText) : const SizedBox.shrink();
   }
 
   @override

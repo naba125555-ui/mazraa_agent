@@ -583,11 +583,15 @@ class _PointOfSaleState extends State<PointOfSale> {
       const SizedBox(height:8),
       Expanded(child:PagedRecords(
         key:ValueKey('pos:${app.grantId}:${app.revision}:$search'),
+        emptyText:search.isEmpty
+          ?context.tr('لا توجد أصناف صالحة للبيع في المخزن المحدد.','The selected warehouse has no items available for sale.')
+          :context.tr('لا توجد أصناف مطابقة للبحث.','No sale items match the search.'),
         loadPage:(cursor)=>app.cursorPage('/api/agent/directory/sale-stock',
           query:app.scoped({if(search.isNotEmpty)'search':search}),afterId:cursor),
         header:[
           SectionBanner(art:SectionArt.commerce,icon:Icons.point_of_sale_outlined,
-            title:context.tr('أصناف البيع','Items for sale')),
+            title:context.tr('أصناف البيع','Items for sale'),
+            subtitle:context.tr('المخزن رقم ${app.grant?.warehouse ?? "—"}','Warehouse ${app.grant?.warehouse ?? "—"}')),
           const SizedBox(height:12),
         ],
         itemBuilder:(stock) {
